@@ -208,3 +208,86 @@
     background: var(--color-ice-100);
 
 }
+/* ==========================================
+   Header
+========================================== */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header-inner {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.logo {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+  color: var(--color-charcoal);
+}
+
+.main-nav {
+  display: none;
+  align-items: center;
+  gap: var(--space-xl);
+  color: var(--color-grey-600);
+  font-weight: 600;
+}
+
+.header-cta {
+  display: none;
+}
+
+/* ==========================================
+   Homepage hero
+========================================== */
+
+.hero-home {
+  background:
+    radial-gradient(circle at top right, var(--color-ice-200), transparent 34%),
+    linear-gradient(180deg, var(--color-white), var(--color-grey-50));
+}
+
+.hero-grid {
+  display: grid;
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+.hero-content {
+  max-width: 760px;
+}
+
+.hero-content h1 {
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.hero-panel {
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.hero-panel h2 {
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-2xl);
+}
