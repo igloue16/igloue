@@ -1,60 +1,220 @@
 <!doctype html>
 <html lang="fr">
+
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IGLOUE | Confort climatique premium</title>
-  <meta name="description" content="IGLOUE propose des solutions premium de confort climatique : location de climatisation mobile, installation de clim fixe et pompes à chaleur.">
-  <link rel="stylesheet" href="assets/css/main.css">
+
+    <meta charset="utf-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>IGLOUE | Location de climatiseurs mobiles en Charente</title>
+
+    <meta name="description"
+        content="Louez un climatiseur mobile en Charente (16). Livraison aller-retour, installation en option et réservation simple avec IGLOUE.">
+
+    <link rel="stylesheet" href="assets/css/main.css">
+
 </head>
 
 <body>
-  <header class="site-header">
-    <div class="container header-inner">
-      <a href="/" class="logo" aria-label="IGLOUE accueil">
-        IGLOUE
-      </a>
 
-      <nav class="main-nav" aria-label="Navigation principale">
-        <a href="#services">Services</a>
-        <a href="#pricing">Tarifs</a>
-        <a href="#about">À propos</a>
-        <a href="#contact">Contact</a>
-      </nav>
+    <header class="site-header">
 
-      <a href="#contact" class="btn btn-primary header-cta">
-        Réserver
-      </a>
-    </div>
-  </header>
+        <div class="container header-inner">
 
-  <main>
-    <section class="hero hero-home">
-      <div class="container hero-grid">
-        <div class="hero-content">
-          <span class="eyebrow">Confort climatique premium</span>
+            <a href="/" class="logo">
 
-          <h1>Restez au frais. Restez confortable.</h1>
+                IGLOUE
 
-          <p class="lead">
-            IGLOUE prépare une nouvelle façon de louer, installer et gérer vos solutions de climatisation en France.
-          </p>
+            </a>
 
-          <div class="hero-actions">
-            <a href="#contact" class="btn btn-primary">Demander une disponibilité</a>
-            <a href="#services" class="btn btn-secondary">Découvrir les services</a>
-          </div>
+            <nav class="main-nav">
+
+                <a href="#location">Location</a>
+
+                <a href="#fonctionnement">Comment ça marche</a>
+
+                <a href="#livraison">Livraison</a>
+
+                <a href="#faq">FAQ</a>
+
+                <a href="#contact">Contact</a>
+
+            </nav>
+
+            <a href="#postcode" class="btn btn-primary header-cta">
+
+                Vérifier ma zone
+
+            </a>
+
         </div>
 
-        <div class="hero-panel glass">
-          <span class="badge">Phase de lancement</span>
-          <h2>Location. Installation. Sérénité.</h2>
-          <p>
-            Une plateforme pensée pour les réservations, paiements, contrats et suivi client — construite étape par étape.
-          </p>
-        </div>
-      </div>
-    </section>
-  </main>
+    </header>
+
+    <main>
+
+        <section class="hero hero-home">
+
+            <div class="container hero-grid">
+
+                <div class="hero-content">
+
+                    <span class="eyebrow">
+
+                        Location de climatiseurs mobiles • Charente (16)
+
+                    </span>
+
+                    <h1>
+
+                        Restez au frais cet été.
+
+                    </h1>
+
+                    <p class="lead">
+
+                        Louez un climatiseur mobile premium avec livraison aller-retour
+                        dans toute la Charente.
+                        Installation possible dans la pièce de votre choix.
+
+                    </p>
+
+                    <div class="hero-actions">
+
+                        <a href="#postcode" class="btn btn-primary">
+
+                            Vérifier ma livraison
+
+                        </a>
+
+                        <a href="#location" class="btn btn-secondary">
+
+                            Voir les climatiseurs
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+                <div class="hero-panel glass">
+
+                    <span class="badge">
+
+                        À partir de
+
+                    </span>
+
+                    <h2>
+
+                        19 € / semaine
+
+                    </h2>
+
+                    <p>
+
+                        soit environ 2,71 € / jour
+
+                    </p>
+
+                    <hr class="divider">
+
+                    <p>
+
+                        Livraison + reprise
+
+                    </p>
+
+                    <strong>
+
+                        à partir de 15,99 €
+
+                    </strong>
+
+                    <p>
+
+                        Mise en service (option)
+
+                    </p>
+
+                    <strong>
+
+                        9,99 €
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <section id="postcode" class="section-sm">
+
+            <div class="container">
+
+                <div class="delivery-checker card">
+
+                    <span class="eyebrow">
+
+                        Livraison en Charente
+
+                    </span>
+
+                    <h2>
+
+                        Vérifiez votre zone de livraison
+
+                    </h2>
+
+                    <p>
+
+                        Entrez votre code postal pour connaître :
+
+                    </p>
+
+                    <ul>
+
+                        <li>✓ votre zone</li>
+
+                        <li>✓ votre tarif de livraison aller-retour</li>
+
+                        <li>✓ le coût de la première semaine</li>
+
+                    </ul>
+
+                    <form data-delivery-form class="delivery-form">
+
+                        <input
+                            data-postcode-input
+                            type="text"
+                            maxlength="5"
+                            placeholder="16000"
+                            required>
+
+                        <button
+                            class="btn btn-primary"
+                            type="submit">
+
+                            Vérifier
+
+                        </button>
+
+                    </form>
+
+                    <div data-delivery-result></div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <script src="assets/js/delivery-zones.js"></script>
+
 </body>
+
 </html>
