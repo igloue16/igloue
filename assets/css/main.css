@@ -1,4 +1,7 @@
-/* Main stylesheet */
+/* =========================================================
+   IGLOUE Main Stylesheet
+   Imports the full CSS architecture in the correct order.
+   ========================================================= */
 
 @import url("variables.css");
 @import url("reset.css");
