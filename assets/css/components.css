@@ -1,1 +1,210 @@
-/* Buttons, cards, navigation, forms and reusable UI */
+/* =========================================================
+   IGLOUE Components
+   Buttons, cards, badges and reusable UI elements
+   ========================================================= */
+
+
+/* ==========================================
+   Primary Button
+========================================== */
+
+.btn {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: var(--space-sm);
+
+    padding: 0.95rem 1.6rem;
+
+    border-radius: var(--radius-pill);
+
+    font-family: var(--font-body);
+
+    font-weight: 600;
+
+    transition: all var(--transition-normal);
+
+    cursor: pointer;
+
+}
+
+
+/* Blue button */
+
+.btn-primary {
+
+    background: var(--color-blue-500);
+
+    color: var(--color-white);
+
+    box-shadow: var(--shadow-sm);
+
+}
+
+.btn-primary:hover {
+
+    background: var(--color-blue-600);
+
+    transform: translateY(-2px);
+
+}
+
+
+/* White button */
+
+.btn-secondary {
+
+    background: var(--color-white);
+
+    color: var(--color-blue-600);
+
+    border: 1px solid var(--color-border);
+
+}
+
+.btn-secondary:hover {
+
+    box-shadow: var(--shadow-sm);
+
+}
+
+
+/* ==========================================
+   Card
+========================================== */
+
+.card {
+
+    background: var(--color-white);
+
+    border-radius: var(--radius-lg);
+
+    padding: var(--space-xl);
+
+    box-shadow: var(--shadow-sm);
+
+    transition: all var(--transition-normal);
+
+}
+
+.card:hover {
+
+    transform: translateY(-6px);
+
+    box-shadow: var(--shadow-md);
+
+}
+
+
+/* ==========================================
+   Badge
+========================================== */
+
+.badge {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: .45rem .85rem;
+
+    border-radius: var(--radius-pill);
+
+    background: var(--color-ice-100);
+
+    color: var(--color-blue-600);
+
+    font-size: var(--text-sm);
+
+    font-weight: 700;
+
+}
+
+
+/* ==========================================
+   Divider
+========================================== */
+
+.divider {
+
+    width: 100%;
+
+    height: 1px;
+
+    background: var(--color-border);
+
+}
+
+
+/* ==========================================
+   Section title
+========================================== */
+
+.section-title {
+
+    margin-bottom: var(--space-md);
+
+}
+
+.section-description {
+
+    margin-bottom: var(--space-xl);
+
+}
+
+
+/* ==========================================
+   Image
+========================================== */
+
+.image-rounded {
+
+    border-radius: var(--radius-lg);
+
+    overflow: hidden;
+
+}
+
+
+/* ==========================================
+   Glass panel
+========================================== */
+
+.glass {
+
+    background: rgba(255,255,255,.7);
+
+    backdrop-filter: blur(14px);
+
+    border-radius: var(--radius-lg);
+
+    border: 1px solid rgba(255,255,255,.35);
+
+}
+
+
+/* ==========================================
+   Icon Circle
+========================================== */
+
+.icon-circle {
+
+    width: 70px;
+
+    height: 70px;
+
+    border-radius: 50%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background: var(--color-ice-100);
+
+}
