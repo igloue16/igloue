@@ -1,277 +1,153 @@
 <!doctype html>
 <html lang="fr">
-
 <head>
-
-    <meta charset="utf-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <title>IGLOUE | Location de climatiseurs mobiles en Charente</title>
-
-    <meta name="description"
-        content="Louez un climatiseur mobile en Charente (16). Livraison aller-retour, installation en option et réservation simple avec IGLOUE.">
-
-    <link rel="stylesheet" href="assets/css/main.css">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IGLOUE | Location de climatiseurs mobiles en Charente</title>
+  <meta name="description" content="Louez un climatiseur mobile en Charente (16). Livraison aller-retour, mise en service optionnelle et tarifs transparents.">
+  <link rel="stylesheet" href="assets/css/main.css">
 </head>
 
 <body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">IGLOUE</a>
 
-    <header class="site-header">
+      <nav class="main-nav" aria-label="Navigation principale">
+        <a href="#assistant">Vérifier ma zone</a>
+        <a href="#location">Location</a>
+        <a href="#livraison">Livraison</a>
+        <a href="#tarifs">Tarifs</a>
+        <a href="#contact">Contact</a>
+      </nav>
 
-        <div class="container header-inner">
+      <div class="language-switcher" aria-label="Choix de langue">
+        <a href="index.html" class="active">FR</a>
+        <a href="en/index.html">EN</a>
+        <a href="es/index.html">ES</a>
+      </div>
+    </div>
+  </header>
 
-            <a href="/" class="logo">
+  <main>
+    <section class="hero hero-home">
+      <div class="container hero-grid">
+        <div class="hero-content">
+          <span class="eyebrow">Location de climatiseurs mobiles • Charente (16)</span>
 
-                IGLOUE
+          <h1>La fraîcheur quand vous en avez besoin.</h1>
 
-            </a>
-
-            <nav class="main-nav">
-
-                <a href="#location">Location</a>
-
-                <a href="#fonctionnement">Comment ça marche</a>
-
-                <a href="#livraison">Livraison</a>
-
-                <a href="#faq">FAQ</a>
-
-                <a href="#contact">Contact</a>
-
-            </nav>
-
-            <a href="#postcode" class="btn btn-primary header-cta">
-
-                Vérifier ma zone
-
-            </a>
-
+          <p class="lead">
+            Louez un climatiseur mobile livré chez vous, avec reprise incluse et mise en service optionnelle.
+          </p>
         </div>
 
-    </header>
+        <div id="assistant" class="assistant-panel card">
+          <span class="eyebrow">Assistant IGLOUE</span>
 
-    <main>
+          <h2>Où avez-vous besoin de fraîcheur ?</h2>
 
-        <section class="hero hero-home">
+          <p>
+            Entrez votre code postal pour vérifier votre zone, votre tarif de livraison aller-retour et votre première estimation.
+          </p>
 
-            <div class="container hero-grid">
+          <form data-delivery-form class="assistant-form">
+            <label for="postcode">Code postal</label>
 
-                <div class="hero-content">
+            <div class="assistant-input-row">
+              <input
+                id="postcode"
+                data-postcode-input
+                type="text"
+                inputmode="numeric"
+                maxlength="5"
+                placeholder="Ex : 16000"
+                required>
 
-                    <span class="eyebrow">
-
-                        Location de climatiseurs mobiles • Charente (16)
-
-                    </span>
-
-                    <h1>
-
-                        Restez au frais cet été.
-
-                    </h1>
-
-                    <p class="lead">
-
-                        Louez un climatiseur mobile premium avec livraison aller-retour
-                        dans toute la Charente.
-                        Installation possible dans la pièce de votre choix.
-
-                    </p>
-
-                    <div class="hero-actions">
-
-                        <a href="#postcode" class="btn btn-primary">
-
-                            Vérifier ma livraison
-
-                        </a>
-
-                        <a href="#location" class="btn btn-secondary">
-
-                            Voir les climatiseurs
-
-                        </a>
-
-                    </div>
-
-                </div>
-
-                <div class="hero-panel glass">
-
-                    <span class="badge">
-
-                        À partir de
-
-                    </span>
-
-                    <h2>
-
-                        19 € / semaine
-
-                    </h2>
-
-                    <p>
-
-                        soit environ 2,71 € / jour
-
-                    </p>
-
-                    <hr class="divider">
-
-                    <p>
-
-                        Livraison + reprise
-
-                    </p>
-
-                    <strong>
-
-                        à partir de 15,99 €
-
-                    </strong>
-
-                    <p>
-
-                        Mise en service (option)
-
-                    </p>
-
-                    <strong>
-
-                        9,99 €
-
-                    </strong>
-
-                </div>
-
+              <button class="btn btn-primary" type="submit">
+                Vérifier →
+              </button>
             </div>
+          </form>
 
-        </section>
+          <div data-delivery-result></div>
+        </div>
+      </div>
+    </section>
 
-        <section id="postcode" class="section-sm">
+    <section id="location" class="section">
+      <div class="container">
+        <span class="eyebrow">Location simple</span>
 
-            <div class="container">
+        <h2>Un climatiseur mobile, livré chez vous.</h2>
 
-                <div class="delivery-checker card">
+        <p class="lead">
+          Une solution rapide pour rafraîchir une chambre, un bureau ou une pièce de vie pendant les fortes chaleurs.
+        </p>
 
-                    <span class="eyebrow">
+        <div class="grid-3 mt-xl">
+          <article class="card">
+            <span class="badge">Location</span>
+            <h3>19 € / semaine</h3>
+            <p>Location courte durée, sans engagement long terme.</p>
+          </article>
 
-                        Livraison en Charente
+          <article class="card">
+            <span class="badge">Livraison</span>
+            <h3>Dès 15,99 €</h3>
+            <p>Livraison à domicile et reprise du climatiseur à la fin de la location.</p>
+          </article>
 
-                    </span>
+          <article class="card">
+            <span class="badge">Option</span>
+            <h3>Mise en service 9,99 €</h3>
+            <p>Placement dans la pièce, branchement et installation du kit fenêtre.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
-                    <h2>
+    <section id="livraison" class="section bg-light">
+      <div class="container">
+        <span class="eyebrow">Livraison & reprise</span>
 
-                        Vérifiez votre zone de livraison
+        <h2>Un tarif clair, une fois.</h2>
 
-                    </h2>
+        <div class="grid-3 mt-xl">
+          <article class="card">
+            <h3>Zone 1</h3>
+            <p>Centre Charente.</p>
+            <strong>15,99 € aller-retour</strong>
+          </article>
 
-                    <p>
+          <article class="card">
+            <h3>Zone 2</h3>
+            <p>Zone intermédiaire.</p>
+            <strong>17,99 € aller-retour</strong>
+          </article>
 
-                        Entrez votre code postal pour connaître :
+          <article class="card">
+            <h3>Zone 3</h3>
+            <p>Périphérie Charente.</p>
+            <strong>19,99 € aller-retour</strong>
+          </article>
+        </div>
+      </div>
+    </section>
 
-                    </p>
+    <section id="tarifs" class="section">
+      <div class="container">
+        <span class="eyebrow">Tarifs transparents</span>
 
-                    <ul>
+        <h2>Vous savez à quoi vous attendre.</h2>
 
-                        <li>✓ votre zone</li>
+        <p class="lead">
+          La location commence à 19 € par semaine. La livraison comprend l’aller-retour : dépôt chez vous et reprise à la fin.
+        </p>
+      </div>
+    </section>
+  </main>
 
-                        <li>✓ votre tarif de livraison aller-retour</li>
-
-                        <li>✓ le coût de la première semaine</li>
-
-                    </ul>
-
-                    <form data-delivery-form class="delivery-form">
-
-                        <input
-                            data-postcode-input
-                            type="text"
-                            maxlength="5"
-                            placeholder="16000"
-                            required>
-
-                        <button
-                            class="btn btn-primary"
-                            type="submit">
-
-                            Vérifier
-
-                        </button>
-
-                    </form>
-
-                    <div data-delivery-result></div>
-
-                </div>
-
-            </div>
-
-        </section>
-<section id="location" class="section">
-  <div class="container">
-    <span class="eyebrow">Location simple</span>
-
-    <h2>Climatiseur mobile à louer</h2>
-
-    <p class="lead">
-      Une solution rapide pour rafraîchir une chambre, un bureau ou une pièce de vie pendant les fortes chaleurs.
-    </p>
-
-    <div class="grid-3 mt-xl">
-      <article class="card">
-        <span class="badge">Offre lancement</span>
-        <h3>Climatiseur mobile</h3>
-        <p>Location courte durée avec livraison et reprise en Charente.</p>
-        <strong>19 € / semaine</strong>
-      </article>
-
-      <article class="card">
-        <span class="badge">Option</span>
-        <h3>Mise en service</h3>
-        <p>Placement dans la pièce, branchement et installation du kit fenêtre.</p>
-        <strong>9,99 €</strong>
-      </article>
-
-      <article class="card">
-        <span class="badge">Livraison</span>
-        <h3>Aller-retour inclus</h3>
-        <p>Livraison à domicile et reprise du climatiseur à la fin de la location.</p>
-        <strong>à partir de 15,99 €</strong>
-      </article>
-    </div>
-  </div>
-</section>
-<section id="livraison" class="section bg-light">
-  <div class="container">
-    <span class="eyebrow">Livraison & mise en service</span>
-
-    <h2>Simple du début à la fin</h2>
-
-    <div class="grid-3 mt-xl">
-      <article class="card">
-        <h3>1. Livraison</h3>
-        <p>Nous livrons le climatiseur à votre adresse selon votre zone en Charente.</p>
-      </article>
-
-      <article class="card">
-        <h3>2. Mise en service optionnelle</h3>
-        <p>Pour 9,99 €, nous plaçons l’appareil, installons le kit fenêtre et expliquons son utilisation.</p>
-      </article>
-
-      <article class="card">
-        <h3>3. Reprise</h3>
-        <p>À la fin de la location, nous revenons récupérer le climatiseur. Le tarif de livraison comprend l’aller-retour.</p>
-      </article>
-    </div>
-  </div>
-</section>
-    </main>
-
-    <script src="assets/js/delivery-zones.js"></script>
-
+  <script src="assets/js/delivery-zones.js"></script>
 </body>
-
 </html>

@@ -342,3 +342,70 @@
     display: grid;
   }
 }
+/* ==========================================
+   Assistant panel
+========================================== */
+
+.assistant-panel {
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+.assistant-form {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.assistant-form label {
+  color: var(--color-blue-600);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assistant-input-row {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.assistant-input-row input {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-bottom: 2px solid var(--color-charcoal);
+  background: transparent;
+  font-size: var(--text-xl);
+}
+
+.assistant-input-row input:focus {
+  outline: none;
+  border-color: var(--color-blue-500);
+}
+
+.language-switcher {
+  display: none;
+  gap: var(--space-sm);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+
+.language-switcher a {
+  color: var(--color-grey-600);
+}
+
+.language-switcher a.active {
+  color: var(--color-blue-500);
+}
+
+@media (min-width: 768px) {
+  .assistant-input-row {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .language-switcher {
+    display: flex;
+  }
+}
