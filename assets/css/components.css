@@ -1,223 +1,91 @@
 /* =========================================================
    IGLOUE Components
-   Buttons, cards, badges and reusable UI elements
+   Design System V2
+   Engineered, calm, non-generic UI
    ========================================================= */
 
-
-/* ==========================================
-   Primary Button
-========================================== */
+/* Buttons */
 
 .btn {
-
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    gap: var(--space-sm);
-
-    padding: 0.95rem 1.6rem;
-
-    border-radius: var(--radius-pill);
-
-    font-family: var(--font-body);
-
-    font-weight: 600;
-
-    transition: all var(--transition-normal);
-
-    cursor: pointer;
-
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  box-shadow: none;
 }
 
-
-/* Blue button */
-
 .btn-primary {
-
-    background: var(--color-blue-500);
-
-    color: var(--color-white);
-
-    box-shadow: var(--shadow-sm);
-
+  background: var(--color-blue-500);
+  color: var(--color-white);
 }
 
 .btn-primary:hover {
-
-    background: var(--color-blue-600);
-
-    transform: translateY(-2px);
-
+  background: var(--color-blue-600);
 }
 
-
-/* White button */
-
 .btn-secondary {
-
-    background: var(--color-white);
-
-    color: var(--color-blue-600);
-
-    border: 1px solid var(--color-border);
-
+  background: transparent;
+  color: var(--color-blue-600);
+  border-color: var(--color-border);
 }
 
 .btn-secondary:hover {
-
-    box-shadow: var(--shadow-sm);
-
+  background: var(--color-grey-50);
 }
 
-
-/* ==========================================
-   Card
-========================================== */
+/* Cards */
 
 .card {
-
-    background: var(--color-white);
-
-    border-radius: var(--radius-lg);
-
-    padding: var(--space-xl);
-
-    box-shadow: var(--shadow-sm);
-
-    transition: all var(--transition-normal);
-
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: none;
+  transition: border-color 0.2s ease;
 }
 
 .card:hover {
-
-    transform: translateY(-6px);
-
-    box-shadow: var(--shadow-md);
-
+  border-color: var(--color-ice-300);
 }
 
-
-/* ==========================================
-   Badge
-========================================== */
+/* Badge */
 
 .badge {
-
-    display: inline-flex;
-
-    align-items: center;
-
-    padding: .45rem .85rem;
-
-    border-radius: var(--radius-pill);
-
-    background: var(--color-ice-100);
-
-    color: var(--color-blue-600);
-
-    font-size: var(--text-sm);
-
-    font-weight: 700;
-
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--color-ice-100);
+  color: var(--color-blue-600);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-
-/* ==========================================
-   Divider
-========================================== */
+/* Divider */
 
 .divider {
-
-    width: 100%;
-
-    height: 1px;
-
-    background: var(--color-border);
-
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
 }
 
-
-/* ==========================================
-   Section title
-========================================== */
-
-.section-title {
-
-    margin-bottom: var(--space-md);
-
-}
-
-.section-description {
-
-    margin-bottom: var(--space-xl);
-
-}
-
-
-/* ==========================================
-   Image
-========================================== */
-
-.image-rounded {
-
-    border-radius: var(--radius-lg);
-
-    overflow: hidden;
-
-}
-
-
-/* ==========================================
-   Glass panel
-========================================== */
-
-.glass {
-
-    background: rgba(255,255,255,.7);
-
-    backdrop-filter: blur(14px);
-
-    border-radius: var(--radius-lg);
-
-    border: 1px solid rgba(255,255,255,.35);
-
-}
-
-
-/* ==========================================
-   Icon Circle
-========================================== */
-
-.icon-circle {
-
-    width: 70px;
-
-    height: 70px;
-
-    border-radius: 50%;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    background: var(--color-ice-100);
-
-}
-/* ==========================================
-   Header
-========================================== */
+/* Header */
 
 .site-header {
   position: sticky;
   top: 0;
   z-index: var(--z-header);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.94);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -245,18 +113,10 @@
   font-weight: 600;
 }
 
-.header-cta {
-  display: none;
-}
-
-/* ==========================================
-   Homepage hero
-========================================== */
+/* Hero */
 
 .hero-home {
-  background:
-    radial-gradient(circle at top right, var(--color-ice-200), transparent 34%),
-    linear-gradient(180deg, var(--color-white), var(--color-grey-50));
+  background: var(--color-white);
 }
 
 .hero-grid {
@@ -282,8 +142,10 @@
 }
 
 .hero-panel {
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  box-shadow: none;
   padding: var(--space-xl);
-  box-shadow: var(--shadow-md);
 }
 
 .hero-panel h2 {
@@ -291,63 +153,13 @@
   margin-bottom: var(--space-md);
   font-size: var(--text-2xl);
 }
-.delivery-checker {
-  display: grid;
-  gap: var(--space-lg);
-}
 
-.delivery-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.delivery-form input {
-  width: 100%;
-  padding: 1rem 1.2rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  font: inherit;
-}
-
-.delivery-form input:focus {
-  outline: 3px solid var(--color-ice-200);
-  border-color: var(--color-blue-500);
-}
-
-.delivery-result {
-  padding: var(--space-lg);
-  border-radius: var(--radius-lg);
-}
-
-.delivery-result.success {
-  background: var(--color-ice-100);
-  border: 1px solid var(--color-ice-200);
-}
-
-.delivery-result.error {
-  background: #fff5f5;
-  border: 1px solid #ffd1d1;
-}
-
-.delivery-result ul {
-  display: grid;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
-}
-
-@media (min-width: 768px) {
-  .delivery-form {
-    grid-template-columns: 1fr auto;
-    display: grid;
-  }
-}
-/* ==========================================
-   Assistant panel
-========================================== */
+/* Assistant */
 
 .assistant-panel {
-  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  border: 2px solid var(--color-ice-300);
+  padding: 48px;
   box-shadow: none;
 }
 
@@ -372,17 +184,44 @@
 
 .assistant-input-row input {
   width: 100%;
-  padding: 1rem;
+  padding: 18px 0;
   border: none;
-  border-bottom: 2px solid var(--color-charcoal);
+  border-bottom: 2px solid var(--color-ice-300);
   background: transparent;
-  font-size: var(--text-xl);
+  font-size: 2rem;
+  font-weight: 300;
 }
 
 .assistant-input-row input:focus {
   outline: none;
-  border-color: var(--color-blue-500);
+  border-color: var(--color-blue-600);
 }
+
+/* Delivery result */
+
+.delivery-result {
+  margin-top: var(--space-lg);
+  padding: var(--space-lg);
+  border-radius: 12px;
+}
+
+.delivery-result.success {
+  background: var(--color-ice-100);
+  border: 1px solid var(--color-ice-300);
+}
+
+.delivery-result.error {
+  background: #fff5f5;
+  border: 1px solid #ffd1d1;
+}
+
+.delivery-result ul {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/* Language switcher */
 
 .language-switcher {
   display: none;
@@ -399,7 +238,17 @@
   color: var(--color-blue-500);
 }
 
+/* Responsive */
+
 @media (min-width: 768px) {
+  .main-nav {
+    display: flex;
+  }
+
+  .hero-actions {
+    flex-direction: row;
+  }
+
   .assistant-input-row {
     grid-template-columns: 1fr auto;
     align-items: end;
