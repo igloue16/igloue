@@ -258,3 +258,92 @@
     display: flex;
   }
 }
+/* ==========================================
+   Assistant V1
+========================================== */
+
+.assistant-screen {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.assistant-label {
+  color: var(--color-blue-600);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assistant-line-input {
+  width: 100%;
+  padding: 18px 0;
+  border: none;
+  border-bottom: 2px solid var(--color-ice-300);
+  background: transparent;
+  color: var(--color-charcoal);
+  font-size: clamp(2rem, 8vw, 4rem);
+  font-weight: 300;
+}
+
+.assistant-line-input:focus {
+  outline: none;
+  border-color: var(--color-blue-600);
+}
+
+.assistant-hint {
+  font-size: var(--text-sm);
+}
+
+.assistant-result-grid {
+  display: grid;
+  gap: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-lg);
+}
+
+.assistant-result-grid div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-sm);
+}
+
+.assistant-result-grid span {
+  color: var(--color-text-muted);
+}
+
+.assistant-next {
+  justify-self: start;
+  border: none;
+  background: transparent;
+  color: var(--color-blue-600);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assistant-options {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.assistant-options button {
+  width: 100%;
+  padding: var(--space-md) 0;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+
+.assistant-options button:hover {
+  color: var(--color-blue-600);
+}
+
+.assistant-panel.is-loading {
+  opacity: 0.55;
+}
