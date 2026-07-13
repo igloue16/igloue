@@ -347,3 +347,132 @@
 .assistant-panel.is-loading {
   opacity: 0.55;
 }
+/* ==========================================
+   Assistant navigation and products
+========================================== */
+
+.assistant-back {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-grey-600);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.assistant-back:hover {
+  color: var(--color-blue-600);
+}
+
+.assistant-note {
+  padding-left: var(--space-md);
+  border-left: 2px solid var(--color-ice-300);
+  font-size: var(--text-sm);
+}
+
+.assistant-intro {
+  font-size: var(--text-lg);
+}
+
+.assistant-product {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+  padding-block: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assistant-product-mark {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.assistant-product h2 {
+  margin-bottom: var(--space-sm);
+}
+
+.assistant-product-use {
+  margin-top: var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+.assistant-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.assistant-help {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-blue-500);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-blue-600);
+  font-family: serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assistant-help-content {
+  padding: var(--space-lg);
+  border-left: 2px solid var(--color-blue-500);
+  background: var(--color-ice-50);
+}
+
+.assistant-help-content ul {
+  display: grid;
+  gap: var(--space-sm);
+  margin-block: var(--space-md);
+}
+
+.assistant-help-content li::before {
+  content: "— ";
+  color: var(--color-blue-600);
+}
+
+.assistant-pricing-block {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.assistant-pricing-block h3 {
+  font-size: var(--text-lg);
+}
+
+.assistant-total-row {
+  padding-top: var(--space-md);
+  border-bottom: 0 !important;
+}
+
+.assistant-total-row strong {
+  color: var(--color-blue-700);
+  font-size: var(--text-xl);
+}
+
+.assistant-recurring-block {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-ice-300);
+  background: var(--color-ice-50);
+}
+
+.assistant-recurring-price {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.assistant-recurring-price strong {
+  font-size: var(--text-xl);
+  color: var(--color-blue-700);
+}
