@@ -1,0 +1,225 @@
+.assistant-panel {
+  width: min(100%, 720px);
+  min-height: 300px;
+  margin-inline: auto;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.assistant-screen {
+  animation: assistant-in 220ms ease both;
+}
+
+@keyframes assistant-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.assistant-screen h2 {
+  margin: 10px 0 14px;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.assistant-screen > p {
+  color: var(--text-soft);
+  line-height: 1.65;
+}
+
+.assistant-step-label {
+  display: block;
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.assistant-label {
+  display: block;
+  margin-top: 28px;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.assistant-line-input {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid var(--line-strong);
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+.assistant-line-input:focus {
+  border-color: var(--blue);
+}
+
+.assistant-hint,
+.assistant-note {
+  margin-top: 10px;
+  color: var(--text-muted) !important;
+  font-size: 0.82rem;
+}
+
+.assistant-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.assistant-options button {
+  min-height: 58px;
+  padding: 15px 17px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assistant-options button:hover {
+  border-color: var(--blue);
+  background: var(--surface-blue);
+}
+
+.assistant-next {
+  min-height: 50px;
+  margin-top: 26px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue-dark);
+  color: #ffffff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.assistant-back {
+  margin-bottom: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.assistant-result-grid {
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.assistant-result-grid > div {
+  min-height: 68px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.assistant-result-grid span {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.assistant-result-grid strong {
+  text-align: right;
+}
+
+.assistant-product {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-top: 26px;
+  padding-block: 22px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.assistant-product-mark {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-blue);
+  font-size: 1.7rem;
+}
+
+.assistant-product h2 {
+  margin: 0 0 6px;
+}
+
+.assistant-product p {
+  margin: 4px 0;
+}
+
+.assistant-heading-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.assistant-heading-row h2 {
+  margin-right: auto;
+}
+
+.assistant-help {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-top: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--blue-dark);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.assistant-help-content {
+  margin-top: 8px;
+  padding: 18px;
+  border-left: 3px solid var(--blue);
+  background: var(--surface-blue);
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.assistant-recurring-block {
+  margin-top: 26px;
+  padding: 22px;
+  border: 1px solid #bdd9e6;
+  border-radius: 12px;
+  background: var(--surface-blue);
+}
+
+.assistant-recurring-price {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 10px;
+}

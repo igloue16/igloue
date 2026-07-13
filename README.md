@@ -1,12 +1,24 @@
 # IGLOUE
 
-Professional multilingual website for IGLOUE, a premium French climate comfort company.
+Clean static-site foundation for the IGLOUE portable air-conditioner rental experience.
 
-## Phase 1
+## Stack
 
-Static GitHub Pages website.
+- HTML
+- CSS
+- JavaScript
+- GitHub Pages
+- No framework
 
-No backend.
-No customer passwords.
-No card details.
-No private customer data stored in GitHub.
+## Structure
+
+- `index.html` — French homepage
+- `assets/css/` — base, layout, components, assistant, responsive styles
+- `assets/js/products.js` — product data and recommendation helper
+- `assets/js/assistant.js` — assistant state and screens
+- `assets/js/app.js` — future general site behaviour
+- `assets/images/` — product, homepage, map and brand assets
+
+## Local development
+
+Open `index.html` with VS Code Live Server.

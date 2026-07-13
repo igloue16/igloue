@@ -1,8 +1,0 @@
-{
-  "name": "IGLOUE",
-  "short_name": "IGLOUE",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#BFEFFF"
-}
