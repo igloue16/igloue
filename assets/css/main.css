@@ -10,6 +10,7 @@
 @import url("components.css");
 @import url("utilities.css");
 @import url("animations.css");
+@import url("homepage.css");
 @import url("responsive.css");
 /* =========================================================
    IGLOUE Homepage Layout
@@ -315,6 +316,7 @@ main {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
 }
 }
 
