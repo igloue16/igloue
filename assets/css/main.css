@@ -307,6 +307,17 @@ main {
   text-wrap: balance;
 }
 
+.assistant-step-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--igloue-blue);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+}
+
 .assistant-screen > p {
   max-width: 610px;
   color: var(--igloue-text-soft);
