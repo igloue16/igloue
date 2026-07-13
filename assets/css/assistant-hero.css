@@ -1,94 +1,71 @@
 /* =========================================================
-   IGLOUE Design Tokens
-   Global variables for colours, typography, spacing,
-   radius, shadows, transitions and layout.
+   ASSISTANT HERO — COMPACT, ASSISTANT-FIRST
    ========================================================= */
 
-:root {
-  /* Brand colours */
-  --color-ice-50: #f4fcff;
-  --color-ice-100: #e6f8ff;
-  --color-ice-200: #bfefff;
-  --color-ice-300: #8edfff;
+.assistant-hero {
+  position: relative;
+  min-height: auto;
+  overflow: hidden;
+  border-bottom: 1px solid var(--igloue-line);
+  background:
+    linear-gradient(
+      180deg,
+      #f3f8fb 0,
+      #f8fbfd 40%,
+      #ffffff 100%
+    );
+}
 
-  --color-blue-500: #1e88e5;
-  --color-blue-600: #166fc0;
-  --color-blue-700: #105794;
+.assistant-hero-inner {
+  position: relative;
+  padding-top: clamp(34px, 5vw, 58px);
+  padding-bottom: clamp(48px, 7vw, 80px);
+}
 
-  --color-white: #ffffff;
-  --color-grey-50: #f5f7f8;
-  --color-grey-100: #edf1f3;
-  --color-grey-200: #d9e1e5;
-  --color-grey-400: #9aa8b0;
-  --color-grey-600: #5f6f78;
-  --color-grey-800: #344047;
-  --color-charcoal: #2e2e2e;
+.assistant-introduction {
+  max-width: 680px;
+  margin-inline: auto;
+  margin-bottom: 24px;
+  text-align: center;
+}
 
-  --color-success: #2e7d32;
-  --color-warning: #ff8c42;
-  --color-danger: #d32f2f;
-  --color-info: #1e88e5;
+.assistant-introduction .eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.11em;
+}
 
-  /* Page colours */
-  --color-page-bg: var(--color-white);
-  --color-surface: var(--color-white);
-  --color-surface-soft: var(--color-grey-50);
-  --color-text: var(--color-charcoal);
-  --color-text-muted: var(--color-grey-600);
-  --color-border: var(--color-grey-200);
+.assistant-introduction h1 {
+  max-width: 640px;
+  margin: 10px auto 12px;
+  font-size: clamp(2.25rem, 5vw, 3.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
 
-  /* Typography */
-  --font-heading: "Manrope", "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
+.assistant-introduction .lead {
+  max-width: 580px;
+  margin-inline: auto;
+  color: var(--igloue-text-soft);
+  font-size: clamp(0.98rem, 1.5vw, 1.08rem);
+  line-height: 1.55;
+  text-wrap: balance;
+}
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-md: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.35rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: 2.25rem;
-  --text-4xl: 3rem;
+.assistant-panel {
+  width: min(100%, 720px);
+  min-height: 300px;
+  margin-inline: auto;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--igloue-line-strong);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(18 35 46 / 4%),
+    0 14px 34px rgb(18 52 72 / 7%);
+}
 
-  --line-tight: 1.1;
-  --line-normal: 1.5;
-  --line-relaxed: 1.7;
-
-  /* Spacing */
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-  --space-3xl: 4rem;
-  --space-4xl: 6rem;
-
-  /* Layout */
-  --container-sm: 720px;
-  --container-md: 960px;
-  --container-lg: 1180px;
-  --container-xl: 1320px;
-
-  /* Radius */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 2rem;
-  --radius-pill: 999px;
-
-  /* Shadows */
-  --shadow-sm: 0 4px 14px rgba(46, 46, 46, 0.06);
-  --shadow-md: 0 12px 30px rgba(46, 46, 46, 0.08);
-  --shadow-lg: 0 24px 60px rgba(46, 46, 46, 0.12);
-
-  /* Transitions */
-  --transition-fast: 160ms ease;
-  --transition-normal: 240ms ease;
-  --transition-slow: 400ms ease;
-
-  /* Z-index */
-  --z-header: 100;
-  --z-menu: 200;
-  --z-modal: 500;
+.assistant-reassurance {
+  max-width: 720px;
+  margin-top: 18px;
 }

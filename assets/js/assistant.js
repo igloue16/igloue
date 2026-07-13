@@ -1,584 +1,431 @@
-/* =========================================================
-   IGLOUE Rental Assistant
-   Guided portable air-conditioner recommendation journey
-   ========================================================= */
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-const assistantState = {
-  postcode: "",
-  zone: null,
-  room: "",
-  size: "",
-  product: null,
-  setup: false
-};
+  <title>IGLOUE | Location de climatiseurs mobiles en Charente</title>
 
-const assistantHistory = [];
+  <meta
+    name="description"
+    content="Louez un climatiseur mobile en Charente. Livraison et reprise à domicile, mise en service optionnelle et tarifs transparents.">
 
-const deliveryZones = [
-  {
-    id: "zone-1",
-    name: "Zone 1",
-    price: 15.99,
-    postcodes: ["16000", "16430", "16600", "16710", "16800"]
-  },
-  {
-    id: "zone-2",
-    name: "Zone 2",
-    price: 17.99,
-    postcodes: [
-      "16110",
-      "16120",
-      "16160",
-      "16230",
-      "16290",
-      "16320",
-      "16340",
-      "16380",
-      "16400",
-      "16410",
-      "16440",
-      "16560",
-      "16610",
-      "16730"
-    ]
-  },
-  {
-    id: "zone-3",
-    name: "Zone 3",
-    price: 19.99,
-    postcodes: [
-      "16100",
-      "16130",
-      "16140",
-      "16150",
-      "16200",
-      "16210",
-      "16220",
-      "16240",
-      "16250",
-      "16260",
-      "16270",
-      "16300",
-      "16310",
-      "16350",
-      "16360",
-      "16450",
-      "16500",
-      "16510",
-      "16570",
-      "16620",
-      "16660",
-      "16700",
-      "16720",
-      "16760"
-    ]
-  }
-];
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
 
-const setupPrice = 9.99;
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a
+        href="index.html"
+        class="logo"
+        aria-label="IGLOUE — Accueil">
+        IGLOUE
+      </a>
 
-function getAssistantElement() {
-  return document.querySelector("[data-assistant]");
-}
+      <nav class="main-nav" aria-label="Navigation principale">
+        <a href="#assistant">Trouver ma climatisation</a>
+        <a href="#fonctionnement">Comment ça marche</a>
+        <a href="#livraison">Livraison</a>
+        <a href="#tarifs">Tarifs</a>
+        <a href="#faq">FAQ</a>
+      </nav>
 
-function formatPrice(price) {
-  return `${price.toFixed(2).replace(".", ",")} €`;
-}
-
-function findZone(postcode) {
-  return (
-    deliveryZones.find((zone) => zone.postcodes.includes(postcode)) || null
-  );
-}
-
-function pushScreen(screenFunction) {
-  assistantHistory.push(screenFunction);
-}
-
-function goBack() {
-  if (assistantHistory.length <= 1) {
-    showPostcodeScreen(false);
-    return;
-  }
-
-  assistantHistory.pop();
-  const previousScreen = assistantHistory[assistantHistory.length - 1];
-
-  previousScreen(false);
-}
-
-function renderBackControl() {
-  return `
-    <button class="assistant-back" type="button" data-assistant-back>
-      ← Retour
-    </button>
-  `;
-}
-
-function connectBackControl() {
-  const backButton = document.querySelector("[data-assistant-back]");
-
-  if (backButton) {
-    backButton.addEventListener("click", goBack);
-  }
-}
-
-function showPostcodeScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
-  if (addToHistory) {
-    assistantHistory.length = 0;
-    pushScreen(showPostcodeScreen);
-  }
-
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      <span class="eyebrow">Assistant IGLOUE</span>
-
-      <h2>Où avez-vous besoin de fraîcheur ?</h2>
-
-      <p>
-        Entrez votre code postal. Votre zone et votre tarif de
-        livraison aller-retour seront vérifiés automatiquement.
-      </p>
-
-      <label class="assistant-label" for="assistant-postcode">
-        Code postal
-      </label>
-
-      <input
-        id="assistant-postcode"
-        class="assistant-line-input"
-        type="text"
-        inputmode="numeric"
-        maxlength="5"
-        placeholder="16000"
-        autocomplete="postal-code"
-        value="${assistantState.postcode}">
-
-      <p class="assistant-hint">
-        Disponible actuellement dans certaines zones de la Charente (16).
-      </p>
-    </div>
-  `;
-
-  const input = document.querySelector("#assistant-postcode");
-
-  input.addEventListener("input", () => {
-    input.value = input.value.replace(/\D/g, "");
-
-    if (input.value.length !== 5) {
-      return;
-    }
-
-    assistantState.postcode = input.value;
-    assistant.classList.add("is-loading");
-
-    window.setTimeout(() => {
-      assistant.classList.remove("is-loading");
-      assistantState.zone = findZone(assistantState.postcode);
-
-      if (assistantState.zone) {
-        showZoneScreen();
-      } else {
-        showUnavailableScreen();
-      }
-    }, 450);
-  });
-
-  input.focus();
-}
-
-function showZoneScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
-  if (addToHistory) {
-    pushScreen(showZoneScreen);
-  }
-
-  const firstWeekEstimate = 19 + assistantState.zone.price;
-
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
-
-      <span class="eyebrow">Livraison disponible</span>
-
-      <h2>Bonne nouvelle.</h2>
-
-      <p>
-        Nous livrons et reprenons le climatiseur dans votre secteur.
-      </p>
-
-      <div class="assistant-result-grid">
-        <div>
-          <span>Code postal</span>
-          <strong>${assistantState.postcode}</strong>
-        </div>
-
-        <div>
-          <span>Zone</span>
-          <strong>${assistantState.zone.name}</strong>
-        </div>
-
-        <div>
-          <span>Livraison & reprise</span>
-          <strong>${formatPrice(assistantState.zone.price)}</strong>
-        </div>
-      </div>
-
-      <p class="assistant-note">
-        La livraison et la reprise sont facturées une seule fois,
-        quelle que soit la durée de location.
-      </p>
-
-      <button class="assistant-next" type="button" data-next-room>
-        Choisir la pièce →
-      </button>
-    </div>
-  `;
-
-  connectBackControl();
-
-  document
-    .querySelector("[data-next-room]")
-    .addEventListener("click", () => showRoomScreen());
-}
-
-function showUnavailableScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
-  if (addToHistory) {
-    pushScreen(showUnavailableScreen);
-  }
-
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
-
-      <span class="eyebrow">Zone non disponible</span>
-
-      <h2>Pas encore dans votre secteur.</h2>
-
-      <p>
-        IGLOUE se concentre actuellement sur certaines zones
-        de la Charente.
-      </p>
-
-      <button class="assistant-next" type="button" data-restart>
-        Modifier le code postal →
-      </button>
-    </div>
-  `;
-
-  connectBackControl();
-
-  document
-    .querySelector("[data-restart]")
-    .addEventListener("click", () => showPostcodeScreen(false));
-}
-
-function showRoomScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
-  if (addToHistory) {
-    pushScreen(showRoomScreen);
-  }
-
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
-
-      <span class="eyebrow">Votre besoin</span>
-
-      <h2>Quelle pièce souhaitez-vous rafraîchir ?</h2>
-
-      <div class="assistant-options">
-        <button type="button" data-room="chambre">Chambre</button>
-        <button type="button" data-room="salon">Salon</button>
-        <button type="button" data-room="bureau">Bureau</button>
-        <button type="button" data-room="autre">Autre pièce</button>
+      <div class="language-switcher" aria-label="Choix de langue">
+        <a href="index.html" class="active" aria-current="page">FR</a>
+        <a href="en/index.html">EN</a>
+        <a href="es/index.html">ES</a>
       </div>
     </div>
-  `;
+  </header>
 
-  connectBackControl();
+  <main>
+    <!-- =====================================================
+         ASSISTANT — PRIMARY HOMEPAGE EXPERIENCE
+         ===================================================== -->
 
-  document.querySelectorAll("[data-room]").forEach((button) => {
-    button.addEventListener("click", () => {
-      assistantState.room = button.dataset.room;
-      showSizeScreen();
-    });
-  });
-}
+    <section class="assistant-hero" aria-labelledby="page-title">
+      <div class="container assistant-hero-inner">
+        <div class="assistant-introduction">
+          <span class="assistant-step-label">Étape 1</span>
 
-function showSizeScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
+<h2>Quel est votre code postal ?</h2>
 
-  if (addToHistory) {
-    pushScreen(showSizeScreen);
-  }
+<p>
+  Nous vérifierons immédiatement votre zone de livraison.
+</p>
+        </div>
 
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
+        <div
+          id="assistant"
+          class="assistant-panel"
+          data-assistant
+          aria-live="polite"
+          aria-busy="false">
+        </div>
 
-      <span class="eyebrow">Surface approximative</span>
+        <div class="assistant-reassurance" aria-label="Avantages IGLOUE">
+          <span>
+            <span aria-hidden="true">✓</span>
+            Sans engagement long terme
+          </span>
 
-      <h2>Quelle est la taille de cette pièce ?</h2>
+          <span>
+            <span aria-hidden="true">✓</span>
+            Livraison et reprise
+          </span>
 
-      <div class="assistant-options">
-        <button type="button" data-size="small">
-          Moins de 15 m²
-        </button>
-
-        <button type="button" data-size="medium">
-          De 15 à 25 m²
-        </button>
-
-        <button type="button" data-size="large">
-          De 25 à 35 m²
-        </button>
-
-        <button type="button" data-size="xl">
-          Plus de 35 m²
-        </button>
+          <span>
+            <span aria-hidden="true">✓</span>
+            Tarifs transparents
+          </span>
+        </div>
       </div>
-    </div>
-  `;
+    </section>
 
-  connectBackControl();
+    <!-- =====================================================
+         HOW IT WORKS
+         ===================================================== -->
 
-  document.querySelectorAll("[data-size]").forEach((button) => {
-    button.addEventListener("click", () => {
-      assistantState.size = button.dataset.size;
-      assistantState.product = findProductByRoomSize(assistantState.size);
+    <section id="fonctionnement" class="section section-process">
+      <div class="container">
+        <div class="section-heading">
+          <span class="eyebrow">Une location simple</span>
 
-      showRecommendationScreen();
-    });
-  });
-}
+          <h2>
+            La fraîcheur sans acheter un appareil pour quelques semaines.
+          </h2>
 
-function showRecommendationScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-  const product = assistantState.product;
-
-  if (addToHistory) {
-    pushScreen(showRecommendationScreen);
-  }
-
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
-
-      <span class="eyebrow">Notre recommandation</span>
-
-      <p class="assistant-intro">
-        D’après vos réponses, nous pensons que
-        <strong>${product.name}</strong> est le meilleur choix.
-      </p>
-
-      <div class="assistant-product">
-        <span class="assistant-product-mark" aria-hidden="true">❄</span>
-
-        <div>
-          <h2>${product.name}</h2>
-
-          <p>${product.tagline}</p>
-
-          <p class="assistant-product-use">
-            ${product.suitableFor}
+          <p class="lead">
+            IGLOUE vous aide à choisir le bon climatiseur, vous le livre
+            et le récupère lorsque vous n’en avez plus besoin.
           </p>
         </div>
-      </div>
 
-      <div class="assistant-result-grid">
-        <div>
-          <span>Surface conseillée</span>
-          <strong>
-            ${
-              product.maxRoomSize
-                ? `Jusqu’à ${product.maxRoomSize} m²`
-                : "Plus de 35 m²"
-            }
-          </strong>
+        <div class="process-list">
+          <article class="process-item">
+            <span class="process-number" aria-hidden="true">01</span>
+
+            <div>
+              <h3>Décrivez votre pièce</h3>
+
+              <p>
+                Indiquez votre code postal, le type de pièce et sa surface
+                approximative.
+              </p>
+            </div>
+          </article>
+
+          <article class="process-item">
+            <span class="process-number" aria-hidden="true">02</span>
+
+            <div>
+              <h3>Recevez votre recommandation</h3>
+
+              <p>
+                L’assistant sélectionne le modèle IGLOUE correspondant
+                le mieux à votre besoin.
+              </p>
+            </div>
+          </article>
+
+          <article class="process-item">
+            <span class="process-number" aria-hidden="true">03</span>
+
+            <div>
+              <h3>Nous livrons et récupérons l’appareil</h3>
+
+              <p>
+                La livraison et la reprise sont réunies dans un seul tarif,
+                payé une seule fois.
+              </p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================
+         DELIVERY
+         ===================================================== -->
+
+    <section id="livraison" class="section section-delivery">
+      <div class="container">
+        <div class="section-heading">
+          <span class="eyebrow">Livraison et reprise</span>
+
+          <h2>Un seul tarif de transport.</h2>
+
+          <p class="lead">
+            Vous ne payez pas la livraison chaque semaine. Le montant comprend
+            le dépôt du climatiseur et sa récupération à la fin de la location.
+          </p>
         </div>
 
-        <div>
-          <span>Location</span>
-          <strong>${formatPrice(product.weeklyPrice)} / semaine</strong>
-        </div>
+        <div class="delivery-layout">
+          <div class="delivery-map">
+            <div class="delivery-map-placeholder">
+              <span class="delivery-map-label">Zone de livraison</span>
 
-        <div>
-          <span>Livraison & reprise</span>
-          <strong>${formatPrice(assistantState.zone.price)}</strong>
+              <strong>Charente</strong>
+
+              <span>Carte à venir</span>
+            </div>
+          </div>
+
+          <div class="delivery-zones">
+            <article class="delivery-zone">
+              <div>
+                <span class="delivery-zone-name">Zone 1</span>
+                <p>Centre Charente</p>
+              </div>
+
+              <div class="delivery-zone-price">
+                <strong>15,99 €</strong>
+                <span>paiement unique</span>
+              </div>
+            </article>
+
+            <article class="delivery-zone">
+              <div>
+                <span class="delivery-zone-name">Zone 2</span>
+                <p>Zone intermédiaire</p>
+              </div>
+
+              <div class="delivery-zone-price">
+                <strong>17,99 €</strong>
+                <span>paiement unique</span>
+              </div>
+            </article>
+
+            <article class="delivery-zone">
+              <div>
+                <span class="delivery-zone-name">Zone 3</span>
+                <p>Périphérie de la zone desservie</p>
+              </div>
+
+              <div class="delivery-zone-price">
+                <strong>19,99 €</strong>
+                <span>paiement unique</span>
+              </div>
+            </article>
+
+            <p class="delivery-note">
+              Chaque tarif comprend la livraison et la reprise de l’appareil.
+            </p>
+          </div>
         </div>
       </div>
+    </section>
 
-      <button class="assistant-next" type="button" data-next-setup>
-        Choisir la mise en service →
-      </button>
-    </div>
-  `;
+    <!-- =====================================================
+         PRICING EXAMPLE
+         ===================================================== -->
 
-  connectBackControl();
+    <section id="tarifs" class="section section-pricing">
+      <div class="container">
+        <div class="section-heading">
+          <span class="eyebrow">Tarifs transparents</span>
 
-  document
-    .querySelector("[data-next-setup]")
-    .addEventListener("click", () => showSetupScreen());
-}
+          <h2>Les frais ponctuels restent ponctuels.</h2>
 
-function showSetupScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
+          <p class="lead">
+            Dès la deuxième semaine, vous payez uniquement la location
+            hebdomadaire de votre climatiseur.
+          </p>
+        </div>
 
-  if (addToHistory) {
-    pushScreen(showSetupScreen);
-  }
+        <div class="pricing-example">
+          <div class="pricing-example-header">
+            <div>
+              <span>Exemple de location</span>
+              <strong>IGLOUE Polar</strong>
+            </div>
 
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
+            <span class="pricing-model-price">24 € / semaine</span>
+          </div>
 
-      <span class="eyebrow">Mise en service</span>
+          <div class="pricing-period">
+            <span class="pricing-period-label">Première semaine</span>
 
-      <div class="assistant-heading-row">
-        <h2>Souhaitez-vous que nous l’installions pour vous ?</h2>
+            <dl class="price-breakdown">
+              <div>
+                <dt>
+                  Location
+                  <small>Première semaine</small>
+                </dt>
 
-        <button
-          class="assistant-help"
-          type="button"
-          aria-label="Afficher les détails de la mise en service"
-          aria-expanded="false"
-          data-setup-help>
-          i
-        </button>
+                <dd>24,00 €</dd>
+              </div>
+
+              <div>
+                <dt>
+                  Livraison et reprise
+                  <small>Paiement unique</small>
+                </dt>
+
+                <dd>17,99 €</dd>
+              </div>
+
+              <div>
+                <dt>
+                  Mise en service
+                  <small>Option — paiement unique</small>
+                </dt>
+
+                <dd>9,99 €</dd>
+              </div>
+
+              <div class="price-total">
+                <dt>Total de départ</dt>
+                <dd>51,98 €</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="recurring-price">
+            <div>
+              <span>Après votre première semaine</span>
+              <strong>Location uniquement</strong>
+            </div>
+
+            <div class="recurring-price-value">
+              <strong>24 €</strong>
+              <span>par semaine</span>
+            </div>
+          </div>
+        </div>
       </div>
+    </section>
 
-      <div class="assistant-help-content" data-setup-help-content hidden>
-        <strong>La mise en service comprend :</strong>
+    <!-- =====================================================
+         TRUST
+         ===================================================== -->
 
-        <ul>
-          <li>Placement dans la pièce de votre choix</li>
-          <li>Déballage et branchement de l’appareil</li>
-          <li>Installation du kit de sortie de fenêtre, si compatible</li>
-          <li>Test de fonctionnement</li>
-          <li>Explication simple de l’utilisation</li>
-        </ul>
+    <section class="section section-trust">
+      <div class="container">
+        <div class="section-heading">
+          <span class="eyebrow">Pensé pour être simple</span>
+
+          <h2>Vous restez au frais. Nous nous occupons du reste.</h2>
+        </div>
+
+        <div class="trust-grid">
+          <article class="trust-item">
+            <span class="trust-icon" aria-hidden="true">01</span>
+
+            <h3>Un appareil adapté</h3>
+
+            <p>
+              Une recommandation basée sur le type et la surface de votre pièce.
+            </p>
+          </article>
+
+          <article class="trust-item">
+            <span class="trust-icon" aria-hidden="true">02</span>
+
+            <h3>Une tarification lisible</h3>
+
+            <p>
+              Les frais uniques sont séparés du prix de location hebdomadaire.
+            </p>
+          </article>
+
+          <article class="trust-item">
+            <span class="trust-icon" aria-hidden="true">03</span>
+
+            <h3>Une reprise déjà organisée</h3>
+
+            <p>
+              Vous n’avez pas besoin de transporter ou de retourner l’appareil.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================
+         FAQ
+         ===================================================== -->
+
+    <section id="faq" class="section section-faq">
+      <div class="container faq-container">
+        <div class="section-heading">
+          <span class="eyebrow">Questions fréquentes</span>
+
+          <h2>Avant de commencer votre location.</h2>
+        </div>
+
+        <div class="faq-list">
+          <details>
+            <summary>
+              La livraison est-elle facturée chaque semaine ?
+            </summary>
+
+            <p>
+              Non. Le tarif est payé une seule fois et comprend la livraison
+              ainsi que la reprise du climatiseur à la fin de votre location.
+            </p>
+          </details>
+
+          <details>
+            <summary>
+              Que comprend la mise en service ?
+            </summary>
+
+            <p>
+              Elle comprend le placement de l’appareil, son branchement,
+              l’installation du kit fenêtre lorsqu’il est compatible,
+              une démonstration rapide et un test de fonctionnement.
+            </p>
+          </details>
+
+          <details>
+            <summary>
+              Puis-je louer un climatiseur pendant plusieurs semaines ?
+            </summary>
+
+            <p>
+              Oui. Après la première semaine, vous payez uniquement le prix
+              de location hebdomadaire du modèle choisi.
+            </p>
+          </details>
+
+          <details>
+            <summary>
+              Comment savoir quel modèle choisir ?
+            </summary>
+
+            <p>
+              L’assistant IGLOUE vous recommande un modèle selon le type
+              et la surface de votre pièce.
+            </p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <a href="index.html" class="logo">IGLOUE</a>
 
         <p>
-          Cette option est facturée une seule fois.
+          Location de climatiseurs mobiles en Charente.
         </p>
       </div>
 
-      <div class="assistant-options">
-        <button type="button" data-setup="yes">
-          Oui — mise en service ${formatPrice(setupPrice)}
-        </button>
-
-        <button type="button" data-setup="no">
-          Non — je m’en charge
-        </button>
-      </div>
+      <nav aria-label="Navigation du pied de page">
+        <a href="#assistant">Trouver ma climatisation</a>
+        <a href="#livraison">Livraison</a>
+        <a href="#tarifs">Tarifs</a>
+        <a href="#faq">FAQ</a>
+      </nav>
     </div>
-  `;
+  </footer>
 
-  connectBackControl();
-
-  const helpButton = document.querySelector("[data-setup-help]");
-  const helpContent = document.querySelector("[data-setup-help-content]");
-
-  helpButton.addEventListener("click", () => {
-    const isExpanded = helpButton.getAttribute("aria-expanded") === "true";
-
-    helpButton.setAttribute("aria-expanded", String(!isExpanded));
-    helpContent.hidden = isExpanded;
-  });
-
-  document.querySelectorAll("[data-setup]").forEach((button) => {
-    button.addEventListener("click", () => {
-      assistantState.setup = button.dataset.setup === "yes";
-      showSummaryScreen();
-    });
-  });
-}
-
-function showSummaryScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-  const product = assistantState.product;
-
-  if (addToHistory) {
-    pushScreen(showSummaryScreen);
-  }
-
-  const selectedSetupPrice = assistantState.setup ? setupPrice : 0;
-
-  const firstWeekTotal =
-    product.weeklyPrice +
-    assistantState.zone.price +
-    selectedSetupPrice;
-
-  assistant.innerHTML = `
-    <div class="assistant-screen">
-      ${renderBackControl()}
-
-      <span class="eyebrow">Votre estimation</span>
-
-      <h2>${product.name}</h2>
-
-      <section class="assistant-pricing-block">
-        <h3>À régler au début de la location</h3>
-
-        <div class="assistant-result-grid">
-          <div>
-            <span>Location — première semaine</span>
-            <strong>${formatPrice(product.weeklyPrice)}</strong>
-          </div>
-
-          <div>
-            <span>Livraison & reprise — paiement unique</span>
-            <strong>${formatPrice(assistantState.zone.price)}</strong>
-          </div>
-
-          <div>
-            <span>Mise en service — paiement unique</span>
-            <strong>
-              ${
-                assistantState.setup
-                  ? formatPrice(setupPrice)
-                  : "Non sélectionnée"
-              }
-            </strong>
-          </div>
-
-          <div class="assistant-total-row">
-            <span>Total de départ estimé</span>
-            <strong>${formatPrice(firstWeekTotal)}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section class="assistant-recurring-block">
-        <span class="eyebrow">Après votre première semaine</span>
-
-        <div class="assistant-recurring-price">
-          <span>Location uniquement</span>
-          <strong>${formatPrice(product.weeklyPrice)} / semaine</strong>
-        </div>
-
-        <p>
-          Aucun nouveau frais de livraison, de reprise ou de mise en service.
-        </p>
-      </section>
-
-      <button class="assistant-next" type="button">
-        Demander une réservation →
-      </button>
-    </div>
-  `;
-
-  connectBackControl();
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  showPostcodeScreen();
-});
+  <script src="assets/js/products.js"></script>
+  <script src="assets/js/assistant.js"></script>
+</body>
+</html>
