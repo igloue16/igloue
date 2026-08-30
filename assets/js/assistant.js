@@ -4,10 +4,11 @@ const assistantState = {
   room: "",
   size: "",
   product: null,
-  setup: false
+  setup: null
 };
 
 const assistantHistory = [];
+const assistantStepCount = 4;
 
 const deliveryZones = [
   {
@@ -48,12 +49,62 @@ function formatPrice(price) {
   return `${price.toFixed(2).replace(".", ",")} €`;
 }
 
+function roundCurrency(price) {
+  return Math.round((price + Number.EPSILON) * 100) / 100;
+}
+
 function findZone(postcode) {
   return deliveryZones.find((zone) => zone.postcodes.includes(postcode)) || null;
 }
 
 function pushScreen(screenFunction) {
   assistantHistory.push(screenFunction);
+}
+
+function renderProgress(step, label, isComplete = false) {
+  const progress = isComplete ? 100 : (step / assistantStepCount) * 100;
+  const count = isComplete ? "Terminé" : `Étape ${step} sur ${assistantStepCount}`;
+
+  return `
+    <div
+      class="assistant-progress"
+      role="progressbar"
+      aria-label="${label}"
+      aria-valuemin="1"
+      aria-valuemax="${assistantStepCount}"
+      aria-valuenow="${step}"
+      style="--assistant-progress: ${progress}%">
+      <span>${label}</span>
+      <strong>${count}</strong>
+      <i aria-hidden="true"><span></span></i>
+    </div>
+  `;
+}
+
+function renderAssistant(markup, focusSelector = "[data-assistant-heading]") {
+  const assistant = getAssistantElement();
+
+  if (!assistant) {
+    return null;
+  }
+
+  assistant.innerHTML = markup;
+
+  const screen = assistant.querySelector(".assistant-screen");
+
+  if (screen) {
+    screen.scrollTop = 0;
+  }
+
+  requestAnimationFrame(() => {
+    const focusTarget = assistant.querySelector(focusSelector);
+
+    if (focusTarget) {
+      focusTarget.focus({ preventScroll: true });
+    }
+  });
+
+  return assistant;
 }
 
 function goBack() {
@@ -75,56 +126,93 @@ function renderBackControl() {
   `;
 }
 
-function connectBackControl() {
-  const backButton = document.querySelector("[data-assistant-back]");
+function connectBackControl(assistant) {
+  const backButton = assistant.querySelector("[data-assistant-back]");
 
   if (backButton) {
     backButton.addEventListener("click", goBack);
   }
 }
 
+function setPostcodeError(assistant, message = "") {
+  const input = assistant.querySelector("#assistant-postcode");
+  const error = assistant.querySelector("#assistant-postcode-error");
+  const hasError = Boolean(message);
+
+  input.setAttribute("aria-invalid", String(hasError));
+  error.textContent = message;
+  error.hidden = !hasError;
+}
+
 function showPostcodeScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
-  if (!assistant) {
-    return;
-  }
-
   if (addToHistory) {
     assistantHistory.length = 0;
     pushScreen(showPostcodeScreen);
   }
 
-  assistant.innerHTML = `
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
-      <span class="assistant-step-label">Étape 1</span>
-      <h2>Quel est votre code postal ?</h2>
+      ${renderProgress(1, "Zone de livraison")}
+      <h2 data-assistant-heading tabindex="-1">Quel est votre code postal ?</h2>
       <p>Nous vérifierons immédiatement votre zone de livraison.</p>
 
-      <label class="assistant-label" for="assistant-postcode">Code postal</label>
+      <form data-postcode-form novalidate>
+        <label class="assistant-label" for="assistant-postcode">Code postal</label>
 
-      <input
-        id="assistant-postcode"
-        class="assistant-line-input"
-        type="text"
-        inputmode="numeric"
-        maxlength="5"
-        placeholder="16000"
-        autocomplete="postal-code"
-        value="${assistantState.postcode}">
+        <input
+          id="assistant-postcode"
+          class="assistant-line-input"
+          type="text"
+          inputmode="numeric"
+          maxlength="5"
+          pattern="[0-9]{5}"
+          placeholder="16000"
+          autocomplete="postal-code"
+          aria-describedby="assistant-postcode-hint assistant-postcode-error"
+          aria-invalid="false"
+          required
+          value="${assistantState.postcode}">
 
-      <p class="assistant-hint">
-        Disponible actuellement dans certaines zones de la Charente.
-      </p>
+        <p id="assistant-postcode-hint" class="assistant-hint">
+          Disponible actuellement dans certaines zones de la Charente.
+        </p>
+
+        <p id="assistant-postcode-error" class="assistant-error" role="alert" hidden></p>
+
+        <button class="assistant-next" type="submit">
+          Vérifier ma zone →
+        </button>
+      </form>
     </div>
-  `;
+  `, "#assistant-postcode");
 
-  const input = document.querySelector("#assistant-postcode");
+  if (!assistant) {
+    return;
+  }
+
+  const form = assistant.querySelector("[data-postcode-form]");
+  const input = assistant.querySelector("#assistant-postcode");
 
   input.addEventListener("input", () => {
     input.value = input.value.replace(/\D/g, "");
+    assistantState.postcode = input.value;
+    assistantState.zone = null;
+    setPostcodeError(assistant);
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
     if (input.value.length !== 5) {
+      setPostcodeError(assistant, "Saisissez un code postal à 5 chiffres.");
+      input.focus();
       return;
     }
 
@@ -137,22 +225,18 @@ function showPostcodeScreen(addToHistory = true) {
       showUnavailableScreen();
     }
   });
-
-  input.focus();
 }
 
 function showZoneScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
   if (addToHistory) {
     pushScreen(showZoneScreen);
   }
 
-  assistant.innerHTML = `
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Livraison disponible</span>
-      <h2>Bonne nouvelle.</h2>
+      ${renderProgress(1, "Zone de livraison")}
+      <h2 data-assistant-heading tabindex="-1">Bonne nouvelle.</h2>
       <p>Nous livrons et reprenons le climatiseur dans votre secteur.</p>
 
       <div class="assistant-result-grid">
@@ -169,61 +253,72 @@ function showZoneScreen(addToHistory = true) {
         Choisir la pièce →
       </button>
     </div>
-  `;
+  `);
 
-  connectBackControl();
-  document.querySelector("[data-next-room]").addEventListener("click", showRoomScreen);
+  connectBackControl(assistant);
+  assistant.querySelector("[data-next-room]").addEventListener("click", showRoomScreen);
 }
 
 function showUnavailableScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
   if (addToHistory) {
     pushScreen(showUnavailableScreen);
   }
 
-  assistant.innerHTML = `
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Zone non disponible</span>
-      <h2>Pas encore dans votre secteur.</h2>
+      ${renderProgress(1, "Zone de livraison")}
+      <h2 data-assistant-heading tabindex="-1">Pas encore dans votre secteur.</h2>
       <p>IGLOUE se concentre actuellement sur certaines zones de la Charente.</p>
+
+      <p class="assistant-note" role="status">
+        Le code postal ${assistantState.postcode} n’est pas dans la zone desservie actuellement.
+      </p>
 
       <button class="assistant-next" type="button" data-restart>
         Modifier le code postal →
       </button>
     </div>
-  `;
+  `);
 
-  connectBackControl();
-  document.querySelector("[data-restart]").addEventListener("click", () => showPostcodeScreen(false));
+  connectBackControl(assistant);
+  assistant.querySelector("[data-restart]").addEventListener("click", () => showPostcodeScreen(false));
 }
 
 function showRoomScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
   if (addToHistory) {
     pushScreen(showRoomScreen);
   }
 
-  assistant.innerHTML = `
+  const rooms = [
+    ["chambre", "Chambre"],
+    ["salon", "Salon"],
+    ["bureau", "Bureau"],
+    ["autre", "Autre pièce"]
+  ];
+  const roomOptions = rooms.map(([value, label]) => `
+    <button
+      class="${assistantState.room === value ? "is-selected" : ""}"
+      type="button"
+      aria-pressed="${assistantState.room === value}"
+      data-room="${value}">${label}</button>
+  `).join("");
+
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Votre besoin</span>
-      <h2>Quelle pièce souhaitez-vous rafraîchir ?</h2>
+      ${renderProgress(2, "Type de pièce")}
+      <h2 data-assistant-heading tabindex="-1">Quelle pièce souhaitez-vous rafraîchir ?</h2>
 
       <div class="assistant-options">
-        <button type="button" data-room="chambre">Chambre</button>
-        <button type="button" data-room="salon">Salon</button>
-        <button type="button" data-room="bureau">Bureau</button>
-        <button type="button" data-room="autre">Autre pièce</button>
+        ${roomOptions}
       </div>
     </div>
-  `;
+  `);
 
-  connectBackControl();
+  connectBackControl(assistant);
 
-  document.querySelectorAll("[data-room]").forEach((button) => {
+  assistant.querySelectorAll("[data-room]").forEach((button) => {
     button.addEventListener("click", () => {
       assistantState.room = button.dataset.room;
       showSizeScreen();
@@ -232,30 +327,39 @@ function showRoomScreen(addToHistory = true) {
 }
 
 function showSizeScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
   if (addToHistory) {
     pushScreen(showSizeScreen);
   }
 
-  assistant.innerHTML = `
+  const sizes = [
+    ["small", "Moins de 15 m²"],
+    ["medium", "De 15 à 25 m²"],
+    ["large", "De 25 à 35 m²"],
+    ["xl", "Plus de 35 m²"]
+  ];
+  const sizeOptions = sizes.map(([value, label]) => `
+    <button
+      class="${assistantState.size === value ? "is-selected" : ""}"
+      type="button"
+      aria-pressed="${assistantState.size === value}"
+      data-size="${value}">${label}</button>
+  `).join("");
+
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Surface approximative</span>
-      <h2>Quelle est la taille de cette pièce ?</h2>
+      ${renderProgress(3, "Surface de la pièce")}
+      <h2 data-assistant-heading tabindex="-1">Quelle est la taille de cette pièce ?</h2>
 
       <div class="assistant-options">
-        <button type="button" data-size="small">Moins de 15 m²</button>
-        <button type="button" data-size="medium">De 15 à 25 m²</button>
-        <button type="button" data-size="large">De 25 à 35 m²</button>
-        <button type="button" data-size="xl">Plus de 35 m²</button>
+        ${sizeOptions}
       </div>
     </div>
-  `;
+  `);
 
-  connectBackControl();
+  connectBackControl(assistant);
 
-  document.querySelectorAll("[data-size]").forEach((button) => {
+  assistant.querySelectorAll("[data-size]").forEach((button) => {
     button.addEventListener("click", () => {
       assistantState.size = button.dataset.size;
       assistantState.product = findProductByRoomSize(assistantState.size);
@@ -265,22 +369,21 @@ function showSizeScreen(addToHistory = true) {
 }
 
 function showRecommendationScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
   const product = assistantState.product;
 
   if (addToHistory) {
     pushScreen(showRecommendationScreen);
   }
 
-  assistant.innerHTML = `
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Notre recommandation</span>
+      ${renderProgress(3, "Recommandation")}
 
       <div class="assistant-product">
         <span class="assistant-product-mark" aria-hidden="true">❄</span>
         <div>
-          <h2>${product.name}</h2>
+          <h2 data-assistant-heading tabindex="-1">${product.name}</h2>
           <p>${product.tagline}</p>
           <p>${product.suitableFor}</p>
         </div>
@@ -299,35 +402,38 @@ function showRecommendationScreen(addToHistory = true) {
         Choisir la mise en service →
       </button>
     </div>
-  `;
+  `);
 
-  connectBackControl();
-  document.querySelector("[data-next-setup]").addEventListener("click", showSetupScreen);
+  connectBackControl(assistant);
+  assistant.querySelector("[data-next-setup]").addEventListener("click", showSetupScreen);
 }
 
 function showSetupScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
-
   if (addToHistory) {
     pushScreen(showSetupScreen);
   }
 
-  assistant.innerHTML = `
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Mise en service</span>
+      ${renderProgress(4, "Mise en service")}
 
       <div class="assistant-heading-row">
-        <h2>Souhaitez-vous que nous l’installions pour vous ?</h2>
+        <h2 data-assistant-heading tabindex="-1">Souhaitez-vous que nous l’installions pour vous ?</h2>
         <button
           class="assistant-help"
           type="button"
-          aria-label="Afficher les détails"
+          aria-label="Afficher les détails de la mise en service"
           aria-expanded="false"
+          aria-controls="assistant-setup-help"
           data-setup-help>i</button>
       </div>
 
-      <div class="assistant-help-content" data-setup-help-content hidden>
+      <div
+        id="assistant-setup-help"
+        class="assistant-help-content"
+        data-setup-help-content
+        hidden>
         <strong>La mise en service comprend :</strong>
         <ul>
           <li>Placement dans la pièce</li>
@@ -339,16 +445,24 @@ function showSetupScreen(addToHistory = true) {
       </div>
 
       <div class="assistant-options">
-        <button type="button" data-setup="yes">Oui — ${formatPrice(setupPrice)}</button>
-        <button type="button" data-setup="no">Non — je m’en charge</button>
+        <button
+          class="${assistantState.setup === true ? "is-selected" : ""}"
+          type="button"
+          aria-pressed="${assistantState.setup === true}"
+          data-setup="yes">Oui — ${formatPrice(setupPrice)}</button>
+        <button
+          class="${assistantState.setup === false ? "is-selected" : ""}"
+          type="button"
+          aria-pressed="${assistantState.setup === false}"
+          data-setup="no">Non — je m’en charge</button>
       </div>
     </div>
-  `;
+  `);
 
-  connectBackControl();
+  connectBackControl(assistant);
 
-  const helpButton = document.querySelector("[data-setup-help]");
-  const helpContent = document.querySelector("[data-setup-help-content]");
+  const helpButton = assistant.querySelector("[data-setup-help]");
+  const helpContent = assistant.querySelector("[data-setup-help-content]");
 
   helpButton.addEventListener("click", () => {
     const expanded = helpButton.getAttribute("aria-expanded") === "true";
@@ -356,7 +470,7 @@ function showSetupScreen(addToHistory = true) {
     helpContent.hidden = expanded;
   });
 
-  document.querySelectorAll("[data-setup]").forEach((button) => {
+  assistant.querySelectorAll("[data-setup]").forEach((button) => {
     button.addEventListener("click", () => {
       assistantState.setup = button.dataset.setup === "yes";
       showSummaryScreen();
@@ -364,8 +478,35 @@ function showSetupScreen(addToHistory = true) {
   });
 }
 
+function buildReservationDraft() {
+  const product = assistantState.product;
+  const selectedSetupPrice = assistantState.setup ? setupPrice : 0;
+
+  return {
+    postcode: assistantState.postcode,
+    deliveryZone: {
+      id: assistantState.zone.id,
+      name: assistantState.zone.name
+    },
+    requirement: {
+      room: assistantState.room,
+      size: assistantState.size
+    },
+    product: {
+      id: product.id,
+      name: product.name
+    },
+    pricing: {
+      currency: "EUR",
+      weeklyRental: roundCurrency(product.weeklyPrice),
+      deliveryAndCollection: roundCurrency(assistantState.zone.price),
+      setup: roundCurrency(selectedSetupPrice),
+      initialTotal: roundCurrency(product.weeklyPrice + assistantState.zone.price + selectedSetupPrice)
+    }
+  };
+}
+
 function showSummaryScreen(addToHistory = true) {
-  const assistant = getAssistantElement();
   const product = assistantState.product;
 
   if (addToHistory) {
@@ -375,11 +516,11 @@ function showSummaryScreen(addToHistory = true) {
   const selectedSetupPrice = assistantState.setup ? setupPrice : 0;
   const firstWeekTotal = product.weeklyPrice + assistantState.zone.price + selectedSetupPrice;
 
-  assistant.innerHTML = `
+  const assistant = renderAssistant(`
     <div class="assistant-screen">
       ${renderBackControl()}
-      <span class="assistant-step-label">Votre estimation</span>
-      <h2>${product.name}</h2>
+      ${renderProgress(4, "Estimation prête", true)}
+      <h2 data-assistant-heading tabindex="-1">${product.name}</h2>
 
       <div class="assistant-result-grid">
         <div><span>Location — première semaine</span><strong>${formatPrice(product.weeklyPrice)}</strong></div>
@@ -388,10 +529,10 @@ function showSummaryScreen(addToHistory = true) {
           <span>Mise en service — paiement unique</span>
           <strong>${assistantState.setup ? formatPrice(setupPrice) : "Non sélectionnée"}</strong>
         </div>
-        <div><span>Total de départ estimé</span><strong>${formatPrice(firstWeekTotal)}</strong></div>
+        <div class="assistant-total"><span>Total de départ estimé</span><strong>${formatPrice(firstWeekTotal)}</strong></div>
       </div>
 
-      <section class="assistant-recurring-block">
+      <section class="assistant-recurring-block" aria-label="Tarif après la première semaine">
         <span class="assistant-step-label">Après votre première semaine</span>
         <div class="assistant-recurring-price">
           <span>Location uniquement</span>
@@ -399,13 +540,28 @@ function showSummaryScreen(addToHistory = true) {
         </div>
       </section>
 
-      <button class="assistant-next" type="button">
+      <button class="assistant-next" type="button" data-reservation-request>
         Demander une réservation →
       </button>
-    </div>
-  `;
 
-  connectBackControl();
+      <p class="assistant-reservation-status" role="status" tabindex="-1" data-reservation-status hidden></p>
+    </div>
+  `);
+
+  connectBackControl(assistant);
+
+  assistant.querySelector("[data-reservation-request]").addEventListener("click", () => {
+    const status = assistant.querySelector("[data-reservation-status]");
+
+    assistant.dispatchEvent(new CustomEvent("igloue:reservation-requested", {
+      bubbles: true,
+      detail: buildReservationDraft()
+    }));
+
+    status.textContent = "La réservation en ligne n’est pas encore activée.";
+    status.hidden = false;
+    status.focus({ preventScroll: true });
+  });
 }
 
 document.addEventListener("DOMContentLoaded", showPostcodeScreen);

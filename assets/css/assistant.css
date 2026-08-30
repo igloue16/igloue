@@ -1,17 +1,48 @@
+/* =========================================================
+   HERO ASSISTANT STAGE
+   ========================================================= */
+
 .assistant-panel {
-  width: min(100%, 720px);
-  min-height: 300px;
-  margin-inline: auto;
-  padding: clamp(24px, 4vw, 40px);
+  width: min(100%, 520px);
+  height: min(430px, calc(100svh - 230px));
+  min-height: 320px;
+  overflow: hidden;
+  padding:
+    clamp(24px, 3vh, 28px)
+    clamp(28px, 3vw, 36px);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: 8px;
   background: #ffffff;
   box-shadow: var(--shadow);
 }
 
 .assistant-screen {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
   animation: assistant-in 220ms ease both;
 }
+
+.assistant-screen::-webkit-scrollbar {
+  width: 6px;
+}
+
+.assistant-screen::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.assistant-screen::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+}
+
+
+/* =========================================================
+   SCREEN TRANSITION
+   ========================================================= */
 
 @keyframes assistant-in {
   from {
@@ -25,161 +56,328 @@
   }
 }
 
+
+/* =========================================================
+   ASSISTANT TYPOGRAPHY
+   ========================================================= */
+
 .assistant-screen h2 {
-  margin: 10px 0 14px;
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  max-width: 560px;
+  margin: 7px 0 8px;
+  font-family:
+    "Bahnschrift",
+    "Arial Narrow",
+    Arial,
+    sans-serif;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.assistant-screen [tabindex="-1"]:focus {
+  outline: none;
 }
 
 .assistant-screen > p {
+  max-width: 520px;
+  margin-bottom: 0;
   color: var(--text-soft);
-  line-height: 1.65;
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 .assistant-step-label {
   display: block;
   color: var(--blue);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   PROGRESS
+   ========================================================= */
+
+.assistant-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 16px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assistant-progress > strong {
+  color: var(--blue);
+  font-size: inherit;
+}
+
+.assistant-progress > i {
+  grid-column: 1 / -1;
+  height: 2px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.assistant-progress > i > span {
+  width: var(--assistant-progress);
+  height: 100%;
+  display: block;
+  background: var(--blue);
+  transition: width 180ms ease;
+}
+
+
+/* =========================================================
+   POSTCODE INPUT
+   ========================================================= */
+
+.assistant-label {
+  display: block;
+  margin-top: 18px;
+  margin-bottom: 5px;
+  color: var(--blue);
+  font-size: 0.66rem;
   font-weight: 750;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.assistant-label {
-  display: block;
-  margin-top: 28px;
-  margin-bottom: 8px;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
 .assistant-line-input {
-  width: 100%;
-  min-height: 58px;
+  width: calc(100% - 58px);
+  max-width: 430px;
+  min-height: 42px;
   padding: 0 2px;
   border: 0;
-  border-bottom: 2px solid var(--line-strong);
+  border-bottom: 1px solid #223647;
   border-radius: 0;
   outline: none;
   background: transparent;
   color: var(--text);
-  font-size: 1.7rem;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  transition: border-color 150ms ease;
 }
 
 .assistant-line-input:focus {
   border-color: var(--blue);
 }
 
+.assistant-line-input::placeholder {
+  color: #9aa6ad;
+}
+
 .assistant-hint,
 .assistant-note {
-  margin-top: 10px;
+  margin-top: 7px;
   color: var(--text-muted) !important;
-  font-size: 0.82rem;
+  font-size: 0.7rem;
+  line-height: 1.45 !important;
 }
+
+.assistant-error {
+  margin: 6px 0 0;
+  color: #9b2f2f;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.assistant-error[hidden] {
+  display: none;
+}
+
+
+/* =========================================================
+   ANSWER CONTROLS
+   ========================================================= */
 
 .assistant-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 28px;
+  gap: 8px;
+  margin-top: 15px;
 }
 
 .assistant-options button {
-  min-height: 58px;
-  padding: 15px 17px;
+  min-height: 42px;
+  padding: 10px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: 3px;
+  background: transparent;
   color: var(--text);
+  font-size: 0.78rem;
   font-weight: 650;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
 }
 
 .assistant-options button:hover {
   border-color: var(--blue);
+  background: rgb(255 255 255 / 62%);
+  transform: translateY(-1px);
+}
+
+.assistant-options button.is-selected {
+  border-color: var(--blue);
   background: var(--surface-blue);
 }
 
-.assistant-next {
-  min-height: 50px;
-  margin-top: 26px;
-  padding: 12px 18px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--blue-dark);
-  color: #ffffff;
-  font-weight: 750;
-  cursor: pointer;
+.assistant-options button:focus-visible,
+.assistant-next:focus-visible,
+.assistant-back:focus-visible,
+.assistant-help:focus-visible,
+.assistant-line-input:focus-visible {
+  outline: 3px solid rgb(23 107 148 / 18%);
+  outline-offset: 3px;
 }
 
+
+/* =========================================================
+   PRIMARY ACTION
+   ========================================================= */
+
+.assistant-next {
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 9px 14px;
+  border: 1px solid var(--blue-dark);
+  border-radius: 3px;
+  background: var(--blue-dark);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.assistant-next:hover {
+  background: var(--blue);
+  transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   BACK CONTROL
+   ========================================================= */
+
 .assistant-back {
-  margin-bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 10px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--text-muted);
+  font-size: 0.72rem;
   cursor: pointer;
 }
 
+.assistant-back:hover {
+  color: var(--text);
+}
+
+
+/* =========================================================
+   RESULT ROWS
+   ========================================================= */
+
 .assistant-result-grid {
-  margin-top: 28px;
+  margin-top: 12px;
   border-top: 1px solid var(--line);
 }
 
 .assistant-result-grid > div {
-  min-height: 68px;
+  min-height: 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
-  padding-block: 16px;
+  gap: 18px;
+  padding-block: 6px;
   border-bottom: 1px solid var(--line);
+}
+
+.assistant-result-grid .assistant-total {
+  border-bottom-color: var(--blue);
+}
+
+.assistant-result-grid .assistant-total span,
+.assistant-result-grid .assistant-total strong {
+  color: var(--blue-dark);
+  font-weight: 800;
 }
 
 .assistant-result-grid span {
   color: var(--text-soft);
-  font-size: 0.88rem;
+  font-size: 0.72rem;
 }
 
 .assistant-result-grid strong {
+  color: var(--text);
+  font-size: 0.76rem;
   text-align: right;
 }
 
+
+/* =========================================================
+   PRODUCT RECOMMENDATION
+   ========================================================= */
+
 .assistant-product {
   display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 20px;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 14px;
   align-items: center;
-  margin-top: 26px;
-  padding-block: 22px;
+  margin-top: 12px;
+  padding-block: 12px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
 .assistant-product-mark {
-  width: 72px;
-  height: 72px;
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: var(--surface-blue);
-  font-size: 1.7rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 56%);
+  font-size: 1.2rem;
 }
 
 .assistant-product h2 {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
+  font-size: 1.25rem;
 }
 
 .assistant-product p {
-  margin: 4px 0;
+  margin: 2px 0;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
+
+
+/* =========================================================
+   SETUP INFORMATION
+   ========================================================= */
 
 .assistant-heading-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
 }
 
 .assistant-heading-row h2 {
@@ -188,38 +386,162 @@
 
 .assistant-help {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  margin-top: 10px;
+  width: 24px;
+  height: 24px;
+  margin-top: 3px;
   border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  background: #ffffff;
+  border-radius: 2px;
+  background: transparent;
   color: var(--blue-dark);
+  font-size: 0.7rem;
   font-weight: 800;
   cursor: pointer;
 }
 
 .assistant-help-content {
   margin-top: 8px;
-  padding: 18px;
+  padding: 12px 14px;
   border-left: 3px solid var(--blue);
-  background: var(--surface-blue);
+  background: rgb(255 255 255 / 60%);
   color: var(--text-soft);
-  font-size: 0.88rem;
-  line-height: 1.6;
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
 
+.assistant-help-content ul {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+
+/* =========================================================
+   RECURRING PRICE
+   ========================================================= */
+
 .assistant-recurring-block {
-  margin-top: 26px;
-  padding: 22px;
+  margin-top: 12px;
+  padding: 10px 12px;
   border: 1px solid #bdd9e6;
-  border-radius: 12px;
-  background: var(--surface-blue);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 55%);
+}
+
+.assistant-reservation-status {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .assistant-recurring-price {
   display: flex;
   justify-content: space-between;
-  gap: 18px;
-  margin-top: 10px;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.assistant-recurring-price span {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.assistant-recurring-price strong {
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+
+/* =========================================================
+   LOADING STATE
+   ========================================================= */
+
+.assistant-panel.is-loading {
+  cursor: progress;
+}
+
+.assistant-panel.is-loading .assistant-screen {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+
+/* =========================================================
+   MOBILE SAFETY
+   ========================================================= */
+
+@media (max-width: 640px) {
+  .assistant-panel {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .assistant-screen {
+    padding-right: 2px;
+  }
+
+  .assistant-screen h2 {
+    font-size: 1.28rem;
+  }
+
+  .assistant-line-input {
+    width: 100%;
+    max-width: none;
+  }
+
+  .assistant-options {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-options button,
+  .assistant-next {
+    min-height: 44px;
+  }
+
+  .assistant-result-grid > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .assistant-result-grid strong {
+    text-align: left;
+  }
+
+  .assistant-product {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .assistant-product-mark {
+    width: 46px;
+    height: 46px;
+  }
+
+  .assistant-recurring-price {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .assistant-recurring-price strong {
+    text-align: left;
+  }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-screen {
+    animation: none;
+  }
+
+  .assistant-progress > i > span {
+    transition: none;
+  }
 }
