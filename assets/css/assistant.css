@@ -1,5 +1,5 @@
 /* =========================================================
-   HERO ASSISTANT STAGE
+   ASSISTANT WORKSPACE
    ========================================================= */
 
 .assistant-panel {
@@ -24,7 +24,7 @@
   padding: 0 4px 4px 0;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
-  animation: assistant-in 220ms ease both;
+  animation: assistant-in 180ms ease both;
 }
 
 .assistant-screen::-webkit-scrollbar {
@@ -39,15 +39,34 @@
   background: var(--line-strong);
 }
 
+.assistant-stage-layout,
+.assistant-stage-content {
+  min-width: 0;
+}
 
-/* =========================================================
-   SCREEN TRANSITION
-   ========================================================= */
+.assistant-stage-layout {
+  min-height: 100%;
+}
+
+/* The empty slot takes no space. Adding a transparent <img> later activates it. */
+.assistant-mascot-slot {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  align-self: stretch;
+}
+
+.assistant-mascot-slot > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
 
 @keyframes assistant-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
 
   to {
@@ -58,10 +77,11 @@
 
 
 /* =========================================================
-   ASSISTANT TYPOGRAPHY
+   TYPOGRAPHY AND PROGRESS
    ========================================================= */
 
-.assistant-screen h2 {
+.assistant-stage-content h2,
+.assistant-fieldset legend {
   max-width: 560px;
   margin: 7px 0 8px;
   font-family:
@@ -69,9 +89,9 @@
     "Arial Narrow",
     Arial,
     sans-serif;
-  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-size: clamp(1.32rem, 2vw, 1.76rem);
   font-weight: 650;
-  line-height: 1;
+  line-height: 1.05;
   letter-spacing: -0.035em;
 }
 
@@ -79,12 +99,13 @@
   outline: none;
 }
 
-.assistant-screen > p {
+.assistant-stage-content > p,
+.assistant-stage-content form > p {
   max-width: 520px;
   margin-bottom: 0;
   color: var(--text-soft);
-  font-size: 0.84rem;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .assistant-step-label {
@@ -96,51 +117,59 @@
   text-transform: uppercase;
 }
 
-
-/* =========================================================
-   PROGRESS
-   ========================================================= */
-
 .assistant-progress {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 5px 16px;
-  margin-bottom: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-progress li {
+  position: relative;
+  padding-top: 7px;
+  border-top: 2px solid var(--line);
   color: var(--text-muted);
-  font-size: 0.64rem;
+  font-size: 0.56rem;
   font-weight: 750;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
-.assistant-progress > strong {
-  color: var(--blue);
-  font-size: inherit;
-}
-
-.assistant-progress > i {
-  grid-column: 1 / -1;
-  height: 2px;
-  overflow: hidden;
-  background: var(--line);
-}
-
-.assistant-progress > i > span {
-  width: var(--assistant-progress);
-  height: 100%;
+.assistant-progress li span {
   display: block;
-  background: var(--blue);
-  transition: width 180ms ease;
+  margin-bottom: 2px;
+  font-size: 0.52rem;
+}
+
+.assistant-progress li.is-current,
+.assistant-progress li.is-complete {
+  border-top-color: var(--blue);
+  color: var(--blue-dark);
 }
 
 
 /* =========================================================
-   POSTCODE INPUT
+   FORMS AND ANSWERS
    ========================================================= */
+
+.assistant-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.assistant-fieldset legend {
+  width: 100%;
+  padding: 0;
+}
 
 .assistant-label {
   display: block;
-  margin-top: 18px;
+  margin-top: 16px;
   margin-bottom: 5px;
   color: var(--blue);
   font-size: 0.66rem;
@@ -170,49 +199,50 @@
   border-color: var(--blue);
 }
 
-.assistant-line-input::placeholder {
+.assistant-line-input::placeholder,
+.assistant-area-input::placeholder {
   color: #9aa6ad;
 }
 
 .assistant-hint,
 .assistant-note {
-  margin-top: 7px;
+  margin-top: 6px;
   color: var(--text-muted) !important;
-  font-size: 0.7rem;
-  line-height: 1.45 !important;
+  font-size: 0.69rem !important;
+  line-height: 1.4 !important;
 }
 
 .assistant-error {
   margin: 6px 0 0;
-  color: #9b2f2f;
-  font-size: 0.72rem;
-  line-height: 1.4;
+  color: #9b2f2f !important;
+  font-size: 0.71rem !important;
+  line-height: 1.4 !important;
 }
 
-.assistant-error[hidden] {
+.assistant-error[hidden],
+.assistant-reservation-status[hidden] {
   display: none;
 }
-
-
-/* =========================================================
-   ANSWER CONTROLS
-   ========================================================= */
 
 .assistant-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 15px;
+  margin-top: 14px;
+}
+
+.assistant-options-compact {
+  margin-top: 10px;
 }
 
 .assistant-options button {
   min-height: 42px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--line-strong);
   border-radius: 3px;
   background: transparent;
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: 0.77rem;
   font-weight: 650;
   text-align: left;
   cursor: pointer;
@@ -224,7 +254,7 @@
 
 .assistant-options button:hover {
   border-color: var(--blue);
-  background: rgb(255 255 255 / 62%);
+  background: var(--surface-blue);
   transform: translateY(-1px);
 }
 
@@ -233,23 +263,131 @@
   background: var(--surface-blue);
 }
 
-.assistant-options button:focus-visible,
-.assistant-next:focus-visible,
-.assistant-back:focus-visible,
-.assistant-help:focus-visible,
-.assistant-line-input:focus-visible {
-  outline: 3px solid rgb(23 107 148 / 18%);
-  outline-offset: 3px;
+.assistant-area-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-top: 14px;
+  color: var(--text);
+}
+
+.assistant-area-label strong {
+  font-size: 0.86rem;
+}
+
+.assistant-area-label span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.assistant-area-input-wrap {
+  width: min(100%, 180px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  border-bottom: 1px solid #223647;
+}
+
+.assistant-area-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 2px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.assistant-area-input-wrap span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.assistant-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.assistant-check-option,
+.assistant-setup-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.assistant-check-option {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.assistant-check-none {
+  grid-column: 1 / -1;
+}
+
+.assistant-check-option:has(input:checked),
+.assistant-setup-option:has(input:checked) {
+  border-color: var(--blue);
+  background: var(--surface-blue);
+}
+
+.assistant-check-option input,
+.assistant-setup-option input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--blue-dark);
+}
+
+.assistant-date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.assistant-date-grid label > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--blue-dark);
+  font-size: 0.69rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.assistant-date-grid input {
+  width: 100%;
+  min-height: 42px;
+  padding: 7px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
 }
 
 
 /* =========================================================
-   PRIMARY ACTION
+   ACTIONS AND FOCUS
    ========================================================= */
 
 .assistant-next {
   min-height: 40px;
-  margin-top: 14px;
+  margin-top: 13px;
   padding: 9px 14px;
   border: 1px solid var(--blue-dark);
   border-radius: 3px;
@@ -268,20 +406,15 @@
   transform: translateY(-1px);
 }
 
-
-/* =========================================================
-   BACK CONTROL
-   ========================================================= */
-
 .assistant-back {
   display: inline-flex;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.71rem;
   cursor: pointer;
 }
 
@@ -289,24 +422,47 @@
   color: var(--text);
 }
 
+.assistant-options button:focus-visible,
+.assistant-next:focus-visible,
+.assistant-back:focus-visible,
+.assistant-line-input:focus-visible,
+.assistant-area-input:focus-visible,
+.assistant-date-grid input:focus-visible,
+.assistant-check-option:has(input:focus-visible),
+.assistant-setup-option:has(input:focus-visible) {
+  outline: 3px solid rgb(23 107 148 / 18%);
+  outline-offset: 3px;
+}
+
 
 /* =========================================================
-   RESULT ROWS
+   DELIVERY AND RESULT
    ========================================================= */
 
 .assistant-result-grid {
-  margin-top: 12px;
+  margin-top: 10px;
   border-top: 1px solid var(--line);
 }
 
 .assistant-result-grid > div {
-  min-height: 32px;
+  min-height: 29px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 18px;
-  padding-block: 6px;
+  gap: 16px;
+  padding-block: 5px;
   border-bottom: 1px solid var(--line);
+}
+
+.assistant-result-grid span {
+  color: var(--text-soft);
+  font-size: 0.69rem;
+}
+
+.assistant-result-grid strong {
+  color: var(--text);
+  font-size: 0.73rem;
+  text-align: right;
 }
 
 .assistant-result-grid .assistant-total {
@@ -319,118 +475,38 @@
   font-weight: 800;
 }
 
-.assistant-result-grid span {
-  color: var(--text-soft);
-  font-size: 0.72rem;
+.assistant-recommendation-copy {
+  margin: 0 !important;
+  font-size: 0.75rem !important;
+  line-height: 1.4 !important;
 }
 
-.assistant-result-grid strong {
-  color: var(--text);
-  font-size: 0.76rem;
-  text-align: right;
+.assistant-date-summary {
+  margin: 5px 0 0 !important;
+  color: var(--blue-dark) !important;
+  font-size: 0.69rem !important;
+  font-weight: 750;
 }
 
-
-/* =========================================================
-   PRODUCT RECOMMENDATION
-   ========================================================= */
-
-.assistant-product {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-  margin-top: 12px;
-  padding-block: 12px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+.assistant-setup-option {
+  margin-top: 9px;
+  padding: 8px 10px;
 }
 
-.assistant-product-mark {
-  width: 54px;
-  height: 54px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgb(255 255 255 / 56%);
-  font-size: 1.2rem;
-}
-
-.assistant-product h2 {
-  margin: 0 0 4px;
-  font-size: 1.25rem;
-}
-
-.assistant-product p {
-  margin: 2px 0;
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  line-height: 1.4;
-}
-
-
-/* =========================================================
-   SETUP INFORMATION
-   ========================================================= */
-
-.assistant-heading-row {
+.assistant-setup-option span {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.assistant-heading-row h2 {
-  margin-right: auto;
-}
-
-.assistant-help {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  margin-top: 3px;
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
-  background: transparent;
-  color: var(--blue-dark);
-  font-size: 0.7rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.assistant-help-content {
-  margin-top: 8px;
-  padding: 12px 14px;
-  border-left: 3px solid var(--blue);
-  background: rgb(255 255 255 / 60%);
-  color: var(--text-soft);
+.assistant-setup-option strong {
   font-size: 0.72rem;
-  line-height: 1.45;
 }
 
-.assistant-help-content ul {
-  margin: 8px 0;
-  padding-left: 18px;
-}
-
-
-/* =========================================================
-   RECURRING PRICE
-   ========================================================= */
-
-.assistant-recurring-block {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px solid #bdd9e6;
-  border-radius: 3px;
-  background: rgb(255 255 255 / 55%);
-}
-
-.assistant-reservation-status {
-  margin: 8px 0 0;
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  line-height: 1.4;
+.assistant-setup-option small {
+  color: var(--text-muted);
+  font-size: 0.63rem;
+  line-height: 1.3;
 }
 
 .assistant-recurring-price {
@@ -443,32 +519,42 @@
 
 .assistant-recurring-price span {
   color: var(--text-soft);
-  font-size: 0.72rem;
+  font-size: 0.69rem;
 }
 
 .assistant-recurring-price strong {
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   text-align: right;
 }
 
-
-/* =========================================================
-   LOADING STATE
-   ========================================================= */
-
-.assistant-panel.is-loading {
-  cursor: progress;
+.assistant-recurring-compact {
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
 }
 
-.assistant-panel.is-loading .assistant-screen {
-  opacity: 0.5;
-  pointer-events: none;
+.assistant-reservation-status {
+  margin: 7px 0 0 !important;
+  color: var(--text-soft) !important;
+  font-size: 0.7rem !important;
+  line-height: 1.4 !important;
 }
 
 
 /* =========================================================
-   MOBILE SAFETY
+   RESPONSIVE AND REDUCED MOTION
    ========================================================= */
+
+@media (min-width: 1600px) {
+  .assistant-stage-layout:has(.assistant-mascot-slot > img) {
+    display: grid;
+    grid-template-columns: minmax(0, 68%) minmax(0, 32%);
+    gap: 12px;
+  }
+
+  .assistant-stage-layout:has(.assistant-mascot-slot > img) .assistant-mascot-slot {
+    display: block;
+  }
+}
 
 @media (max-width: 640px) {
   .assistant-panel {
@@ -484,8 +570,9 @@
     padding-right: 2px;
   }
 
-  .assistant-screen h2 {
-    font-size: 1.28rem;
+  .assistant-stage-content h2,
+  .assistant-fieldset legend {
+    font-size: 1.25rem;
   }
 
   .assistant-line-input {
@@ -494,54 +581,40 @@
   }
 
   .assistant-options {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .assistant-options button,
-  .assistant-next {
+  .assistant-next,
+  .assistant-date-grid input {
     min-height: 44px;
+  }
+
+  .assistant-date-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
 
   .assistant-result-grid > div {
     align-items: flex-start;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
   }
 
-  .assistant-result-grid strong {
+  .assistant-result-grid strong,
+  .assistant-recurring-price strong {
     text-align: left;
-  }
-
-  .assistant-product {
-    grid-template-columns: 46px minmax(0, 1fr);
-  }
-
-  .assistant-product-mark {
-    width: 46px;
-    height: 46px;
   }
 
   .assistant-recurring-price {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .assistant-recurring-price strong {
-    text-align: left;
+    gap: 3px;
   }
 }
-
-
-/* =========================================================
-   REDUCED MOTION
-   ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
   .assistant-screen {
     animation: none;
-  }
-
-  .assistant-progress > i > span {
-    transition: none;
   }
 }

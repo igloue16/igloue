@@ -43,3 +43,20 @@ function findProductByRoomSize(size) {
 
   return IGLOUE_PRODUCTS.find((product) => product.id === map[size]) || IGLOUE_PRODUCTS[0];
 }
+
+function findProductByRoomArea(area, hasDifficultConditions = false) {
+  const numericArea = Number(area);
+  let productIndex = IGLOUE_PRODUCTS.findIndex((product) => (
+    product.maxRoomSize === null || numericArea <= product.maxRoomSize
+  ));
+
+  if (productIndex < 0) {
+    productIndex = IGLOUE_PRODUCTS.length - 1;
+  }
+
+  if (hasDifficultConditions) {
+    productIndex = Math.min(productIndex + 1, IGLOUE_PRODUCTS.length - 1);
+  }
+
+  return IGLOUE_PRODUCTS[productIndex];
+}
