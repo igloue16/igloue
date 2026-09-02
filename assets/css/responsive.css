@@ -32,8 +32,8 @@
   }
 
   .assistant-panel {
-    height: 360px;
-    min-height: 360px;
+    height: min(680px, calc(100svh - 96px));
+    min-height: 560px;
   }
 
   .assistant-trust-strip {
@@ -62,20 +62,25 @@
   }
 
   .assistant-hero-content {
-    min-height: 580px;
-    padding: 24px 20px 30px;
+    min-height: auto;
+    padding: 14px 16px 16px;
   }
 
   .assistant-brand-line {
-    gap: 13px;
+    gap: 9px;
   }
 
   .assistant-brand-line > span {
-    padding-left: 13px;
+    padding-left: 9px;
+    font-size: 0.52rem;
+  }
+
+  .hero-logo {
+    font-size: 1.15rem;
   }
 
   .assistant-hero-copy {
-    margin-bottom: 28px;
+    margin: 0;
   }
 
   .assistant-hero-left-body {
@@ -85,12 +90,19 @@
   }
 
   .assistant-hero-copy h1 {
-    font-size: clamp(2.55rem, 13vw, 4rem);
+    margin-bottom: 7px;
+    font-size: clamp(1.35rem, 6.4vw, 1.85rem);
+    line-height: 1.04;
+  }
+
+  .assistant-hero-copy .lead {
+    font-size: 0.76rem;
+    line-height: 1.35;
   }
 
   .assistant-panel {
-    height: 400px;
-    min-height: 400px;
+    height: calc(100svh - 190px);
+    min-height: 460px;
   }
 
   .assistant-line-input {
@@ -102,12 +114,13 @@
   }
 
   .assistant-hero-visual {
-    width: 100%;
-    min-height: 450px;
+    display: none;
   }
 
   .assistant-hero-assistant {
-    padding: 30px 20px;
+    min-height: calc(100svh - 170px);
+    padding: 12px 14px 16px;
+    align-items: start;
   }
 
   .hero-contact {

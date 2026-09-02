@@ -81,7 +81,7 @@
 .assistant-hero-main {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 56%) minmax(420px, 44%);
+  grid-template-columns: minmax(360px, 40%) minmax(520px, 60%);
 }
 
 .assistant-hero-content {
@@ -91,7 +91,7 @@
   flex-direction: column;
   padding:
     clamp(22px, 3.5vh, 38px)
-    clamp(32px, 4vw, 68px)
+    clamp(24px, 2.5vw, 40px)
     clamp(20px, 3vh, 32px);
   background:
     radial-gradient(
@@ -109,9 +109,9 @@
 .assistant-hero-left-body {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(180px, 0.72fr);
+  grid-template-columns: minmax(190px, 1fr) minmax(130px, 0.58fr);
   align-items: end;
-  gap: clamp(24px, 3vw, 48px);
+  gap: clamp(16px, 2vw, 28px);
   flex: 1;
   padding-top: clamp(18px, 3vh, 34px);
 }
@@ -147,7 +147,7 @@
 }
 
 .assistant-hero-copy {
-  max-width: 620px;
+  max-width: 430px;
   margin: 0;
   align-self: center;
 }
@@ -157,14 +157,14 @@
 }
 
 .assistant-hero-copy h1 {
-  max-width: 600px;
+  max-width: 430px;
   margin: 0 0 16px;
   font-family:
     "Bahnschrift",
     "Arial Narrow",
     Arial,
     sans-serif;
-  font-size: clamp(2.55rem, 4.2vw, 4.7rem);
+  font-size: clamp(2rem, 3.15vw, 3.55rem);
   font-weight: 650;
   line-height: 0.94;
   letter-spacing: -0.055em;
@@ -255,8 +255,8 @@
   display: grid;
   place-items: center;
   padding:
-    clamp(24px, 4vh, 40px)
-    clamp(28px, 5vw, 72px);
+    clamp(12px, 2vh, 24px)
+    clamp(16px, 2vw, 32px);
   border-left: 1px solid var(--line);
   background: var(--surface-blue);
 }
