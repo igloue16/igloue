@@ -11,7 +11,7 @@
     clamp(24px, 3vh, 28px)
     clamp(28px, 3vw, 36px);
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ffffff;
   box-shadow: var(--shadow);
 }
@@ -441,10 +441,14 @@
   grid-column: 1 / -1;
 }
 
-.assistant-check-option:has(input:checked),
-.assistant-setup-option:has(input:checked) {
+.assistant-check-option:has(input:checked) {
   border-color: var(--blue);
   background: var(--surface-blue);
+}
+
+.assistant-setup-option:has(input:checked) {
+  border-color: var(--tan);
+  background: #fffaf4;
 }
 
 .assistant-check-option input,
@@ -561,10 +565,10 @@
 .assistant-featured-product {
   position: relative;
   padding: 14px 15px;
-  border: 1px solid var(--blue);
-  border-left-width: 4px;
+  border: 1px solid var(--line-strong);
+  border-top: 5px solid var(--tan);
   border-radius: 4px;
-  background: var(--surface-blue);
+  background: #fffdfa;
 }
 
 .assistant-featured-product.is-warning,
@@ -665,8 +669,8 @@
 
 .assistant-info-toggle:hover,
 .assistant-info-toggle[aria-expanded="true"] {
-  border-color: var(--blue);
-  background: var(--surface-blue);
+  border-color: #a66e35;
+  background: #fffaf4;
 }
 
 .assistant-info-panel {
@@ -731,12 +735,12 @@
 
 .assistant-model-card:has(.assistant-model-select:hover:not(:disabled)) {
   border-color: var(--blue);
-  background: var(--surface-blue);
+  background: #fbfdfe;
 }
 
 .assistant-model-card.is-selected {
   border: 2px solid var(--blue-dark);
-  background: var(--surface-blue);
+  background: #fbfdfe;
 }
 
 .assistant-model-select {
@@ -785,12 +789,16 @@
 
 .assistant-model-status {
   min-height: 1.2em;
-  color: var(--blue);
+  color: #8a5a2e;
   font-size: 0.55rem;
   font-weight: 750;
   letter-spacing: 0.05em;
   line-height: 1.2;
   text-transform: uppercase;
+}
+
+.assistant-model-card.is-selected .assistant-model-status {
+  color: var(--blue);
 }
 
 .assistant-model-price {
@@ -820,6 +828,12 @@
 .assistant-setup-options button {
   min-height: 38px;
   padding-block: 7px;
+}
+
+.assistant-setup-options button.is-selected {
+  border-color: var(--tan);
+  background: #fffaf4;
+  box-shadow: inset 3px 0 0 var(--tan);
 }
 
 .assistant-result-grid {
@@ -865,8 +879,9 @@
   margin-top: 9px;
   padding: 8px 10px;
   border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--tan);
   border-radius: 3px;
-  background: var(--surface);
+  background: #fffdfa;
 }
 
 .assistant-caution span,

@@ -5,17 +5,16 @@
 
 .process-list article {
   display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 18px;
+  grid-template-columns: 1px 1fr;
+  gap: 26px;
   padding-block: 28px;
   border-bottom: 1px solid rgb(196 154 108 / 22%);
 }
 
-.process-list article > span {
-  color: var(--tan-soft);
-  font-size: 0.76rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
+.process-marker {
+  width: 1px;
+  min-height: 100%;
+  background: rgb(159 179 192 / 45%);
 }
 
 .process-list h3 {
@@ -50,11 +49,72 @@
   font-size: 1.08rem;
 }
 
+.why-igloue {
+  padding-block: clamp(64px, 8vw, 104px);
+  border-block: 1px solid rgb(230 191 145 / 18%);
+  background: var(--page-alt);
+}
+
+.why-igloue-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.36fr) minmax(0, 0.64fr);
+  gap: clamp(54px, 8vw, 120px);
+  align-items: start;
+}
+
+.why-igloue header {
+  padding: 4px 0 8px 24px;
+  border-left: 6px solid var(--tan);
+}
+
+.why-igloue h2 {
+  max-width: 360px;
+  margin: 14px 0 0;
+}
+
+.why-igloue-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.why-igloue-list article {
+  min-width: 0;
+  padding: 22px 30px 25px 0;
+  border-top: 1px solid rgb(230 191 145 / 30%);
+}
+
+.why-igloue-list article:nth-child(even) {
+  padding-right: 0;
+  padding-left: 30px;
+  border-left: 1px solid rgb(230 191 145 / 18%);
+}
+
+.why-igloue-list article:last-child {
+  grid-column: 1 / -1;
+  max-width: 640px;
+  padding-right: 0;
+}
+
+.why-igloue-list h3 {
+  margin: 0 0 7px;
+  font-size: clamp(1rem, 1.45vw, 1.25rem);
+}
+
+.why-igloue-list p {
+  max-width: 390px;
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.55;
+}
+
 .section-heading-row {
   display: flex;
-  align-items: end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 48px;
+  margin-top: 14px;
+  padding-left: 24px;
+  border-left: 6px solid var(--tan);
 }
 
 .section-heading-row h2 {
@@ -69,32 +129,72 @@
 
 .model-showcase {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  margin-top: 42px;
-  border: 1px solid rgb(196 154 108 / 28%);
-  background: rgb(196 154 108 / 28%);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 54px 28px;
+  margin-top: clamp(56px, 8vw, 96px);
 }
 
 .model-showcase article {
   min-width: 0;
-  padding: clamp(18px, 2.5vw, 28px);
-  background: var(--page-alt);
+  padding-top: 16px;
+  border-top: 1px solid rgb(230 191 145 / 30%);
+}
+
+.model-showcase article:nth-child(1) {
+  grid-column: 1 / 8;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(190px, 0.65fr);
+  gap: 26px;
+  border-top: 6px solid var(--tan);
+}
+
+.model-showcase article:nth-child(2) {
+  grid-column: 9 / 13;
+  grid-row: 1;
+  margin-top: 82px;
+}
+
+.model-showcase article:nth-child(3) {
+  grid-column: 2 / 6;
+  grid-row: 2;
+  margin-top: 18px;
+}
+
+.model-showcase article:nth-child(4) {
+  grid-column: 7 / 13;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: minmax(170px, 0.7fr) minmax(0, 1fr);
+  gap: 26px;
+  margin-top: -28px;
+  border-top: 6px solid var(--tan);
 }
 
 .model-image-slot {
-  height: 112px;
-  margin-bottom: 22px;
+  min-height: 154px;
+  margin-bottom: 20px;
   border: 1px solid rgb(217 229 236 / 12%);
   background: rgb(217 229 236 / 3%);
 }
 
-.model-showcase article > span {
+.model-showcase article:nth-child(1) .model-image-slot,
+.model-showcase article:nth-child(4) .model-image-slot {
+  min-height: 228px;
+  margin-bottom: 0;
+}
+
+.model-showcase article:nth-child(1) .model-copy,
+.model-showcase article:nth-child(4) .model-copy {
+  align-self: end;
+  padding-bottom: 4px;
+}
+
+.model-copy > span {
   color: var(--tan-soft);
-  font-size: 0.62rem;
-  font-weight: 750;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
 }
 
 .model-showcase h3 {
@@ -102,13 +202,13 @@
   font-size: 1.25rem;
 }
 
-.model-showcase article > strong {
+.model-copy > strong {
   display: block;
   color: #ffffff;
   font-size: 1.2rem;
 }
 
-.model-showcase article > strong small {
+.model-copy > strong small {
   color: var(--text-on-dark-soft);
   font-size: 0.68rem;
   font-weight: 500;

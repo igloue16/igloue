@@ -12,8 +12,8 @@
   --blue-dark: #0d4f71;
   --text-on-dark: #d9e5ec;
   --text-on-dark-soft: #9fb3c0;
-  --tan: #c49a6c;
-  --tan-soft: #e0c19e;
+  --tan: #cf995b;
+  --tan-soft: #e6bf91;
   --content: 1180px;
   --reading: 720px;
   --radius: 16px;
@@ -82,8 +82,7 @@ h2 {
 
 .eyebrow {
   color: var(--tan-soft);
-  font-size: 0.74rem;
-  font-weight: 750;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
 }
