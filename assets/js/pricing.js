@@ -4,7 +4,6 @@ const IGLOUE_PRICING = {
   minimumRentalNights: 3,
 
   caution: {
-    amount: 500,
     chargedUpfront: false
   },
 
@@ -114,7 +113,8 @@ function calculateBookingTotal({
   startDate,
   endDate,
   deliveryPrice = 0,
-  setupPrice = 0
+  setupPrice = 0,
+  cautionAmount = 0
 }) {
   const rental = calculateRentalPrice(
     weeklyPrice,
@@ -144,7 +144,7 @@ function calculateBookingTotal({
     total,
 
     caution: {
-      amount: IGLOUE_PRICING.caution.amount,
+      amount: roundCurrency(cautionAmount),
       chargedUpfront: IGLOUE_PRICING.caution.chargedUpfront
     }
   };

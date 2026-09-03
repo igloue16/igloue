@@ -3,6 +3,7 @@ const IGLOUE_PRODUCTS = [
     id: "essential",
     name: "IGLOUE Essential",
     weeklyPrice: 59,
+    cautionAmount: 250,
 
     type: "monobloc",
     tier: "entry",
@@ -37,6 +38,7 @@ const IGLOUE_PRODUCTS = [
     id: "mobile-duo",
     name: "IGLOUE Mobile Duo",
     weeklyPrice: 79,
+    cautionAmount: 350,
 
     type: "dual-hose-monobloc",
     tier: "standard",
@@ -71,6 +73,7 @@ const IGLOUE_PRODUCTS = [
     id: "split-12",
     name: "IGLOUE Split 12",
     weeklyPrice: 99,
+    cautionAmount: 550,
 
     type: "portable-split",
     tier: "premium",
@@ -105,6 +108,7 @@ const IGLOUE_PRODUCTS = [
     id: "max-pro",
     name: "IGLOUE Max Pro",
     weeklyPrice: 129,
+    cautionAmount: 750,
 
     type: "high-capacity",
     tier: "pro",

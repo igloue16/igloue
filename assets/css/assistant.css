@@ -16,6 +16,11 @@
   box-shadow: var(--shadow);
 }
 
+.assistant-panel:has(.assistant-screen.is-result) {
+  width: min(100%, 760px);
+  height: min(620px, calc(100svh - 169px));
+}
+
 .assistant-screen {
   width: 100%;
   height: 100%;
@@ -37,6 +42,10 @@
 
 .assistant-screen::-webkit-scrollbar-thumb {
   background: var(--line-strong);
+}
+
+.assistant-screen.is-result {
+  padding-bottom: 0;
 }
 
 .assistant-stage-layout,
@@ -518,6 +527,7 @@
 }
 
 .assistant-options button:focus-visible,
+.assistant-model-card:focus-visible,
 .assistant-next:focus-visible,
 .assistant-back:focus-visible,
 .assistant-line-input:focus-visible,
@@ -532,6 +542,199 @@
 /* =========================================================
    DELIVERY AND RESULT
    ========================================================= */
+
+.assistant-result-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(245px, 0.8fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.assistant-product-choice,
+.assistant-booking-summary {
+  min-width: 0;
+}
+
+.assistant-featured-product {
+  position: relative;
+  padding: 14px 15px;
+  border: 1px solid var(--blue);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: var(--surface-blue);
+}
+
+.assistant-featured-product.is-warning,
+.assistant-featured-product.is-danger {
+  border-color: #b76a33;
+  background: #fff9f4;
+}
+
+.assistant-featured-product.is-neutral {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.assistant-featured-product h2 {
+  margin-block: 4px 5px;
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+}
+
+.assistant-sizing-message,
+.assistant-product-tagline {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.assistant-sizing-message {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.assistant-product-tagline {
+  margin-top: 4px;
+  color: var(--text-soft);
+}
+
+.assistant-featured-price {
+  display: block;
+  margin-top: 9px;
+  color: var(--blue-dark);
+  font-size: 0.9rem;
+}
+
+.assistant-product-image {
+  display: none;
+}
+
+.assistant-product-image:has(> img) {
+  width: 72px;
+  height: 64px;
+  display: block;
+  float: right;
+  margin: 0 0 8px 12px;
+  overflow: hidden;
+}
+
+.assistant-product-image > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.assistant-product-choice > .assistant-recommendation-copy {
+  margin-top: 5px !important;
+}
+
+.assistant-model-selector {
+  margin-top: 7px;
+}
+
+.assistant-model-selector-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.assistant-model-selector-heading strong {
+  font-size: 0.76rem;
+}
+
+.assistant-model-selector-heading span {
+  max-width: 210px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.assistant-model-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.assistant-model-card {
+  min-width: 0;
+  min-height: 64px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: #ffffff;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.assistant-model-card:hover:not(:disabled) {
+  border-color: var(--blue);
+  background: var(--surface-blue);
+}
+
+.assistant-model-card.is-selected {
+  border: 2px solid var(--blue-dark);
+  background: var(--surface-blue);
+}
+
+.assistant-model-card:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.assistant-model-card strong,
+.assistant-model-card span {
+  display: block;
+}
+
+.assistant-model-card strong {
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 0.73rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+}
+
+.assistant-model-status {
+  min-height: 1.2em;
+  color: var(--blue);
+  font-size: 0.55rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.assistant-model-price {
+  margin-top: 5px;
+  color: var(--text-soft);
+  font-size: 0.65rem;
+}
+
+.assistant-booking-summary {
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+
+.assistant-booking-summary .assistant-date-summary {
+  margin-top: 0 !important;
+}
+
+.assistant-nights-note {
+  margin-bottom: 0;
+}
+
+.assistant-setup-options {
+  grid-template-columns: 1fr;
+  margin-top: 8px;
+}
+
+.assistant-setup-options button {
+  min-height: 38px;
+  padding-block: 7px;
+}
 
 .assistant-result-grid {
   margin-top: 10px;
@@ -567,6 +770,43 @@
 .assistant-result-grid .assistant-total strong {
   color: var(--blue-dark);
   font-weight: 800;
+}
+
+.assistant-caution {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  margin-top: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.assistant-caution span,
+.assistant-caution small {
+  color: var(--text-soft);
+  font-size: 0.64rem;
+}
+
+.assistant-caution strong {
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.assistant-caution small {
+  grid-column: 1 / -1;
+}
+
+.assistant-caution-explanation {
+  margin: 5px 0 0 !important;
+  color: var(--text-muted) !important;
+  font-size: 0.62rem !important;
+  line-height: 1.35 !important;
+}
+
+.assistant-booking-action {
+  width: 100%;
 }
 
 .assistant-recommendation-copy {
@@ -658,6 +898,54 @@
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  .assistant-panel:has(.assistant-screen.is-result) {
+    height: auto;
+    min-height: 0;
+  }
+
+  .assistant-screen.is-result {
+    height: auto;
+    overflow: visible;
+  }
+
+  .assistant-result-layout {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .assistant-booking-summary {
+    padding: 16px 0 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .assistant-model-selector-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .assistant-model-selector-heading span {
+    max-width: none;
+    text-align: left;
+  }
+
+  .assistant-model-list {
+    grid-auto-columns: minmax(145px, 68%);
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 0 2px 8px;
+    scroll-snap-type: inline mandatory;
+  }
+
+  .assistant-model-card {
+    min-height: 92px;
+    scroll-snap-align: start;
+    touch-action: manipulation;
   }
 
   .assistant-screen {

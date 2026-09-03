@@ -169,9 +169,42 @@ const ASSISTANT_I18N = {
       weeklyReference: "Tarif affiché",
       perWeek: "/ semaine",
 
+      modelChoiceHeading: "Choisissez votre modèle",
+      modelChoiceHint:
+        "Notre recommandation reste votre meilleur repère, mais vous gardez le choix.",
+      recommendedLabel: "Recommandé par IGLOUE",
+      recommendedShort: "Recommandé",
+      unavailableShort: "Indisponible",
+      selectedSummary: ({ room, area, product }) =>
+        `Vous avez sélectionné ${product} pour votre ${room.toLowerCase()} d’environ ${area >= 60 ? "60+" : area} m².`,
+
+      sizing: {
+        best: {
+          label: "Recommandé par IGLOUE",
+          text: "Le modèle le mieux adapté aux informations que vous nous avez données."
+        },
+        slightlySmaller: {
+          label: "Un peu juste",
+          text: "Il peut améliorer votre confort, mais devra travailler davantage pour cette surface."
+        },
+        tooSmall: {
+          label: "Trop petit pour cette pièce",
+          text: "Il apportera un peu de fraîcheur, mais nous ne le recommandons pas pour refroidir efficacement cette surface."
+        },
+        slightlyLarger: {
+          label: "Plus puissant que nécessaire",
+          text: "Il fonctionnera très bien, mais le modèle inférieur devrait suffire pour votre pièce."
+        },
+        muchLarger: {
+          label: "Très largement dimensionné",
+          text: "Il fonctionnera, mais un modèle plus petit suffit normalement pour cette pièce."
+        }
+      },
+
       cautionHeading: "Garantie du matériel",
       cautionLabel: "Caution sécurisée",
-      cautionNotCharged: "500 € non ajoutés à votre paiement",
+      cautionNotCharged: (amount) =>
+        `${amount} non ajoutés à votre paiement`,
       cautionExplanation:
         "Si le matériel est rendu normalement, aucun montant n’est prélevé au titre de la caution.",
 
@@ -243,6 +276,7 @@ const assistantState = {
   endDate: "",
 
   recommendedProduct: null,
+  idealProduct: null,
 
   setupMode: null,
 
@@ -338,6 +372,7 @@ function getEarliestDeliveryDate() {
 
 function invalidateRecommendation() {
   assistantState.recommendedProduct = null;
+  assistantState.idealProduct = null;
   assistantState.setupMode = null;
   assistantState.pricing = null;
 assistantState.availability = null;
@@ -393,7 +428,7 @@ function renderStageShell({
 }) {
   return `
     <div
-      class="assistant-screen"
+      class="assistant-screen${isResult ? " is-result" : ""}"
       data-assistant-stage="${mascotState}">
 
       <div class="assistant-stage-layout">
@@ -1841,7 +1876,7 @@ function showUnavailableRecommendation(
             selected a fallback product.
           */
           assistantState.availability = {
-            idealAvailable: true,
+            ...assistantState.availability,
             selectedAsAlternative: true
           };
 
@@ -1936,6 +1971,9 @@ function calculateRecommendation() {
       initialProduct
     );
 
+  assistantState.idealProduct =
+    assistantState.recommendedProduct;
+
   if (
     assistantState.roomArea >=
     60
@@ -1962,44 +2000,18 @@ function determineDefaultSetupMode() {
   const product =
     assistantState.recommendedProduct;
 
-  const opening =
-    assistantState.openingType;
-
   if (!product) {
     assistantState.setupMode = null;
     return;
   }
 
-  if (
-    product.type ===
-    "portable-split"
-  ) {
-    if (opening === "terrace") {
-      assistantState.setupMode =
-        "terrace-split";
-    } else {
-      assistantState.setupMode =
-        "window-split";
-    }
+  const modes =
+    getAvailableSetupModes(product);
 
-    return;
-  }
-
-  if (
-    product.id === "max-pro"
-  ) {
-    if (opening === "terrace") {
-      assistantState.setupMode =
-        "terrace-split";
-    } else {
-      assistantState.setupMode =
-        "adapted-opening";
-    }
-
-    return;
-  }
-
-  assistantState.setupMode = "none";
+  assistantState.setupMode =
+    modes.includes("none")
+      ? "none"
+      : modes[0] || null;
 }
 
 function getSetupPrice() {
@@ -2070,7 +2082,10 @@ function calculateCurrentPricing() {
         assistantState.deliveryPrice,
 
       setupPrice:
-        getSetupPrice()
+        getSetupPrice(),
+
+      cautionAmount:
+        product.cautionAmount
     });
 }
 
@@ -2084,50 +2099,67 @@ function getAvailableSetupModes(
   const opening =
     assistantState.openingType;
 
+  const supported = (modes) =>
+    modes.filter((mode) =>
+      productSupportsSetupMode(
+        product,
+        mode
+      )
+    );
+
   if (
     product.type ===
     "portable-split"
   ) {
     if (opening === "terrace") {
-      return ["terrace-split"];
+      return supported(["terrace-split"]);
     }
 
     if (
-      opening === "unsure" ||
-      opening === "velux"
+      opening === "unsure"
     ) {
-      return ["special"];
+      return supported(["special"]);
     }
 
-    return ["window-split"];
+    if (opening === "velux") {
+      return supported([
+        "adapted-opening",
+        "special"
+      ]);
+    }
+
+    return supported(["window-split"]);
   }
 
   if (
     product.id === "max-pro"
   ) {
     if (opening === "terrace") {
-      return [
-        "terrace-split",
-        "special"
-      ];
+      return supported(["terrace-split"]);
     }
 
-    return [
-      "adapted-opening",
-      "special"
-    ];
+    if (opening === "unsure") {
+      return supported(["special"]);
+    }
+
+    if (opening === "velux") {
+      return supported(["adapted-opening"]);
+    }
+
+    return supported(["window-split"]);
   }
 
-  return [
-    "none",
-    "basic",
-    "adapted-opening"
-  ].filter((mode) =>
-    productSupportsSetupMode(
-      product,
-      mode
-    )
-  );
+  if (
+    opening === "velux" ||
+    opening === "unsure"
+  ) {
+    return supported([
+      "none",
+      "adapted-opening"
+    ]);
+  }
+
+  return supported(["none", "basic"]);
 }
 
 function buildSetupOptions(
@@ -2181,6 +2213,178 @@ function buildSetupOptions(
     .join("");
 }
 
+function getIdealProduct() {
+  return (
+    assistantState.idealProduct ||
+    assistantState.recommendedProduct
+  );
+}
+
+function getProductSizing(product) {
+  const idealProduct =
+    getIdealProduct();
+
+  const sizingCopy =
+    assistantCopy.result.sizing;
+
+  const productIndex =
+    IGLOUE_PRODUCTS.findIndex(
+      (candidate) =>
+        candidate.id === product.id
+    );
+
+  const idealIndex =
+    IGLOUE_PRODUCTS.findIndex(
+      (candidate) =>
+        idealProduct &&
+        candidate.id === idealProduct.id
+    );
+
+  const difference =
+    productIndex - idealIndex;
+
+  if (difference === 0) {
+    return {
+      ...sizingCopy.best,
+      tone: "recommended"
+    };
+  }
+
+  if (difference === -1) {
+    return {
+      ...sizingCopy.slightlySmaller,
+      tone: "warning"
+    };
+  }
+
+  if (difference < -1) {
+    return {
+      ...sizingCopy.tooSmall,
+      tone: "danger"
+    };
+  }
+
+  if (difference === 1) {
+    return {
+      ...sizingCopy.slightlyLarger,
+      tone: "neutral"
+    };
+  }
+
+  return {
+    ...sizingCopy.muchLarger,
+    tone: "neutral"
+  };
+}
+
+function isProductChoiceAvailable(product) {
+  return (
+    isProductAvailableForPostcode(
+      product.id,
+      assistantState.postcode
+    ) &&
+    isProductAvailableForDates(
+      product.id,
+      assistantState.startDate,
+      assistantState.endDate
+    )
+  );
+}
+
+function buildProductChoices() {
+  const selectedProduct =
+    assistantState.recommendedProduct;
+
+  const idealProduct =
+    getIdealProduct();
+
+  return IGLOUE_PRODUCTS
+    .map((product) => {
+      const selected =
+        selectedProduct.id === product.id;
+
+      const recommended =
+        idealProduct &&
+        idealProduct.id === product.id;
+
+      const available =
+        isProductChoiceAvailable(product);
+
+      const status = !available
+        ? assistantCopy.result.unavailableShort
+        : recommended
+          ? assistantCopy.result.recommendedShort
+          : getProductSizing(product).label;
+
+      return `
+        <button
+          class="assistant-model-card${selected ? " is-selected" : ""}${recommended ? " is-recommended" : ""}"
+          type="button"
+          data-product-choice="${product.id}"
+          aria-pressed="${selected}"
+          ${available ? "" : "disabled"}>
+
+          <span
+            class="assistant-product-image"
+            data-product-image="${product.id}"
+            aria-hidden="true">
+          </span>
+
+          <span class="assistant-model-status">
+            ${status}
+          </span>
+
+          <strong>${product.name}</strong>
+
+          <span class="assistant-model-price">
+            ${formatPrice(product.weeklyPrice)}
+            ${assistantCopy.result.perWeek}
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function updateSelectedProductAssessment(product) {
+  const opening =
+    assistantState.openingType;
+
+  assistantState.requiresAssessment =
+    assistantState.roomArea >= 60 ||
+    opening === "unsure" ||
+    !productSupportsOpening(
+      product,
+      opening
+    );
+}
+
+function selectProductChoice(productId) {
+  const product =
+    getProductById(productId);
+
+  if (
+    !product ||
+    !isProductChoiceAvailable(product)
+  ) {
+    return;
+  }
+
+  assistantState.recommendedProduct =
+    product;
+
+  assistantState.availability = {
+    ...(assistantState.availability || {}),
+    selectedAsAlternative:
+      product.id !== getIdealProduct().id
+  };
+
+  updateSelectedProductAssessment(product);
+  determineDefaultSetupMode();
+  calculateCurrentPricing();
+  showRecommendationResult(false);
+}
+
 function buildRecommendationExplanation() {
   const copy =
     assistantCopy.result;
@@ -2206,8 +2410,17 @@ function buildRecommendationExplanation() {
   const product =
     assistantState.recommendedProduct;
 
+  const idealProduct =
+    getIdealProduct();
+
+  const isIdealSelection =
+    idealProduct &&
+    idealProduct.id === product.id;
+
   const parts = [
-    copy.recommendation({
+    (isIdealSelection
+      ? copy.recommendation
+      : copy.selectedSummary)({
       room: roomLabel,
       area:
         assistantState.roomArea,
@@ -2221,11 +2434,7 @@ function buildRecommendationExplanation() {
     );
   }
 
-  if (
-    assistantState.availability &&
-    assistantState.availability.selectedAsAlternative
-  ) {
-    parts.push(copy.alternativeSelected);
+  if (!isIdealSelection) {
     return parts.join(" ");
   }
 
@@ -2392,6 +2601,12 @@ function showRecommendationResult(
   const setupOptions =
     buildSetupOptions(product);
 
+  const productChoices =
+    buildProductChoices();
+
+  const sizing =
+    getProductSizing(product);
+
   const installationMessage =
     product.installationRequired
       ? copy.setupRequired
@@ -2404,16 +2619,6 @@ function showRecommendationResult(
         <p class="assistant-note">
           ${copy.minimumNights}
         </p>
-      `
-      : "";
-
-  const undersizedNotice =
-    Number.isFinite(product.maxRoomSize) &&
-    assistantState.roomArea > product.maxRoomSize
-      ? `
-        <div class="assistant-note" role="status">
-          <strong>${copy.undersizedWarning}</strong>
-        </div>
       `
       : "";
 
@@ -2439,176 +2644,174 @@ function showRecommendationResult(
       content: `
         ${renderBackControl()}
 
-        <span
-          class="assistant-step-label">
-          ${copy.eyebrow}
-        </span>
+        <div class="assistant-result-layout">
+          <section
+            class="assistant-product-choice"
+            aria-labelledby="assistant-selected-product">
 
-        <h2
-          data-assistant-heading
-          tabindex="-1">
-          ${product.name}
-        </h2>
+            <article
+              class="assistant-featured-product is-${sizing.tone}"
+              aria-live="polite">
 
-        <p
-          class="
-            assistant-recommendation-copy
-          ">
-          ${buildRecommendationExplanation()}
-        </p>
+              <span
+                class="assistant-product-image"
+                data-product-image="${product.id}"
+                aria-hidden="true">
+              </span>
 
-        <p
-          class="assistant-date-summary">
-          ${copy.dateSummary(
-            formatDate(
-              assistantState.startDate
-            ),
-            formatDate(
-              assistantState.endDate
-            )
-          )}
-        </p>
+              <span class="assistant-step-label">
+                ${sizing.label}
+              </span>
 
-        <div
-          class="
-            assistant-recurring-price
-            assistant-recurring-compact
-          ">
+              <h2
+                id="assistant-selected-product"
+                data-assistant-heading
+                tabindex="-1">
+                ${product.name}
+              </h2>
 
-          <span>
-            ${copy.weeklyReference}
-          </span>
+              <p class="assistant-sizing-message">
+                ${sizing.text}
+              </p>
 
-          <strong>
-            ${formatPrice(
-              product.weeklyPrice
-            )}
-            ${copy.perWeek}
-          </strong>
+              <p class="assistant-product-tagline">
+                ${product.tagline}
+              </p>
 
-        </div>
+              <strong class="assistant-featured-price">
+                ${formatPrice(product.weeklyPrice)}
+                ${copy.perWeek}
+              </strong>
+            </article>
 
-        <p class="assistant-note">
-          ${copy.nights(
-            pricing.actualNights
-          )}
-        </p>
+            <p class="assistant-recommendation-copy">
+              ${buildRecommendationExplanation()}
+            </p>
 
-        ${minimumNotice}
+            <div class="assistant-model-selector">
+              <div class="assistant-model-selector-heading">
+                <strong>${copy.modelChoiceHeading}</strong>
+                <span>${copy.modelChoiceHint}</span>
+              </div>
 
-        ${undersizedNotice}
+              <div
+                class="assistant-model-list"
+                role="group"
+                aria-label="${copy.modelChoiceHeading}">
+                ${productChoices}
+              </div>
+            </div>
+          </section>
 
-        <p class="assistant-hint">
-          ${installationMessage}
-        </p>
+          <section
+            class="assistant-booking-summary"
+            aria-label="Récapitulatif du prix">
 
-        <div
-          class="assistant-options"
-          data-setup-options>
-          ${setupOptions}
-        </div>
-
-        ${assessmentNotice}
-
-        <div
-          class="assistant-result-grid">
-
-          <div>
-            <span>${copy.rental}</span>
-            <strong
-              data-price-rental>
-              ${formatPrice(
-                pricing.rentalPrice
+            <p class="assistant-date-summary">
+              ${copy.dateSummary(
+                formatDate(assistantState.startDate),
+                formatDate(assistantState.endDate)
               )}
-            </strong>
-          </div>
+            </p>
 
-          <div>
-            <span>${copy.delivery}</span>
-            <strong
-              data-price-delivery>
-              ${formatPrice(
-                pricing.deliveryPrice
-              )}
-            </strong>
-          </div>
+            <p class="assistant-note assistant-nights-note">
+              ${copy.nights(pricing.actualNights)}
+            </p>
 
-          <div>
-            <span>${copy.setup}</span>
-            <strong
-              data-price-setup>
-              ${formatPrice(
-                pricing.setupPrice
-              )}
-            </strong>
-          </div>
+            ${minimumNotice}
 
-          <div
-            class="assistant-total">
+            <p class="assistant-hint">
+              ${installationMessage}
+            </p>
 
-            <span>
-              ${copy.total}
-            </span>
+            <div
+              class="assistant-options assistant-setup-options"
+              data-setup-options>
+              ${setupOptions}
+            </div>
 
-            <strong
-              data-price-total>
-              ${formatPrice(
-                pricing.total
-              )}
-            </strong>
+            ${assessmentNotice}
 
-          </div>
+            <div class="assistant-result-grid">
 
+              <div>
+                <span>${copy.rental}</span>
+                <strong data-price-rental>
+                  ${formatPrice(pricing.rentalPrice)}
+                </strong>
+              </div>
+
+              <div>
+                <span>${copy.delivery}</span>
+                <strong data-price-delivery>
+                  ${formatPrice(pricing.deliveryPrice)}
+                </strong>
+              </div>
+
+              <div>
+                <span>${copy.setup}</span>
+                <strong data-price-setup>
+                  ${formatPrice(pricing.setupPrice)}
+                </strong>
+              </div>
+
+              <div class="assistant-total">
+                <span>${copy.total}</span>
+                <strong data-price-total>
+                  ${formatPrice(pricing.total)}
+                </strong>
+              </div>
+            </div>
+
+            <div
+              class="assistant-caution"
+              aria-label="${copy.cautionHeading}">
+              <span>${copy.cautionLabel}</span>
+              <strong>
+                ${formatPrice(pricing.caution.amount)}
+              </strong>
+              <small>
+                ${copy.cautionNotCharged(
+                  formatPrice(pricing.caution.amount)
+                )}
+              </small>
+            </div>
+
+            <p class="assistant-caution-explanation">
+              ${copy.cautionExplanation}
+            </p>
+
+            <button
+              class="assistant-next assistant-booking-action"
+              type="button"
+              data-reservation-request>
+              ${copy.request}
+            </button>
+
+            <p
+              class="assistant-reservation-status"
+              role="status"
+              tabindex="-1"
+              data-reservation-status
+              hidden>
+            </p>
+          </section>
         </div>
-
-        <div
-          class="
-            assistant-recurring-price
-            assistant-recurring-compact
-          ">
-
-          <span>
-            ${copy.cautionHeading}
-          </span>
-
-          <strong>
-            ${copy.cautionLabel}
-            ${formatPrice(
-              pricing.caution.amount
-            )}
-          </strong>
-
-        </div>
-
-        <p class="assistant-note">
-          <strong>
-            ${copy.cautionNotCharged}
-          </strong>
-          <br>
-          ${copy.cautionExplanation}
-        </p>
-
-        <button
-          class="assistant-next"
-          type="button"
-          data-reservation-request>
-          ${copy.request}
-        </button>
-
-        <p
-          class="
-            assistant-reservation-status
-          "
-          role="status"
-          tabindex="-1"
-          data-reservation-status
-          hidden>
-        </p>
       `
     })
   );
 
   connectBackControl(assistant);
+
+  assistant
+    .querySelectorAll("[data-product-choice]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        selectProductChoice(
+          button.dataset.productChoice
+        );
+      });
+    });
 
   assistant
     .querySelectorAll(

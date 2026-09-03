@@ -36,6 +36,15 @@
     min-height: 560px;
   }
 
+  .assistant-hero:has(.assistant-screen.is-result) {
+    overflow: visible;
+  }
+
+  .assistant-panel:has(.assistant-screen.is-result) {
+    height: auto;
+    min-height: 0;
+  }
+
   .assistant-trust-strip {
     grid-template-columns: 1fr;
     padding-inline: 32px;
@@ -103,6 +112,15 @@
   .assistant-panel {
     height: calc(100svh - 190px);
     min-height: 460px;
+  }
+
+  .assistant-panel:has(.assistant-screen.is-result) {
+    height: auto;
+    min-height: 0;
+  }
+
+  .assistant-hero-assistant:has(.assistant-screen.is-result) {
+    min-height: 0;
   }
 
   .assistant-line-input {
