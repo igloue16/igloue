@@ -3,7 +3,7 @@
    ========================================================= */
 
 .assistant-panel {
-  width: min(100%, 720px);
+  width: min(100%, 900px);
   height: min(580px, calc(100svh - 190px));
   min-height: 320px;
   overflow: hidden;
@@ -17,7 +17,7 @@
 }
 
 .assistant-panel:has(.assistant-screen.is-result) {
-  width: min(100%, 760px);
+  width: min(100%, 920px);
   height: min(620px, calc(100svh - 169px));
 }
 
@@ -102,6 +102,7 @@
   font-weight: 650;
   line-height: 1.05;
   letter-spacing: -0.035em;
+  color: var(--text);
 }
 
 .assistant-screen [tabindex="-1"]:focus {
@@ -119,7 +120,7 @@
 
 .assistant-step-label {
   display: block;
-  color: var(--blue);
+  color: #94653d;
   font-size: 0.66rem;
   font-weight: 750;
   letter-spacing: 0.11em;
@@ -155,7 +156,7 @@
 
 .assistant-progress li.is-current,
 .assistant-progress li.is-complete {
-  border-top-color: var(--blue);
+  border-top-color: var(--tan);
   color: var(--blue-dark);
 }
 
@@ -528,6 +529,8 @@
 
 .assistant-options button:focus-visible,
 .assistant-model-card:focus-visible,
+.assistant-model-select:focus-visible,
+.assistant-info-toggle:focus-visible,
 .assistant-next:focus-visible,
 .assistant-back:focus-visible,
 .assistant-line-input:focus-visible,
@@ -631,6 +634,63 @@
   margin-top: 7px;
 }
 
+.assistant-selection-details {
+  margin-top: 7px;
+}
+
+.assistant-info-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-soft);
+  font-size: 0.66rem;
+}
+
+.assistant-info-toggle {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--tan);
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--blue-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.assistant-info-toggle:hover,
+.assistant-info-toggle[aria-expanded="true"] {
+  border-color: var(--blue);
+  background: var(--surface-blue);
+}
+
+.assistant-info-panel {
+  margin-top: 6px;
+  padding: 8px 9px;
+  border-left: 2px solid var(--tan);
+  background: #ffffff;
+}
+
+.assistant-info-panel[hidden] {
+  display: none;
+}
+
+.assistant-info-panel p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.assistant-info-panel p + p {
+  margin-top: 4px;
+}
+
 .assistant-model-selector-heading {
   display: flex;
   align-items: baseline;
@@ -658,18 +718,18 @@
 }
 
 .assistant-model-card {
+  position: relative;
   min-width: 0;
   min-height: 64px;
-  padding: 7px 9px;
+  padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: 3px;
   background: #ffffff;
   color: var(--text);
   text-align: left;
-  cursor: pointer;
 }
 
-.assistant-model-card:hover:not(:disabled) {
+.assistant-model-card:has(.assistant-model-select:hover:not(:disabled)) {
   border-color: var(--blue);
   background: var(--surface-blue);
 }
@@ -679,22 +739,48 @@
   background: var(--surface-blue);
 }
 
-.assistant-model-card:disabled {
+.assistant-model-select {
+  width: 100%;
+  min-height: 64px;
+  display: block;
+  padding: 7px 34px 7px 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assistant-model-select:disabled {
   opacity: 0.48;
   cursor: not-allowed;
 }
 
-.assistant-model-card strong,
-.assistant-model-card span {
+.assistant-model-select strong,
+.assistant-model-select span {
   display: block;
 }
 
-.assistant-model-card strong {
+.assistant-model-select strong {
   margin-top: 3px;
   overflow: hidden;
   font-size: 0.73rem;
   line-height: 1.2;
   text-overflow: ellipsis;
+}
+
+.assistant-model-card > .assistant-info-toggle {
+  position: absolute;
+  z-index: 1;
+  top: 7px;
+  right: 7px;
+  width: 22px;
+  height: 22px;
+}
+
+.assistant-model-card > .assistant-info-panel {
+  margin: 0 7px 7px;
 }
 
 .assistant-model-status {
@@ -806,7 +892,45 @@
 }
 
 .assistant-booking-action {
-  width: 100%;
+  min-width: 170px;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.assistant-result-action-bar {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--tan);
+  background: #f8fbfd;
+  box-shadow: 0 -8px 18px rgb(13 79 113 / 7%);
+}
+
+.assistant-result-action-bar > div {
+  min-width: 0;
+}
+
+.assistant-result-action-bar strong,
+.assistant-result-action-bar span,
+.assistant-result-action-bar small {
+  display: block;
+}
+
+.assistant-result-action-bar strong {
+  color: var(--blue-dark);
+  font-size: 0.92rem;
+}
+
+.assistant-result-action-bar span,
+.assistant-result-action-bar small {
+  color: var(--text-soft);
+  font-size: 0.61rem;
 }
 
 .assistant-recommendation-copy {
@@ -908,6 +1032,7 @@
   .assistant-screen.is-result {
     height: auto;
     overflow: visible;
+    padding-bottom: 0;
   }
 
   .assistant-result-layout {
@@ -928,8 +1053,7 @@
   }
 
   .assistant-model-selector-heading span {
-    max-width: none;
-    text-align: left;
+    display: none;
   }
 
   .assistant-model-list {
@@ -946,6 +1070,24 @@
     min-height: 92px;
     scroll-snap-align: start;
     touch-action: manipulation;
+  }
+
+  .assistant-model-select {
+    min-height: 92px;
+    padding: 10px 38px 10px 11px;
+  }
+
+  .assistant-result-action-bar {
+    position: static;
+    align-items: stretch;
+    flex-direction: column;
+    margin-inline: 0;
+    padding-inline: 0;
+    box-shadow: none;
+  }
+
+  .assistant-booking-action {
+    width: 100%;
   }
 
   .assistant-screen {

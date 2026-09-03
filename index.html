@@ -25,6 +25,7 @@
 
       <nav class="main-nav" aria-label="Navigation principale">
         <a href="#assistant">Trouver ma climatisation</a>
+        <a href="#modeles">Modèles</a>
         <a href="#fonctionnement">Comment ça marche</a>
         <a href="#livraison">Livraison</a>
         <a href="#tarifs">Tarifs</a>
@@ -52,13 +53,25 @@
       </div>
 
       <div class="assistant-hero-left-body">
+        <div class="assistant-hero-visual" aria-hidden="true">
+          <img
+            src="assets/images/homepage/igloue-hero-apartment.webp.png"
+            alt="">
+        </div>
+
         <div class="assistant-hero-copy">
           <span class="eyebrow">
             Location de climatiseurs mobiles
           </span>
 
           <h1 id="page-title">
-            IGLOUE, votre service local de location de climatiseurs en Charente (16).
+            <span class="hero-title-brand" aria-label="IGLOUE">
+              IG<span aria-hidden="true">❄</span>LOUE
+            </span>
+
+            <span class="hero-title-service">
+              Votre service local de location de climatiseurs en Charente (16)
+            </span>
           </h1>
 
           <p class="lead">
@@ -67,18 +80,12 @@
           </p>
         </div>
 
-        <div class="assistant-hero-visual">
-          <img
-            src="assets/images/homepage/igloue-hero-apartment.webp.png"
-            alt="Climatiseur mobile IGLOUE installé dans un appartement familial en Charente">
+        <div class="hero-contact">
+          <span class="hero-contact-icon" aria-hidden="true">⌕</span>
 
-          <div class="hero-contact">
-            <span class="hero-contact-icon" aria-hidden="true">⌕</span>
-
-            <div>
-              <strong>06 48 65 39 75</strong>
-              <span>Lun – Sam · 8h – 20h</span>
-            </div>
+          <div>
+            <strong>06 48 65 39 75</strong>
+            <span>Lun – Sam · 8h – 20h</span>
           </div>
         </div>
       </div>
@@ -180,6 +187,63 @@
     </section>
 
     <!-- =====================================================
+         MODELS
+         ===================================================== -->
+
+    <section id="modeles" class="section section-models">
+      <div class="container">
+        <span class="eyebrow">La gamme IGLOUE</span>
+
+        <div class="section-heading-row">
+          <h2>Quatre modèles, une recommandation adaptée.</h2>
+
+          <p>
+            L’assistant tient compte de votre pièce, de son exposition
+            et de vos dates pour vous orienter.
+          </p>
+        </div>
+
+        <div class="model-showcase">
+          <article>
+            <div class="model-image-slot" aria-hidden="true"></div>
+            <span>Petites pièces</span>
+            <h3>IGLOUE Essential</h3>
+            <strong>59 € <small>/ semaine</small></strong>
+            <p>L’essentiel pour les chambres et bureaux compacts.</p>
+            <a href="#assistant">Voir ce modèle</a>
+          </article>
+
+          <article>
+            <div class="model-image-slot" aria-hidden="true"></div>
+            <span>Confort polyvalent</span>
+            <h3>IGLOUE Mobile Duo</h3>
+            <strong>79 € <small>/ semaine</small></strong>
+            <p>Plus efficace pour les pièces de vie intermédiaires.</p>
+            <a href="#assistant">Voir ce modèle</a>
+          </article>
+
+          <article>
+            <div class="model-image-slot" aria-hidden="true"></div>
+            <span>Silence et efficacité</span>
+            <h3>IGLOUE Split 12</h3>
+            <strong>99 € <small>/ semaine</small></strong>
+            <p>Une solution split performante pour plus de confort.</p>
+            <a href="#assistant">Voir ce modèle</a>
+          </article>
+
+          <article>
+            <div class="model-image-slot" aria-hidden="true"></div>
+            <span>Grands volumes</span>
+            <h3>IGLOUE Max Pro</h3>
+            <strong>129 € <small>/ semaine</small></strong>
+            <p>La puissance prévue pour les besoins les plus exigeants.</p>
+            <a href="#assistant">Voir ce modèle</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================
          DELIVERY
          ===================================================== -->
 
@@ -196,18 +260,28 @@
 
         <div class="delivery-list">
           <div>
-            <span>Zone 1</span>
-            <strong>15,99 €</strong>
+            <span>Angoulême proche</span>
+            <strong>29 €</strong>
           </div>
 
           <div>
-            <span>Zone 2</span>
-            <strong>17,99 €</strong>
+            <span>Grand Angoulême</span>
+            <strong>39 €</strong>
           </div>
 
           <div>
-            <span>Zone 3</span>
-            <strong>19,99 €</strong>
+            <span>Charente proche</span>
+            <strong>55 €</strong>
+          </div>
+
+          <div>
+            <span>Charente intermédiaire</span>
+            <strong>69 €</strong>
+          </div>
+
+          <div>
+            <span>Charente éloignée</span>
+            <strong>89 €</strong>
           </div>
         </div>
       </div>
@@ -218,17 +292,24 @@
          ===================================================== -->
 
     <section id="tarifs" class="section">
-      <div class="container section-narrow">
+      <div class="container">
         <span class="eyebrow">Tarifs transparents</span>
 
         <h2>
-          Après la première semaine, vous payez uniquement la location.
+          Location dès 3 nuits · tarif calculé au prorata
         </h2>
 
         <p class="lead">
-          La livraison, la reprise et la mise en service optionnelle
-          sont des frais ponctuels. Ils ne sont pas ajoutés chaque semaine.
+          Le montant exact dépend de vos dates, de la livraison
+          et de l’installation adaptée à votre ouverture.
         </p>
+
+        <div class="pricing-overview" aria-label="Tarifs hebdomadaires">
+          <div><span>Essential</span><strong>59 € / semaine</strong></div>
+          <div><span>Mobile Duo</span><strong>79 € / semaine</strong></div>
+          <div><span>Split 12</span><strong>99 € / semaine</strong></div>
+          <div><span>Max Pro</span><strong>129 € / semaine</strong></div>
+        </div>
       </div>
     </section>
   </main>

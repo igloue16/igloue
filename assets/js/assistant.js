@@ -172,6 +172,9 @@ const ASSISTANT_I18N = {
       modelChoiceHeading: "Choisissez votre modèle",
       modelChoiceHint:
         "Notre recommandation reste votre meilleur repère, mais vous gardez le choix.",
+      selectionDetails: "Détails de votre recommandation",
+      showInformation: "Afficher les informations",
+      hideInformation: "Masquer les informations",
       recommendedLabel: "Recommandé par IGLOUE",
       recommendedShort: "Recommandé",
       unavailableShort: "Indisponible",
@@ -2317,30 +2320,55 @@ function buildProductChoices() {
           : getProductSizing(product).label;
 
       return `
-        <button
+        <article
           class="assistant-model-card${selected ? " is-selected" : ""}${recommended ? " is-recommended" : ""}"
-          type="button"
-          data-product-choice="${product.id}"
-          aria-pressed="${selected}"
-          ${available ? "" : "disabled"}>
+          data-model-card="${product.id}">
 
-          <span
-            class="assistant-product-image"
-            data-product-image="${product.id}"
-            aria-hidden="true">
-          </span>
+          <button
+            class="assistant-model-select"
+            type="button"
+            data-product-choice="${product.id}"
+            aria-pressed="${selected}"
+            ${available ? "" : "disabled"}>
 
-          <span class="assistant-model-status">
-            ${status}
-          </span>
+            <span
+              class="assistant-product-image"
+              data-product-image="${product.id}"
+              aria-hidden="true">
+            </span>
 
-          <strong>${product.name}</strong>
+            <span class="assistant-model-status">
+              ${status}
+            </span>
 
-          <span class="assistant-model-price">
-            ${formatPrice(product.weeklyPrice)}
-            ${assistantCopy.result.perWeek}
-          </span>
-        </button>
+            <strong>${product.name}</strong>
+
+            <span class="assistant-model-price">
+              ${formatPrice(product.weeklyPrice)}
+              ${assistantCopy.result.perWeek}
+            </span>
+          </button>
+
+          <button
+            class="assistant-info-toggle"
+            type="button"
+            aria-label="${assistantCopy.result.showInformation} — ${product.name}"
+            aria-expanded="false"
+            aria-controls="assistant-model-info-${product.id}"
+            data-info-label="${product.name}"
+            data-info-toggle>
+            ?
+          </button>
+
+          <div
+            id="assistant-model-info-${product.id}"
+            class="assistant-info-panel"
+            data-info-panel
+            hidden>
+            <p>${product.tagline}</p>
+            <p>${product.suitableFor}</p>
+          </div>
+        </article>
       `;
     })
     .join("");
@@ -2383,6 +2411,45 @@ function selectProductChoice(productId) {
   determineDefaultSetupMode();
   calculateCurrentPricing();
   showRecommendationResult(false);
+}
+
+function connectInfoControls(assistant) {
+  assistant
+    .querySelectorAll("[data-info-toggle]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        const panel = assistant.querySelector(
+          `#${button.getAttribute("aria-controls")}`
+        );
+
+        if (!panel) {
+          return;
+        }
+
+        const expanded =
+          button.getAttribute("aria-expanded") === "true";
+
+        button.setAttribute(
+          "aria-expanded",
+          String(!expanded)
+        );
+
+        button.setAttribute(
+          "aria-label",
+          `${
+            expanded
+              ? assistantCopy.result.showInformation
+              : assistantCopy.result.hideInformation
+          }${
+            button.dataset.infoLabel
+              ? ` — ${button.dataset.infoLabel}`
+              : ""
+          }`
+        );
+
+        panel.hidden = expanded;
+      });
+    });
 }
 
 function buildRecommendationExplanation() {
@@ -2511,6 +2578,16 @@ function updateResultPricing(
     )
     .textContent =
       formatPrice(pricing.total);
+
+  const stickyTotal =
+    assistant.querySelector(
+      "[data-sticky-total]"
+    );
+
+  if (stickyTotal) {
+    stickyTotal.textContent =
+      formatPrice(pricing.total);
+  }
 }
 
 function buildReservationDraft() {
@@ -2684,9 +2761,31 @@ function showRecommendationResult(
               </strong>
             </article>
 
-            <p class="assistant-recommendation-copy">
-              ${buildRecommendationExplanation()}
-            </p>
+            <div class="assistant-selection-details">
+              <div class="assistant-info-heading">
+                <span>${copy.selectionDetails}</span>
+
+                <button
+                  class="assistant-info-toggle"
+                  type="button"
+                  aria-label="${copy.showInformation}"
+                  aria-expanded="false"
+                  aria-controls="assistant-selection-info"
+                  data-info-toggle>
+                  ?
+                </button>
+              </div>
+
+              <div
+                id="assistant-selection-info"
+                class="assistant-info-panel"
+                data-info-panel
+                hidden>
+                <p class="assistant-recommendation-copy">
+                  ${buildRecommendationExplanation()}
+                </p>
+              </div>
+            </div>
 
             <div class="assistant-model-selector">
               <div class="assistant-model-selector-heading">
@@ -2713,6 +2812,26 @@ function showRecommendationResult(
                 formatDate(assistantState.endDate)
               )}
             </p>
+
+            <div class="assistant-result-action-bar">
+              <div>
+                <strong data-sticky-total>
+                  ${formatPrice(pricing.total)}
+                </strong>
+                <span>à payer</span>
+                <small>
+                  ${copy.cautionLabel}
+                  ${formatPrice(pricing.caution.amount)}
+                </small>
+              </div>
+
+              <button
+                class="assistant-next assistant-booking-action"
+                type="button"
+                data-reservation-request>
+                ${copy.request}
+              </button>
+            </div>
 
             <p class="assistant-note assistant-nights-note">
               ${copy.nights(pricing.actualNights)}
@@ -2781,13 +2900,6 @@ function showRecommendationResult(
               ${copy.cautionExplanation}
             </p>
 
-            <button
-              class="assistant-next assistant-booking-action"
-              type="button"
-              data-reservation-request>
-              ${copy.request}
-            </button>
-
             <p
               class="assistant-reservation-status"
               role="status"
@@ -2802,6 +2914,7 @@ function showRecommendationResult(
   );
 
   connectBackControl(assistant);
+  connectInfoControls(assistant);
 
   assistant
     .querySelectorAll("[data-product-choice]")
