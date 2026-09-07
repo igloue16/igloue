@@ -213,6 +213,26 @@
     grid-template-columns: 1fr;
   }
 
+  .assistant-room-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .assistant-room-options button {
+    min-height: 84px;
+    gap: 10px;
+    padding: 6px;
+  }
+
+  .assistant-room-illustration {
+    height: 36px;
+  }
+
+  .assistant-room-illustration img {
+    width: min(100%, 72px);
+    height: 36px;
+  }
+
   .assistant-hero-assistant {
     min-height: calc(100svh - 150px);
     padding: 12px 10px 16px;

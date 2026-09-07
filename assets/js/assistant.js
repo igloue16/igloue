@@ -299,12 +299,27 @@ const roomTypeIds = [
   "other"
 ];
 
+const roomTypeIllustrations = {
+  bedroom: "assets/images/assistant/rooms/room-bedroom.png",
+  living_room: "assets/images/assistant/rooms/room-living.png",
+  office: "assets/images/assistant/rooms/room-office.png",
+  other: "assets/images/assistant/rooms/room-other.png"
+};
+
 const roomConditionIds = [
   "sunny",
   "top_floor",
   "large_windows",
   "usually_hot"
 ];
+
+const roomConditionIllustrations = {
+  sunny: "assets/images/assistant/environment/condition-sun1.png",
+  top_floor: "assets/images/assistant/environment/condition-roof1.png",
+  large_windows: "assets/images/assistant/environment/condition-glazing1.png",
+  usually_hot: "assets/images/assistant/environment/condition-hot1.png",
+  none: "assets/images/assistant/environment/condition-none.png"
+};
 
 const openingTypeIds = [
   "casement",
@@ -837,7 +852,17 @@ function showRoomStage(addToHistory = true) {
           assistantState.roomType === roomId
         }"
         data-room-type="${roomId}">
-        ${copy.types[roomId]}
+        <span
+          class="assistant-room-illustration"
+          aria-hidden="true">
+          <img
+            src="${roomTypeIllustrations[roomId]}"
+            alt="">
+        </span>
+
+        <span class="assistant-room-label">
+          ${copy.types[roomId]}
+        </span>
       </button>
     `)
     .join("");
@@ -867,6 +892,7 @@ function showRoomStage(addToHistory = true) {
               class="
                 assistant-options
                 assistant-options-compact
+                assistant-room-options
               ">
               ${roomButtons}
             </div>
@@ -1065,7 +1091,7 @@ function showSituationStage(
     roomConditionIds
       .map((conditionId) => `
         <label
-          class="assistant-check-option">
+          class="assistant-check-option assistant-condition-option">
 
           <input
             type="checkbox"
@@ -1079,9 +1105,19 @@ function showSituationStage(
                 : ""
             }>
 
-          <span>
+          <span
+            class="assistant-condition-illustration"
+            aria-hidden="true">
+            <img
+              src="${roomConditionIllustrations[conditionId]}"
+              alt="">
+          </span>
+
+          <span class="assistant-condition-label">
             ${copy.conditions[conditionId]}
           </span>
+
+          <span class="assistant-condition-check" aria-hidden="true">✓</span>
 
         </label>
       `)
@@ -1121,6 +1157,7 @@ function showSituationStage(
                 class="
                   assistant-check-option
                   assistant-check-none
+                  assistant-condition-option
                 ">
 
                 <input
@@ -1136,9 +1173,19 @@ function showSituationStage(
                       : ""
                   }>
 
-                <span>
+                <span
+                  class="assistant-condition-illustration"
+                  aria-hidden="true">
+                  <img
+                    src="${roomConditionIllustrations.none}"
+                    alt="">
+                </span>
+
+                <span class="assistant-condition-label">
                   ${copy.conditions.none}
                 </span>
+
+                <span class="assistant-condition-check" aria-hidden="true">✓</span>
 
               </label>
 
