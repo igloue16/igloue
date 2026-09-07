@@ -62,11 +62,39 @@ const ASSISTANT_I18N = {
       error:
         "Choisissez une pièce pour continuer.",
 
+      subtypeHeading: "Précisez le type d’espace",
+      subtypeBack: "← Retour aux pièces",
+      subtypeError:
+        "Précisez le type d’espace pour continuer.",
+
       types: {
         bedroom: "Chambre",
-        living_room: "Salon / séjour",
-        office: "Bureau",
-        other: "Autre"
+        living_room: "Salon / Séjour",
+        office: "Bureau / Espace pro",
+        other: "Autre espace"
+      },
+
+      subtypes: {
+        "other-room": {
+          label: "Autre pièce de vie",
+          example: "Ex. pièce polyvalente, buanderie…"
+        },
+        "professional-space": {
+          label: "Local professionnel",
+          example: "Ex. commerce, cabinet, atelier, local d’activité…"
+        },
+        "large-hall": {
+          label: "Grande salle",
+          example: "Ex. mairie, salle des fêtes, salle de réunion…"
+        },
+        "event-reception": {
+          label: "Événement / réception",
+          example: "Ex. mariage, anniversaire, événement associatif…"
+        },
+        "unknown-space": {
+          label: "Je ne sais pas",
+          example: "Nous vous guiderons ensuite."
+        }
       }
     },
 
@@ -270,6 +298,7 @@ const assistantState = {
   deliveryPrice: 0,
 
   roomType: "",
+  roomSubtype: "",
   roomArea: 20,
   roomConditions: null,
 
@@ -300,10 +329,26 @@ const roomTypeIds = [
 ];
 
 const roomTypeIllustrations = {
-  bedroom: "assets/images/assistant/rooms/room-bedroom.png",
-  living_room: "assets/images/assistant/rooms/room-living.png",
-  office: "assets/images/assistant/rooms/room-office.png",
-  other: "assets/images/assistant/rooms/room-other.png"
+  bedroom: "assets/images/assistant/rooms/room-bedroom1.png",
+  living_room: "assets/images/assistant/rooms/room-living1.png",
+  office: "assets/images/assistant/rooms/room-office1.png",
+  other: "assets/images/assistant/rooms/room-other1.png"
+};
+
+const roomSubtypeIds = [
+  "other-room",
+  "professional-space",
+  "large-hall",
+  "event-reception",
+  "unknown-space"
+];
+
+const roomSubtypeIllustrations = {
+  "other-room": "assets/images/assistant/rooms/room-other-submenu main.png",
+  "professional-space": "assets/images/assistant/rooms/local-pro.png",
+  "large-hall": "assets/images/assistant/rooms/local-salle.png",
+  "event-reception": "assets/images/assistant/rooms/local-marriage.png",
+  "unknown-space": "assets/images/assistant/rooms/local-query.png"
 };
 
 const roomConditionIds = [
@@ -822,7 +867,10 @@ function showUnavailableDelivery() {
    ROOM
 -------------------------------- */
 
-function showRoomStage(addToHistory = true) {
+function showRoomStage(
+  addToHistory = true,
+  requestedView = null
+) {
   if (addToHistory) {
     pushStage(showRoomStage);
   }
@@ -839,10 +887,19 @@ function showRoomStage(addToHistory = true) {
   const dimensions =
     getRoomDimensionsExample(selectedArea);
 
+  const usesReplacementView =
+    window.matchMedia("(max-width: 640px)").matches;
+
+  const showSubtypeView =
+    usesReplacementView &&
+    assistantState.roomType === "other" &&
+    (requestedView === "submenu" ||
+      (requestedView === null && usesReplacementView));
+
   const roomButtons = roomTypeIds
     .map((roomId) => `
       <button
-        class="${
+        class="assistant-room-option ${
           assistantState.roomType === roomId
             ? "is-selected"
             : ""
@@ -860,11 +917,53 @@ function showRoomStage(addToHistory = true) {
             alt="">
         </span>
 
-        <span class="assistant-room-label">
-          ${copy.types[roomId]}
+        <span class="assistant-room-label-row">
+          <span class="assistant-room-label">
+            ${copy.types[roomId]}
+          </span>
+
+          ${
+            roomId === "other"
+              ? '<span class="assistant-room-chevron" aria-hidden="true">›</span>'
+              : ""
+          }
         </span>
+
+        <span class="assistant-room-check" aria-hidden="true">✓</span>
       </button>
     `)
+    .join("");
+
+  const roomSubtypeOptions = roomSubtypeIds
+    .map((subtypeId) => {
+      const subtype = copy.subtypes[subtypeId];
+
+      return `
+        <label class="assistant-room-subtype-option">
+          <input
+            type="radio"
+            name="assistant-room-subtype"
+            value="${subtypeId}"
+            data-room-subtype
+            ${assistantState.roomSubtype === subtypeId ? "checked" : ""}>
+
+          <span
+            class="assistant-room-subtype-illustration"
+            aria-hidden="true">
+            <img
+              src="${roomSubtypeIllustrations[subtypeId]}"
+              alt="">
+          </span>
+
+          <span class="assistant-room-subtype-copy">
+            <strong>${subtype.label}</strong>
+            <small>${subtype.example}</small>
+          </span>
+
+          <span class="assistant-room-check" aria-hidden="true">✓</span>
+        </label>
+      `;
+    })
     .join("");
 
   const assistant = renderAssistant(
@@ -880,9 +979,10 @@ function showRoomStage(addToHistory = true) {
           novalidate>
 
           <fieldset
-            class="assistant-fieldset">
+            class="assistant-fieldset${showSubtypeView ? " is-room-subtype-view" : ""}">
 
             <legend
+              class="assistant-room-main-heading"
               data-assistant-heading
               tabindex="-1">
               ${copy.heading}
@@ -890,11 +990,44 @@ function showRoomStage(addToHistory = true) {
 
             <div
               class="
+                assistant-room-main
                 assistant-options
                 assistant-options-compact
                 assistant-room-options
-              ">
+              "
+              data-room-main-options>
               ${roomButtons}
+            </div>
+
+            <div
+              class="assistant-room-submenu"
+              ${
+                assistantState.roomType === "other"
+                  ? ""
+                  : "hidden"
+              }
+              data-room-submenu>
+
+              <button
+                class="assistant-room-submenu-back"
+                type="button"
+                data-room-submenu-back>
+                ${copy.subtypeBack}
+              </button>
+
+              <h3
+                id="assistant-room-subtype-heading"
+                data-room-submenu-heading
+                tabindex="-1">
+                ${copy.subtypeHeading}
+              </h3>
+
+              <div
+                class="assistant-room-subtype-options"
+                role="radiogroup"
+                aria-labelledby="assistant-room-subtype-heading">
+                ${roomSubtypeOptions}
+              </div>
             </div>
 
           </fieldset>
@@ -957,7 +1090,10 @@ function showRoomStage(addToHistory = true) {
 
         </form>
       `
-    })
+    }),
+    requestedView === "submenu" || showSubtypeView
+      ? "[data-room-submenu-heading]"
+      : "[data-assistant-heading]"
   );
 
   connectBackControl(assistant);
@@ -980,16 +1116,45 @@ function showRoomStage(addToHistory = true) {
       "[data-room-area-example]"
     );
 
+  const error =
+    assistant.querySelector(
+      "#assistant-room-error"
+    );
+
   assistant
     .querySelectorAll("[data-room-type]")
     .forEach((button) => {
       button.addEventListener(
         "click",
         () => {
+          const previousRoomType =
+            assistantState.roomType;
+
           assistantState.roomType =
             button.dataset.roomType;
 
+          if (assistantState.roomType !== "other") {
+            assistantState.roomSubtype = "";
+          }
+
           invalidateRecommendation();
+
+          error.hidden = true;
+          error.textContent = "";
+
+          if (
+            assistantState.roomType === "other" ||
+            previousRoomType === "other"
+          ) {
+            showRoomStage(
+              false,
+              assistantState.roomType === "other"
+                ? "submenu"
+                : "main"
+            );
+
+            return;
+          }
 
           assistant
             .querySelectorAll(
@@ -1012,6 +1177,39 @@ function showRoomStage(addToHistory = true) {
         }
       );
     });
+
+  assistant
+    .querySelectorAll("[data-room-subtype]")
+    .forEach((input) => {
+      input.addEventListener(
+        "change",
+        () => {
+          if (!input.checked) {
+            return;
+          }
+
+          assistantState.roomSubtype =
+            input.value;
+
+          invalidateRecommendation();
+
+          error.hidden = true;
+          error.textContent = "";
+        }
+      );
+    });
+
+  const submenuBack =
+    assistant.querySelector(
+      "[data-room-submenu-back]"
+    );
+
+  if (submenuBack) {
+    submenuBack.addEventListener(
+      "click",
+      () => showRoomStage(false, "main")
+    );
+  }
 
   areaInput.addEventListener(
     "input",
@@ -1051,12 +1249,27 @@ function showRoomStage(addToHistory = true) {
         area < 8 ||
         area > 60
       ) {
-        const error = assistant.querySelector(
-          "#assistant-room-error"
-        );
-
         error.textContent = copy.error;
         error.hidden = false;
+
+        return;
+      }
+
+      if (
+        assistantState.roomType === "other" &&
+        !assistantState.roomSubtype
+      ) {
+        error.textContent = copy.subtypeError;
+        error.hidden = false;
+
+        const firstSubtype =
+          assistant.querySelector(
+            "[data-room-subtype]"
+          );
+
+        if (firstSubtype) {
+          firstSubtype.focus();
+        }
 
         return;
       }
@@ -2658,6 +2871,9 @@ function buildReservationDraft() {
     room: {
       type:
         assistantState.roomType,
+
+      subtype:
+        assistantState.roomSubtype || null,
 
       area:
         assistantState.roomArea,

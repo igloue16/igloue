@@ -233,6 +233,75 @@
     height: 36px;
   }
 
+  .assistant-fieldset.is-room-subtype-view .assistant-room-main-heading,
+  .assistant-fieldset.is-room-subtype-view .assistant-room-main {
+    display: none;
+  }
+
+  .assistant-fieldset:not(.is-room-subtype-view)
+    .assistant-room-submenu:not([hidden]) {
+    display: none;
+  }
+
+  .assistant-room-submenu {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .assistant-room-submenu-back {
+    display: inline-flex;
+    min-height: 32px;
+    align-items: center;
+    margin: 0 0 5px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.71rem;
+    cursor: pointer;
+  }
+
+  .assistant-room-submenu h3 {
+    margin-bottom: 9px;
+    font-size: 1.25rem;
+  }
+
+  .assistant-room-subtype-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .assistant-room-subtype-option {
+    min-height: 78px;
+    align-items: center;
+    flex-direction: row;
+    gap: 7px;
+    padding: 7px 21px 7px 6px;
+  }
+
+  .assistant-room-subtype-option:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .assistant-room-subtype-illustration {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .assistant-room-subtype-illustration img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .assistant-room-subtype-copy strong {
+    font-size: 0.7rem;
+  }
+
+  .assistant-room-subtype-copy small {
+    font-size: 0.59rem;
+  }
+
   .assistant-hero-assistant {
     min-height: calc(100svh - 150px);
     padding: 12px 10px 16px;

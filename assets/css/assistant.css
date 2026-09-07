@@ -277,33 +277,214 @@
 }
 
 .assistant-room-options button {
-  min-height: 96px;
+  position: relative;
+  min-height: 70px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 7px 8px;
+  gap: 6px;
+  padding: 5px 24px 5px 8px;
+  border: 2px solid var(--line);
+  background: #ffffff;
   text-align: center;
+  transition: none;
 }
 
 .assistant-room-illustration {
   width: 100%;
-  height: 44px;
+  height: 34px;
   display: grid;
   place-items: center;
 }
 
 .assistant-room-illustration img {
   width: min(100%, 92px);
-  height: 44px;
+  height: 34px;
   object-fit: contain;
-  opacity: 0.78;
 }
 
-.assistant-room-label {
-  display: block;
+.assistant-room-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   line-height: 1.15;
+}
+
+.assistant-room-chevron {
+  color: var(--blue-dark);
+  font-size: 1.2em;
+  line-height: 0.8;
+}
+
+.assistant-room-check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue-dark);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  visibility: hidden;
+}
+
+.assistant-room-options button.is-selected {
+  border-color: var(--blue-dark);
+  background: #ffffff;
+}
+
+.assistant-room-options button.is-selected .assistant-room-check,
+.assistant-room-subtype-option:has(input:checked) .assistant-room-check {
+  visibility: visible;
+}
+
+.assistant-room-main[hidden],
+.assistant-room-submenu[hidden] {
+  display: none;
+}
+
+.assistant-room-submenu {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.assistant-room-submenu-back {
+  display: none;
+}
+
+.assistant-room-submenu h3 {
+  margin: 0 0 7px;
+  color: var(--text);
+  font-family: "Bahnschrift", "Arial Narrow", Arial, sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.assistant-room-subtype-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.assistant-room-subtype-option {
+  position: relative;
+  min-width: 0;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px 22px 6px 6px;
+  border: 2px solid var(--line);
+  border-radius: 3px;
+  background: #ffffff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.assistant-room-subtype-option > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.assistant-room-subtype-illustration {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+}
+
+.assistant-room-subtype-illustration img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.assistant-room-subtype-copy {
+  min-width: 0;
+}
+
+.assistant-room-subtype-copy strong,
+.assistant-room-subtype-copy small {
+  display: block;
+}
+
+.assistant-room-subtype-copy strong {
+  color: var(--text);
+  font-size: 0.69rem;
+  line-height: 1.15;
+}
+
+.assistant-room-subtype-copy small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  line-height: 1.22;
+}
+
+.assistant-room-subtype-option:has(input:checked) {
+  border-color: var(--blue-dark);
+}
+
+.assistant-room-subtype-option:has(input:focus-visible) {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 3px;
+}
+
+.assistant-fieldset:has(.assistant-room-submenu:not([hidden]))
+  + .assistant-area-control {
+  margin-top: 6px;
+}
+
+.assistant-room-submenu-back:focus-visible {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .assistant-room-option,
+  .assistant-room-subtype-option {
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .assistant-room-illustration img,
+  .assistant-room-subtype-illustration img {
+    transition: transform 180ms ease;
+  }
+
+  .assistant-room-option:hover,
+  .assistant-room-subtype-option:hover {
+    border-color: var(--line-strong);
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgb(20 34 44 / 6%);
+    transform: none;
+  }
+
+  .assistant-room-option.is-selected:hover,
+  .assistant-room-subtype-option:hover:has(input:checked) {
+    border-color: var(--blue-dark);
+    box-shadow: 0 2px 10px rgb(20 34 44 / 9%);
+  }
+
+  .assistant-room-option:hover .assistant-room-illustration img,
+  .assistant-room-subtype-option:hover .assistant-room-subtype-illustration img {
+    transform: scale(1.05);
+  }
 }
 
 .assistant-area-control {
@@ -557,11 +738,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .assistant-room-option,
+  .assistant-room-subtype-option,
+  .assistant-room-illustration img,
+  .assistant-room-subtype-illustration img,
   .assistant-condition-option,
   .assistant-condition-illustration img {
     transition: none;
   }
 
+  .assistant-room-option:hover .assistant-room-illustration img,
+  .assistant-room-subtype-option:hover .assistant-room-subtype-illustration img,
   .assistant-condition-option:hover .assistant-condition-illustration img {
     transform: none;
   }
