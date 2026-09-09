@@ -213,6 +213,25 @@
     grid-template-columns: 1fr;
   }
 
+  [data-opening-form] > .assistant-fieldset > .assistant-options {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-outdoor-question {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-outdoor-question legend,
+  .assistant-outdoor-question .assistant-hint,
+  .assistant-outdoor-options {
+    grid-column: 1;
+  }
+
+  .assistant-outdoor-options {
+    grid-row: auto;
+    margin-top: 4px;
+  }
+
   .assistant-room-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
@@ -229,6 +248,11 @@
   }
 
   .assistant-room-illustration img {
+    width: min(100%, 72px);
+    height: 36px;
+  }
+
+  .assistant-room-native-svg {
     width: min(100%, 72px);
     height: 36px;
   }
@@ -290,6 +314,11 @@
   }
 
   .assistant-room-subtype-illustration img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .assistant-room-subtype-native-svg {
     width: 36px;
     height: 36px;
   }

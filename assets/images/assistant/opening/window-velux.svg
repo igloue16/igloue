@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140">
+  <style>
+    #velux-opening-sash { transform: translateY(var(--velux-sash-y, 0px)) scaleY(var(--velux-sash-scale-y, 1)); transform-box: fill-box; transform-origin: center center; transition: transform 350ms cubic-bezier(.2,.75,.25,1); }
+    #velux-opening-sash .opening-frame, #velux-opening-sash .handle { stroke: var(--opening-movable-stroke, #0d4f71); transition: stroke 260ms ease; }
+    .glass { fill: var(--opening-glass-fill, #f7fbfd); transition: fill 260ms ease; }
+    @media (prefers-reduced-motion: reduce) { #velux-opening-sash, #velux-opening-sash .opening-frame, #velux-opening-sash .handle, .glass { transition: none; } }
+  </style>
+  <g id="opening-velux" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path id="velux-outer-frame" class="outer-frame fixed-frame" d="M48 18H151L122 122H19Z" fill="#ffffff"/>
+    <g id="velux-opening-sash" class="opening-sash"><path class="glass" d="M58 31H135L113 107H36Z"/><path class="opening-frame" d="M58 31H135L113 107H36Z"/><path class="reflection" d="M78 72L94 56M75 91L98 68" stroke-width="4"/><path class="handle" d="M73 108H100" stroke-width="8"/></g>
+  </g>
+</svg>

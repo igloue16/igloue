@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160">
+  <style>
+    #event-people .event-person {
+      fill: var(--event-people-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    .event-light {
+      fill: var(--event-light-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    .event-light-glow {
+      opacity: var(--event-light-glow-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #event-people .event-person,
+      .event-light,
+      .event-light-glow {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="event-light-glow-blur" x="-90%" y="-90%" width="280%" height="280%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+  </defs>
+
+  <g id="room-subtype-event-reception">
+    <g id="event-pavilion" class="pavilion central-structure" fill="none" stroke="#0d4f71" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 66C53 60 82 36 100 12C118 36 147 60 182 66"/>
+      <path d="M18 66H182"/>
+      <path d="M18 66V145H31C27 121 28 92 42 67"/>
+      <path d="M182 66V145H169C173 121 172 92 158 67"/>
+      <path d="M100 14V65"/>
+      <path d="M58 65C76 52 89 34 100 15C111 34 124 52 142 65"/>
+    </g>
+
+    <g id="event-light-glows" class="event-light-glows" fill="#e6a24a" filter="url(#event-light-glow-blur)">
+      <circle class="event-light-glow" cx="61" cy="78" r="10"/>
+      <circle class="event-light-glow" cx="87" cy="78" r="10"/>
+      <circle class="event-light-glow" cx="113" cy="78" r="10"/>
+      <circle class="event-light-glow" cx="139" cy="78" r="10"/>
+    </g>
+
+    <g id="event-lights" class="event-lights" stroke="#0d4f71" stroke-width="3" stroke-linecap="round">
+      <path d="M61 66V73M87 66V73M113 66V73M139 66V73" fill="none"/>
+      <circle id="event-light-1" class="event-light" cx="61" cy="79" r="6" fill="#0d4f71"/>
+      <circle id="event-light-2" class="event-light" cx="87" cy="79" r="6" fill="#0d4f71"/>
+      <circle id="event-light-3" class="event-light" cx="113" cy="79" r="6" fill="#0d4f71"/>
+      <circle id="event-light-4" class="event-light" cx="139" cy="79" r="6" fill="#0d4f71"/>
+    </g>
+
+    <g id="event-people" class="people" fill="#0d4f71">
+      <circle class="event-person" cx="66" cy="110" r="12"/>
+      <path class="event-person" d="M45 145C46 127 54 119 66 119C79 119 86 128 87 145Z"/>
+      <circle class="event-person" cx="100" cy="105" r="13"/>
+      <path class="event-person" d="M76 145C78 124 86 115 100 115C114 115 123 125 124 145Z"/>
+      <circle class="event-person" cx="135" cy="110" r="12"/>
+      <path class="event-person" d="M114 145C115 127 123 119 135 119C148 119 155 128 157 145Z"/>
+    </g>
+  </g>
+</svg>

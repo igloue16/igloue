@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <style>
+    #none-circle, #none-tick { stroke: var(--none-mark-stroke, #0d4f71); transition: stroke 240ms ease; }
+    @media (prefers-reduced-motion: reduce) { #none-circle, #none-tick { transition: none; } }
+  </style>
+  <g id="condition-none" fill="none" stroke="#0d4f71" stroke-linecap="round" stroke-linejoin="round">
+    <circle id="none-circle" class="question-circle none-circle" cx="80" cy="80" r="62" stroke-width="7"/>
+    <path id="none-tick" class="tick" d="M45 82L69 106L117 54" stroke-width="12"/>
+  </g>
+</svg>

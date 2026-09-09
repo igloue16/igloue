@@ -304,6 +304,39 @@
   object-fit: contain;
 }
 
+.assistant-room-native-svg {
+  width: min(100%, 92px);
+  height: 34px;
+  display: block;
+  overflow: visible;
+}
+
+.assistant-room-bedroom-svg {
+  --lamp-glow-opacity: 0;
+  --lamp-shade-fill: #0d4f71;
+  --pillow-fill: #0d4f71;
+}
+
+.assistant-room-living-svg {
+  --living-lamp-glow-opacity: 0;
+  --living-lamp-shade-fill: #0d4f71;
+  --living-cushion-fill: #0d4f71;
+}
+
+.assistant-room-office-svg {
+  --monitor-screen-fill: #0d4f71;
+  --monitor-glow-opacity: 0;
+  --rear-paper-shift: 0px;
+  --front-paper-opacity: 0;
+  --front-paper-shift: 18px;
+  --front-paper-delay: 0ms;
+}
+
+.assistant-room-other-svg {
+  --other-door-scale: 1;
+  --other-light-opacity: 0;
+}
+
 .assistant-room-label-row {
   display: flex;
   align-items: center;
@@ -338,6 +371,51 @@
 .assistant-room-options button.is-selected {
   border-color: var(--blue-dark);
   background: #ffffff;
+}
+
+.assistant-room-option[data-room-type="bedroom"].is-selected {
+  border-color: var(--tan);
+}
+
+.assistant-room-option[data-room-type="living_room"].is-selected,
+.assistant-room-option[data-room-type="office"].is-selected,
+.assistant-room-option[data-room-type="other"].is-selected {
+  border-color: var(--tan);
+}
+
+.assistant-room-options .assistant-room-check,
+.assistant-room-subtype-options .assistant-room-check {
+  display: none;
+}
+
+.assistant-room-option[data-room-type="bedroom"].is-selected
+  .assistant-room-bedroom-svg {
+  --lamp-glow-opacity: 0.42;
+  --lamp-shade-fill: #cf995b;
+  --pillow-fill: #cf995b;
+}
+
+.assistant-room-option[data-room-type="living_room"].is-selected
+  .assistant-room-living-svg {
+  --living-lamp-glow-opacity: 0.42;
+  --living-lamp-shade-fill: #cf995b;
+  --living-cushion-fill: #cf995b;
+}
+
+.assistant-room-option[data-room-type="office"].is-selected
+  .assistant-room-office-svg {
+  --monitor-screen-fill: #83c8e8;
+  --monitor-glow-opacity: 0.22;
+  --rear-paper-shift: 27px;
+  --front-paper-opacity: 1;
+  --front-paper-shift: 0px;
+  --front-paper-delay: 150ms;
+}
+
+.assistant-room-option[data-room-type="other"].is-selected
+  .assistant-room-other-svg {
+  --other-door-scale: 0.26;
+  --other-light-opacity: 1;
 }
 
 .assistant-room-options button.is-selected .assistant-room-check,
@@ -415,6 +493,39 @@
   object-fit: contain;
 }
 
+.assistant-room-subtype-native-svg {
+  width: 34px;
+  height: 34px;
+  display: block;
+  overflow: visible;
+}
+
+.assistant-room-subtype-other-room-svg {
+  --other-living-window-fill: #0d4f71;
+  --other-living-window-glow-opacity: 0;
+}
+
+.assistant-room-subtype-professional-space-svg {
+  --pro-door-scale: 1;
+  --pro-window-fill: #0d4f71;
+  --pro-light-opacity: 0;
+}
+
+.assistant-room-subtype-large-hall-svg {
+  --hall-flag-shift: 0px;
+  --hall-interior-fill: #0d4f71;
+}
+
+.assistant-room-subtype-event-reception-svg {
+  --event-people-fill: #0d4f71;
+  --event-light-fill: #0d4f71;
+  --event-light-glow-opacity: 0;
+}
+
+.assistant-room-subtype-unknown-space-svg {
+  --unknown-circle-stroke: #0d4f71;
+}
+
 .assistant-room-subtype-copy {
   min-width: 0;
 }
@@ -439,6 +550,45 @@
 
 .assistant-room-subtype-option:has(input:checked) {
   border-color: var(--blue-dark);
+}
+
+.assistant-room-subtype-option:has(input[value="other-room"]:checked),
+.assistant-room-subtype-option:has(input[value="professional-space"]:checked),
+.assistant-room-subtype-option:has(input[value="large-hall"]:checked),
+.assistant-room-subtype-option:has(input[value="event-reception"]:checked),
+.assistant-room-subtype-option:has(input[value="unknown-space"]:checked) {
+  border-color: var(--tan);
+}
+
+.assistant-room-subtype-option:has(input[value="other-room"]:checked)
+  .assistant-room-subtype-other-room-svg {
+  --other-living-window-fill: #cf995b;
+  --other-living-window-glow-opacity: 0.25;
+}
+
+.assistant-room-subtype-option:has(input[value="professional-space"]:checked)
+  .assistant-room-subtype-professional-space-svg {
+  --pro-door-scale: 0.24;
+  --pro-window-fill: #cf995b;
+  --pro-light-opacity: 0.3;
+}
+
+.assistant-room-subtype-option:has(input[value="large-hall"]:checked)
+  .assistant-room-subtype-large-hall-svg {
+  --hall-flag-shift: -10px;
+  --hall-interior-fill: #cf995b;
+}
+
+.assistant-room-subtype-option:has(input[value="event-reception"]:checked)
+  .assistant-room-subtype-event-reception-svg {
+  --event-people-fill: #cf995b;
+  --event-light-fill: #cf995b;
+  --event-light-glow-opacity: 0.35;
+}
+
+.assistant-room-subtype-option:has(input[value="unknown-space"]:checked)
+  .assistant-room-subtype-unknown-space-svg {
+  --unknown-circle-stroke: #cf995b;
 }
 
 .assistant-room-subtype-option:has(input:focus-visible) {
@@ -479,6 +629,89 @@
   .assistant-room-subtype-option:hover:has(input:checked) {
     border-color: var(--blue-dark);
     box-shadow: 0 2px 10px rgb(20 34 44 / 9%);
+  }
+
+  .assistant-room-option[data-room-type="bedroom"]:hover {
+    background: #ffffff;
+  }
+
+  .assistant-room-option[data-room-type="living_room"]:hover,
+  .assistant-room-option[data-room-type="office"]:hover,
+  .assistant-room-option[data-room-type="other"]:hover {
+    background: #ffffff;
+    transform: none;
+  }
+
+  .assistant-room-option[data-room-type="bedroom"].is-selected:hover {
+    border-color: var(--tan);
+  }
+
+  .assistant-room-option[data-room-type="living_room"].is-selected:hover,
+  .assistant-room-option[data-room-type="office"].is-selected:hover,
+  .assistant-room-option[data-room-type="other"].is-selected:hover {
+    border-color: var(--tan);
+  }
+
+  .assistant-room-subtype-option:hover:has(input[value="other-room"]:checked),
+  .assistant-room-subtype-option:hover:has(input[value="professional-space"]:checked),
+  .assistant-room-subtype-option:hover:has(input[value="large-hall"]:checked),
+  .assistant-room-subtype-option:hover:has(input[value="event-reception"]:checked),
+  .assistant-room-subtype-option:hover:has(input[value="unknown-space"]:checked) {
+    border-color: var(--tan);
+  }
+
+  .assistant-room-option[data-room-type="bedroom"]:hover
+    .assistant-room-bedroom-svg {
+    --lamp-glow-opacity: 0.42;
+    --lamp-shade-fill: #cf995b;
+  }
+
+  .assistant-room-option[data-room-type="living_room"]:hover
+    .assistant-room-living-svg {
+    --living-lamp-glow-opacity: 0.42;
+    --living-lamp-shade-fill: #cf995b;
+  }
+
+  .assistant-room-option[data-room-type="office"]:hover
+    .assistant-room-office-svg {
+    --monitor-screen-fill: #83c8e8;
+    --monitor-glow-opacity: 0.22;
+    --rear-paper-shift: 27px;
+    --front-paper-opacity: 1;
+    --front-paper-shift: 0px;
+    --front-paper-delay: 150ms;
+  }
+
+  .assistant-room-option[data-room-type="other"]:hover
+    .assistant-room-other-svg {
+    --other-door-scale: 0.26;
+    --other-light-opacity: 1;
+  }
+
+  .assistant-room-subtype-option:hover:has(input[value="other-room"])
+    .assistant-room-subtype-other-room-svg {
+    --other-living-window-fill: #cf995b;
+    --other-living-window-glow-opacity: 0.25;
+  }
+
+  .assistant-room-subtype-option:hover:has(input[value="professional-space"])
+    .assistant-room-subtype-professional-space-svg {
+    --pro-door-scale: 0.24;
+    --pro-window-fill: #cf995b;
+    --pro-light-opacity: 0.3;
+  }
+
+  .assistant-room-subtype-option:hover:has(input[value="large-hall"])
+    .assistant-room-subtype-large-hall-svg {
+    --hall-flag-shift: -10px;
+    --hall-interior-fill: #cf995b;
+  }
+
+  .assistant-room-subtype-option:hover:has(input[value="event-reception"])
+    .assistant-room-subtype-event-reception-svg {
+    --event-people-fill: #cf995b;
+    --event-light-fill: #cf995b;
+    --event-light-glow-opacity: 0.35;
   }
 
   .assistant-room-option:hover .assistant-room-illustration img,
@@ -606,24 +839,224 @@
   display: none;
 }
 
-.assistant-opening-option:has(.assistant-opening-thumbnail > img) {
+[data-opening-form] > .assistant-fieldset > .assistant-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.assistant-opening-option:has(.assistant-opening-native-svg) {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  min-height: 62px;
+  padding: 6px 10px;
+  background: #ffffff;
+  text-align: left;
 }
 
-.assistant-opening-thumbnail:has(> img) {
-  width: 48px;
-  height: 38px;
+.assistant-opening-thumbnail:has(> .assistant-opening-native-svg) {
+  width: 54px;
+  height: 46px;
   display: block;
-  overflow: hidden;
+  overflow: visible;
 }
 
-.assistant-opening-thumbnail > img {
+.assistant-opening-native-svg {
+  --opening-movable-stroke: #0d4f71;
+  --opening-glass-fill: #f7fbfd;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  display: block;
+  overflow: visible;
+}
+
+.assistant-opening-casement-svg {
+  --classic-sash-scale: 1;
+}
+
+.assistant-opening-tilt-turn-svg {
+  --tilt-sash-y: 0px;
+  --tilt-sash-scale-y: 1;
+  --tilt-sash-skew: 0deg;
+}
+
+.assistant-opening-sliding-svg {
+  --sliding-sash-x: 0px;
+  --opening-reveal-opacity: 0;
+}
+
+.assistant-opening-french-door-svg {
+  --french-leaf-scale: 1;
+}
+
+.assistant-opening-velux-svg {
+  --velux-sash-y: 0px;
+  --velux-sash-scale-y: 1;
+}
+
+.assistant-opening-sliding-door-svg {
+  --sliding-door-sash-x: 0px;
+  --sliding-door-reveal-opacity: 0;
+}
+
+.assistant-options .assistant-opening-option.is-selected {
+  border-color: var(--tan);
+  background: #ffffff;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-native-svg {
+  --opening-movable-stroke: #cf995b;
+  --opening-glass-fill: #fffaf4;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-casement-svg {
+  --classic-sash-scale: 0.28;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-tilt-turn-svg {
+  --tilt-sash-y: 3px;
+  --tilt-sash-scale-y: 0.76;
+  --tilt-sash-skew: -4deg;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-sliding-svg {
+  --sliding-sash-x: 47px;
+  --opening-reveal-opacity: 1;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-french-door-svg {
+  --french-leaf-scale: 0.26;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-velux-svg {
+  --velux-sash-y: -7px;
+  --velux-sash-scale-y: 0.68;
+}
+
+.assistant-opening-option.is-selected .assistant-opening-sliding-door-svg {
+  --sliding-door-sash-x: 48px;
+  --sliding-door-reveal-opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .assistant-options .assistant-opening-option:has(.assistant-opening-native-svg):hover {
+    border-color: var(--line-strong);
+    background: #ffffff;
+    transform: none;
+  }
+
+  .assistant-opening-option:has(.assistant-opening-native-svg):hover .assistant-opening-native-svg {
+    --opening-movable-stroke: #cf995b;
+    --opening-glass-fill: #fffaf4;
+  }
+
+  .assistant-opening-option:hover .assistant-opening-casement-svg {
+    --classic-sash-scale: 0.28;
+  }
+
+  .assistant-opening-option:hover .assistant-opening-tilt-turn-svg {
+    --tilt-sash-y: 3px;
+    --tilt-sash-scale-y: 0.76;
+    --tilt-sash-skew: -4deg;
+  }
+
+  .assistant-opening-option:hover .assistant-opening-sliding-svg {
+    --sliding-sash-x: 47px;
+    --opening-reveal-opacity: 1;
+  }
+
+  .assistant-opening-option:hover .assistant-opening-french-door-svg {
+    --french-leaf-scale: 0.26;
+  }
+
+  .assistant-opening-option:hover .assistant-opening-velux-svg {
+    --velux-sash-y: -7px;
+    --velux-sash-scale-y: 0.68;
+  }
+
+  .assistant-opening-option:hover .assistant-opening-sliding-door-svg {
+    --sliding-door-sash-x: 48px;
+    --sliding-door-reveal-opacity: 1;
+  }
+
+  .assistant-options .assistant-opening-option.is-selected:hover {
+    border-color: var(--tan);
+    background: #ffffff;
+  }
+}
+
+.assistant-outdoor-question {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 14px;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--tan);
+}
+
+.assistant-outdoor-question[hidden] {
+  display: none;
+}
+
+.assistant-outdoor-question legend {
+  grid-column: 1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.assistant-outdoor-question .assistant-hint {
+  grid-column: 1;
+  margin: 0;
+  max-width: 54ch;
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.assistant-outdoor-options {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(58px, 1fr));
+  gap: 7px;
+}
+
+.assistant-outdoor-option {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: #ffffff;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assistant-outdoor-option:has(input:checked) {
+  border: 2px solid var(--tan);
+  background: #ffffff;
+}
+
+.assistant-outdoor-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.assistant-outdoor-option:has(input:focus-visible) {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 3px;
+}
+
+.assistant-outdoor-question .assistant-error {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
 }
 
 .assistant-check-grid {
@@ -679,6 +1112,42 @@
   object-fit: contain;
 }
 
+.assistant-condition-native-svg {
+  width: 42px;
+  height: 42px;
+  display: block;
+  overflow: visible;
+}
+
+.assistant-condition-sunny-svg {
+  --sun-fill: #0d4f71;
+  --sun-glow-opacity: 0;
+}
+
+.assistant-condition-top-floor-svg,
+.assistant-condition-usually-hot-svg {
+  --heat-wave-stroke: #0d4f71;
+}
+
+.assistant-condition-top-floor-svg {
+  --roof-glow-opacity: 0;
+}
+
+.assistant-condition-large-windows-svg {
+  --window-gleam-stroke: #0d4f71;
+  --window-gleam-opacity: 0.72;
+  --window-gleam-shift-y: 0px;
+}
+
+.assistant-condition-usually-hot-svg {
+  --thermometer-liquid-fill: #0d4f71;
+  --thermometer-liquid-level: 0.5;
+}
+
+.assistant-condition-none-svg {
+  --none-mark-stroke: #0d4f71;
+}
+
 .assistant-condition-label {
   display: block;
 }
@@ -689,8 +1158,37 @@
 }
 
 .assistant-condition-option:has(input:checked) {
-  border-color: var(--blue-dark);
+  border-color: var(--tan);
   background: #ffffff;
+}
+
+.assistant-condition-option:has(input[value="sunny"]:checked) .assistant-condition-sunny-svg {
+  --sun-fill: #cf995b;
+  --sun-glow-opacity: 0.32;
+}
+
+.assistant-condition-option:has(input[value="top_floor"]:checked) .assistant-condition-top-floor-svg {
+  --roof-glow-opacity: 0.22;
+}
+
+.assistant-condition-option:has(input[value="large_windows"]:checked) .assistant-condition-large-windows-svg {
+  --window-gleam-stroke: #cf995b;
+  --window-gleam-opacity: 1;
+  --window-gleam-shift-y: -6px;
+}
+
+.assistant-condition-option:has(input[value="usually_hot"]:checked) .assistant-condition-usually-hot-svg {
+  --thermometer-liquid-fill: #cf995b;
+  --thermometer-liquid-level: 1;
+}
+
+.assistant-condition-option:has(input[value="top_floor"]:checked) .assistant-condition-top-floor-svg,
+.assistant-condition-option:has(input[value="usually_hot"]:checked) .assistant-condition-usually-hot-svg {
+  --heat-wave-stroke: #cf995b;
+}
+
+.assistant-condition-option:has(input[value="none"]:checked) .assistant-condition-none-svg {
+  --none-mark-stroke: #cf995b;
 }
 
 .assistant-condition-check {
@@ -699,7 +1197,7 @@
   right: 5px;
   width: 16px;
   height: 16px;
-  display: grid;
+  display: none;
   place-items: center;
   border-radius: 50%;
   background: var(--blue-dark);
@@ -734,6 +1232,31 @@
 
   .assistant-condition-option:hover .assistant-condition-illustration img {
     transform: scale(1.05);
+  }
+
+  .assistant-condition-option:hover:has(input[value="sunny"]) .assistant-condition-sunny-svg {
+    --sun-fill: #cf995b;
+    --sun-glow-opacity: 0.32;
+  }
+
+  .assistant-condition-option:hover:has(input[value="top_floor"]) .assistant-condition-top-floor-svg {
+    --roof-glow-opacity: 0.22;
+  }
+
+  .assistant-condition-option:hover:has(input[value="large_windows"]) .assistant-condition-large-windows-svg {
+    --window-gleam-stroke: #cf995b;
+    --window-gleam-opacity: 1;
+    --window-gleam-shift-y: -6px;
+  }
+
+  .assistant-condition-option:hover:has(input[value="usually_hot"]) .assistant-condition-usually-hot-svg {
+    --thermometer-liquid-fill: #cf995b;
+    --thermometer-liquid-level: 1;
+  }
+
+  .assistant-condition-option:hover:has(input[value="top_floor"]) .assistant-condition-top-floor-svg,
+  .assistant-condition-option:hover:has(input[value="usually_hot"]) .assistant-condition-usually-hot-svg {
+    --heat-wave-stroke: #cf995b;
   }
 }
 

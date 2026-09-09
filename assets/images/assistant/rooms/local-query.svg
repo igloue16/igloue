@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160">
+  <style>
+    #unknown-question-circle,
+    #unknown-question-mark {
+      stroke: var(--unknown-circle-stroke, #0d4f71);
+      transition: stroke 240ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #unknown-question-circle,
+      #unknown-question-mark {
+        transition: none;
+      }
+    }
+  </style>
+
+  <g id="room-subtype-unknown-space">
+    <circle
+      id="unknown-question-circle"
+      class="question-circle"
+      cx="100"
+      cy="80"
+      r="62"
+      fill="#ffffff"
+      stroke="#0d4f71"
+      stroke-width="7"/>
+    <path
+      id="unknown-question-mark"
+      class="question-mark"
+      d="M81 60C82 47 90 40 102 40C115 40 123 48 123 59C123 69 118 74 111 79C104 84 101 89 101 98M101 117V119"
+      fill="none"
+      stroke="#0d4f71"
+      stroke-width="8"
+      stroke-linecap="round"
+      stroke-linejoin="round"/>
+  </g>
+</svg>

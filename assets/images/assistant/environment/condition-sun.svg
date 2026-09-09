@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <style>
+    #sun-centre,
+    #sun-rays path {
+      fill: var(--sun-fill, #0d4f71);
+      stroke: var(--sun-fill, #0d4f71);
+      transition: fill 240ms ease, stroke 240ms ease;
+    }
+    #sun-glow { opacity: var(--sun-glow-opacity, 0); transition: opacity 240ms ease; }
+    @media (prefers-reduced-motion: reduce) {
+      #sun-centre, #sun-rays path, #sun-glow { transition: none; }
+    }
+  </style>
+  <defs>
+    <filter id="sun-glow-blur" x="-55%" y="-55%" width="210%" height="210%"><feGaussianBlur stdDeviation="8"/></filter>
+  </defs>
+  <g id="condition-sun">
+    <circle id="sun-glow" class="sun-glow" cx="80" cy="80" r="38" fill="#e6a24a" filter="url(#sun-glow-blur)"/>
+    <circle id="sun-centre" class="sun-centre" cx="80" cy="80" r="27" fill="#0d4f71" stroke="#0d4f71" stroke-width="5"/>
+    <g id="sun-rays" class="sun-rays" fill="none" stroke="#0d4f71" stroke-width="7" stroke-linecap="round">
+      <path d="M80 18V34"/><path d="M80 126V142"/><path d="M18 80H34"/><path d="M126 80H142"/>
+      <path d="M36 36L48 48"/><path d="M112 112L124 124"/><path d="M124 36L112 48"/><path d="M48 112L36 124"/>
+    </g>
+  </g>
+</svg>

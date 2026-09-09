@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 323 224">
+  <style>
+    #living-lamp-glow {
+      opacity: var(--living-lamp-glow-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    #living-lamp-shade-fill {
+      fill: var(--living-lamp-shade-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    #living-cushion-fill {
+      fill: var(--living-cushion-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #living-lamp-glow,
+      #living-lamp-shade-fill,
+      #living-cushion-fill {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="living-lamp-glow-blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <g id="room-living">
+    <g id="living-lamp" class="lamp">
+      <circle
+        id="living-lamp-glow"
+        class="lamp-glow"
+        cx="263"
+        cy="58"
+        r="34"
+        fill="#e6a24a"
+        filter="url(#living-lamp-glow-blur)"/>
+      <path d="M263 68V205" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round"/>
+      <path d="M246 205H280" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round"/>
+      <g id="living-lamp-shade" class="lamp-shade">
+        <path
+          id="living-lamp-shade-fill"
+          d="M233 66L246 24H279L292 66Z"
+          fill="#0d4f71"
+          stroke="#0d4f71"
+          stroke-width="6"
+          stroke-linejoin="round"/>
+      </g>
+    </g>
+
+    <g id="living-sofa" class="sofa" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M63 104V98C63 84 75 74 90 74H165C181 74 193 85 193 100V105" fill="#ffffff"/>
+      <path
+        id="living-cushion-fill"
+        class="cushion pillow"
+        d="M132 142L144 107C146 102 150 100 156 100H193V145Z"
+        fill="#0d4f71"
+        stroke="#0d4f71"/>
+      <path d="M36 110C47 106 61 111 64 121L68 146H190L194 121C196 111 210 106 221 110C228 113 231 120 230 129L226 176C225 183 220 187 213 187H51C44 187 39 183 38 176L33 129C32 120 34 113 36 110Z" fill="#ffffff"/>
+      <path d="M65 145H192V166H65Z" fill="#ffffff"/>
+      <path d="M58 187L54 207H67L78 187" fill="#ffffff"/>
+      <path d="M202 187L214 207H226L222 187" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

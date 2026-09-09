@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <style>
+    #window-gleam path { stroke: var(--window-gleam-stroke, #0d4f71); opacity: var(--window-gleam-opacity, 0.72); transform: translateY(var(--window-gleam-shift-y, 0px)); transition: stroke 240ms ease, opacity 240ms ease, transform 300ms ease; }
+    @media (prefers-reduced-motion: reduce) { #window-gleam path { transition: none; } }
+  </style>
+  <g id="condition-glazing">
+    <g id="window-frame" class="window-frame" fill="#ffffff" stroke="#0d4f71" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M27 22H133V139H27Z"/><path d="M80 23V138"/><path d="M18 140H142"/>
+    </g>
+    <g id="glass" class="glass" fill="none" stroke="#0d4f71" stroke-width="3" opacity="0.35"><path d="M37 33H70V128H37ZM90 33H123V128H90Z"/></g>
+    <g id="window-gleam" class="gleam reflection-lines" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round">
+      <path d="M46 91L65 70"/><path d="M47 109L70 84"/><path d="M98 91L117 70"/><path d="M99 109L122 84"/>
+    </g>
+  </g>
+</svg>

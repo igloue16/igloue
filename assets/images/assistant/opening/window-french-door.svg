@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140">
+  <style>
+    #french-opening-leaf { transform: scaleX(var(--french-leaf-scale, 1)); transform-box: fill-box; transform-origin: left center; transition: transform 350ms cubic-bezier(.2,.75,.25,1); }
+    #french-opening-leaf .opening-frame, #french-opening-leaf .handle { stroke: var(--opening-movable-stroke, #0d4f71); transition: stroke 260ms ease; }
+    .glass { fill: var(--opening-glass-fill, #f7fbfd); transition: fill 260ms ease; }
+    @media (prefers-reduced-motion: reduce) { #french-opening-leaf, #french-opening-leaf .opening-frame, #french-opening-leaf .handle, .glass { transition: none; } }
+  </style>
+  <g id="opening-french-door" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect id="french-outer-frame" class="outer-frame fixed-frame" x="34" y="5" width="112" height="132" fill="#ffffff"/>
+    <g id="french-fixed-leaf" class="fixed-pane"><rect class="glass" x="94" y="17" width="40" height="108"/><rect class="fixed-frame" x="94" y="17" width="40" height="108"/><path class="reflection" d="M105 73L118 59M105 89L121 72" stroke-width="4"/></g>
+    <g id="french-opening-leaf" class="opening-sash"><rect class="glass" x="46" y="17" width="40" height="108"/><rect class="opening-frame" x="46" y="17" width="40" height="108"/><path class="reflection" d="M56 73L69 59M56 89L72 72" stroke-width="4"/><path class="handle" d="M89 65V82" stroke-width="7"/></g>
+  </g>
+</svg>

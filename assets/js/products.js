@@ -214,7 +214,11 @@ function productSupportsOpening(product, openingType) {
     return false;
   }
 
-  const compatibleOpeningId = openingType.replaceAll("_", "-");
+  const requestedOpeningId = openingType.replaceAll("_", "-");
+  const compatibleOpeningId =
+    requestedOpeningId === "sliding-door"
+      ? "sliding"
+      : requestedOpeningId;
 
   return product.compatibleOpenings.includes(compatibleOpeningId);
 }

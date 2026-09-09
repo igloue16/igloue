@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140">
+  <style>
+    #balcony-opening-door { transform: scaleX(var(--balcony-door-scale, 1)); transform-box: fill-box; transform-origin: left center; transition: transform 350ms cubic-bezier(.2,.75,.25,1); }
+    #balcony-opening-door .opening-frame, #balcony-opening-door .handle { stroke: var(--opening-movable-stroke, #0d4f71); transition: stroke 260ms ease; }
+    .glass { fill: var(--opening-glass-fill, #f7fbfd); transition: fill 260ms ease; }
+    @media (prefers-reduced-motion: reduce) { #balcony-opening-door, #balcony-opening-door .opening-frame, #balcony-opening-door .handle, .glass { transition: none; } }
+  </style>
+  <g id="opening-terrace" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect id="balcony-outer-frame" class="outer-frame fixed-frame" x="37" y="3" width="106" height="134" fill="#ffffff"/>
+    <g id="balcony-fixed-pane" class="fixed-pane"><rect class="glass" x="94" y="15" width="37" height="110"/><rect class="fixed-frame" x="94" y="15" width="37" height="110"/><path class="reflection" d="M104 72L117 58M104 89L120 71" stroke-width="4"/></g>
+    <g id="balcony-opening-door" class="opening-sash opening-door"><rect class="glass" x="49" y="15" width="37" height="110"/><rect class="opening-frame" x="49" y="15" width="37" height="110"/><path class="reflection" d="M59 72L72 58M59 89L75 71" stroke-width="4"/><path class="handle" d="M89 64V82" stroke-width="7"/></g>
+    <path class="threshold" d="M37 128H143"/>
+  </g>
+</svg>

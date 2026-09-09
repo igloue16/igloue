@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140">
+  <style>
+    #tilt-opening-sash { transform: translateY(var(--tilt-sash-y, 0px)) scaleY(var(--tilt-sash-scale-y, 1)) skewX(var(--tilt-sash-skew, 0deg)); transform-box: fill-box; transform-origin: center bottom; transition: transform 340ms cubic-bezier(.2,.75,.25,1); }
+    #tilt-opening-sash .opening-frame, #tilt-opening-sash .handle { stroke: var(--opening-movable-stroke, #0d4f71); transition: stroke 260ms ease; }
+    .glass { fill: var(--opening-glass-fill, #f7fbfd); transition: fill 260ms ease; }
+    @media (prefers-reduced-motion: reduce) { #tilt-opening-sash, #tilt-opening-sash .opening-frame, #tilt-opening-sash .handle, .glass { transition: none; } }
+  </style>
+  <g id="opening-tilt-turn" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect id="tilt-outer-frame" class="outer-frame fixed-frame" x="34" y="13" width="112" height="114" fill="#ffffff"/>
+    <g id="tilt-opening-sash" class="opening-sash"><rect class="glass" x="46" y="25" width="88" height="90"/><rect class="opening-frame" x="46" y="25" width="88" height="90"/><path class="reflection" d="M89 71L106 53M89 88L109 67" stroke-width="4"/><path class="handle" d="M40 62V80" stroke-width="7"/></g>
+  </g>
+</svg>

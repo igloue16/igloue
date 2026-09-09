@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160">
+  <style>
+    #pro-interior-light,
+    #pro-window-glow {
+      opacity: var(--pro-light-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    #pro-shop-window {
+      fill: var(--pro-window-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    #pro-shop-door {
+      transform: scaleX(var(--pro-door-scale, 1));
+      transform-box: fill-box;
+      transform-origin: left center;
+      transition: transform 270ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #pro-interior-light,
+      #pro-window-glow,
+      #pro-shop-window,
+      #pro-shop-door {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="pro-light-blur" x="-45%" y="-45%" width="190%" height="190%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <g id="room-subtype-professional-space">
+    <g id="pro-shop-frame" class="shop-frame" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M25 65V145H175V65" fill="#ffffff"/>
+      <path d="M23 21H177L188 56C188 66 180 73 170 73C160 73 153 66 153 56C153 66 145 73 135 73C125 73 118 66 118 56C118 66 110 73 100 73C90 73 82 66 82 56C82 66 75 73 65 73C55 73 47 66 47 56C47 66 40 73 30 73C20 73 12 66 12 56Z" fill="#ffffff"/>
+      <path d="M12 56H188" fill="none"/>
+    </g>
+
+    <g id="pro-window-area">
+      <rect id="pro-window-glow" class="window-glow" x="87" y="86" width="73" height="45" rx="4" fill="#e6a24a" filter="url(#pro-light-blur)"/>
+      <rect id="pro-shop-window" class="shop-window" x="88" y="86" width="72" height="45" rx="3" fill="#0d4f71" stroke="#0d4f71" stroke-width="6"/>
+      <path d="M106 118L124 98M125 118L141 101" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.65"/>
+    </g>
+
+    <g id="pro-doorway">
+      <rect id="pro-interior-light" class="interior-light" x="39" y="84" width="34" height="61" fill="#f4bd67"/>
+      <g id="pro-shop-door" class="shop-door" fill="#ffffff" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M39 84H74V145H39Z"/>
+        <circle cx="66" cy="117" r="2.5" fill="#0d4f71" stroke="none"/>
+      </g>
+    </g>
+  </g>
+</svg>

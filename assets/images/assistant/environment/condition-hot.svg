@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <style>
+    #thermometer-liquid { fill: var(--thermometer-liquid-fill, #0d4f71); transform: scaleY(var(--thermometer-liquid-level, 0.5)); transform-box: fill-box; transform-origin: center bottom; transition: fill 240ms ease, transform 270ms ease; }
+    #thermometer-bulb { fill: var(--thermometer-liquid-fill, #0d4f71); transition: fill 240ms ease; }
+    .heat-wave { stroke: var(--heat-wave-stroke, #0d4f71); transition: stroke 260ms ease; }
+    @media (prefers-reduced-motion: reduce) { #thermometer-liquid, #thermometer-bulb, .heat-wave { transition: none; } }
+  </style>
+  <g id="condition-hot">
+    <path id="thermometer-outline" class="thermometer-outline" d="M41 29C41 18 49 11 59 11C70 11 77 19 77 29V102C89 109 96 121 96 134C96 155 79 171 59 171C38 171 22 155 22 134C22 121 29 109 41 102Z" transform="translate(0 -12)" fill="#ffffff" stroke="#0d4f71" stroke-width="7" stroke-linejoin="round"/>
+    <rect id="thermometer-liquid" class="thermometer-liquid" x="55" y="30" width="8" height="92" rx="4" fill="#0d4f71"/>
+    <circle id="thermometer-bulb" class="thermometer-bulb" cx="59" cy="122" r="19" fill="#0d4f71"/>
+    <g id="thermometer-heat-lines" class="heat-waves heat-waves--thermometer" fill="none" stroke="#0d4f71" stroke-width="7" stroke-linecap="round">
+      <g transform="translate(108 41)"><path id="thermometer-heat-line-1" class="heat-wave heat-wave--1" d="M0 56C-8 47 8 39 0 30C-8 21 8 12 0 3"/></g>
+      <g transform="translate(128 41)"><path id="thermometer-heat-line-2" class="heat-wave heat-wave--2" d="M0 56C-8 47 8 39 0 30C-8 21 8 12 0 3"/></g>
+      <g transform="translate(148 41)"><path id="thermometer-heat-line-3" class="heat-wave heat-wave--3" d="M0 56C-8 47 8 39 0 30C-8 21 8 12 0 3"/></g>
+    </g>
+  </g>
+</svg>

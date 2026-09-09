@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 323 224">
+  <style>
+    #office-monitor-screen {
+      fill: var(--monitor-screen-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    #office-monitor-glow {
+      opacity: var(--monitor-glow-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    #office-rear-paper {
+      transform: translateY(var(--rear-paper-shift, 0px));
+      transition: transform 260ms ease;
+    }
+
+    #office-front-paper {
+      opacity: var(--front-paper-opacity, 0);
+      transform: translateY(var(--front-paper-shift, 18px));
+      transition:
+        opacity 170ms ease var(--front-paper-delay, 0ms),
+        transform 230ms ease var(--front-paper-delay, 0ms);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #office-monitor-screen,
+      #office-monitor-glow,
+      #office-rear-paper,
+      #office-front-paper {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="office-monitor-glow-blur" x="-35%" y="-55%" width="170%" height="210%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <g id="room-office">
+    <g id="office-monitor" class="monitor" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <rect
+        id="office-monitor-glow"
+        class="monitor-glow"
+        x="103"
+        y="25"
+        width="108"
+        height="76"
+        rx="4"
+        fill="#83c8e8"
+        stroke="none"
+        filter="url(#office-monitor-glow-blur)"/>
+      <path
+        id="office-monitor-screen"
+        class="monitor-screen"
+        d="M112 31H205L201 94H107Z"
+        fill="#0d4f71"
+        stroke="none"/>
+      <path
+        id="office-monitor-frame"
+        class="monitor-frame"
+        d="M112 31H205L201 94H107Z"
+        fill="none"/>
+      <path d="M155 95V112" fill="none"/>
+      <path d="M139 113H173" fill="none"/>
+    </g>
+
+    <g id="office-printer" class="printer" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <g id="office-rear-paper" class="rear-paper">
+        <path d="M237 50H283V94H237Z" fill="#d9eff8"/>
+        <path d="M245 62H275M245 71H271" fill="none" stroke-width="3"/>
+      </g>
+      <path d="M230 82H289V119H230Z" fill="#ffffff"/>
+      <path d="M237 82V73H283V82" fill="#ffffff"/>
+      <path d="M241 96H278" fill="none"/>
+      <g id="office-front-paper" class="front-paper">
+        <path d="M239 111H280V160H239Z" fill="#d9eff8"/>
+        <path d="M247 126H272M247 135H268" fill="none" stroke-width="3"/>
+      </g>
+    </g>
+
+    <g id="office-desk" class="desk" fill="#ffffff" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 112H299V128H20Z"/>
+      <path d="M28 128V204M291 128V204" fill="none"/>
+    </g>
+
+    <g id="office-chair" class="chair" fill="#ffffff" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M87 95C87 85 95 80 105 80H127C138 80 144 87 144 98V139C144 151 137 158 125 158H103C92 158 85 151 84 140Z"/>
+      <path d="M114 158V174M114 174L83 204M114 174L145 204" fill="none"/>
+    </g>
+  </g>
+</svg>

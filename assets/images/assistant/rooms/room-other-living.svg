@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160">
+  <style>
+    #other-living-window-glow {
+      opacity: var(--other-living-window-glow-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    #other-living-windows .window-pane {
+      fill: var(--other-living-window-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #other-living-window-glow,
+      #other-living-windows .window-pane {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="other-living-window-glow-blur" x="-55%" y="-55%" width="210%" height="210%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <g id="room-subtype-other-room">
+    <g id="other-living-structure" class="structure frame" fill="none" stroke="#0d4f71" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 79L100 16L182 79"/>
+      <path d="M38 80V143M162 80V143"/>
+      <path d="M132 40V18H153V57"/>
+    </g>
+
+    <rect
+      id="other-living-window-glow"
+      class="window-glow"
+      x="71"
+      y="83"
+      width="58"
+      height="48"
+      rx="5"
+      fill="#e6a24a"
+      filter="url(#other-living-window-glow-blur)"/>
+
+    <g id="other-living-windows" class="windows">
+      <rect class="window-pane" x="70" y="82" width="24" height="21" rx="3" fill="#0d4f71"/>
+      <rect class="window-pane" x="106" y="82" width="24" height="21" rx="3" fill="#0d4f71"/>
+      <rect class="window-pane" x="70" y="111" width="24" height="21" rx="3" fill="#0d4f71"/>
+      <rect class="window-pane" x="106" y="111" width="24" height="21" rx="3" fill="#0d4f71"/>
+    </g>
+  </g>
+</svg>

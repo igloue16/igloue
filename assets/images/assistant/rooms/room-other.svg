@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <style>
+    #other-interior-light {
+      opacity: var(--other-light-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    #other-door {
+      transform: scaleX(var(--other-door-scale, 1));
+      transform-box: fill-box;
+      transform-origin: left center;
+      transition: transform 270ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #other-interior-light,
+      #other-door {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="other-light-spill-blur" x="-35%" y="-25%" width="170%" height="150%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <g id="room-other">
+    <g id="other-doorway-frame" class="doorway-frame" fill="none" stroke="#0d4f71" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M59 218V25H190V218"/>
+      <path d="M40 218H211"/>
+    </g>
+
+    <g id="other-interior-light" class="interior-light">
+      <rect x="64" y="30" width="121" height="183" fill="#f4bd67" opacity="0.23" filter="url(#other-light-spill-blur)"/>
+      <rect x="64" y="30" width="121" height="183" fill="#f4bd67" opacity="0.7"/>
+    </g>
+
+    <g id="other-door" class="door" fill="#ffffff" stroke="#0d4f71" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M61 26L121 61V218H61Z"/>
+      <path d="M101 120V145"/>
+      <path d="M92 133H109"/>
+    </g>
+  </g>
+</svg>

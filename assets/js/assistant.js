@@ -128,15 +128,23 @@ const ASSISTANT_I18N = {
         casement: "Fenêtre classique",
         tilt_turn: "Oscillo-battante",
         sliding: "Fenêtre coulissante",
-        french_door: "Porte-fenêtre / baie",
+        french_door: "Porte-fenêtre",
+        sliding_door: "Baie vitrée coulissante",
         velux: "Fenêtre de toit / Velux",
-        terrace: "Terrasse / balcon",
         unsure: "Je ne sais pas"
       },
 
+      outdoorSpace: {
+        heading:
+          "Disposez-vous d'un balcon ou d'une terrasse accessible depuis cette ouverture ?",
+        introduction:
+          "Si oui, nous pourrons également vérifier si une installation avec unité extérieure posée au sol est possible.",
+        yes: "Oui",
+        no: "Non",
+        error: "Indiquez si un balcon ou une terrasse est accessible."
+      },
+
       notes: {
-        terrace:
-          "Une terrasse ou un balcon est souvent la solution la plus simple pour un climatiseur split.",
         velux:
           "Les fenêtres de toit nécessitent généralement un kit ou une adaptation spécifique.",
         unsure:
@@ -303,6 +311,7 @@ const assistantState = {
   roomConditions: null,
 
   openingType: "",
+  hasAccessibleOutdoorSpace: null,
 
   startDate: "",
   endDate: "",
@@ -329,10 +338,10 @@ const roomTypeIds = [
 ];
 
 const roomTypeIllustrations = {
-  bedroom: "assets/images/assistant/rooms/room-bedroom1.png",
-  living_room: "assets/images/assistant/rooms/room-living1.png",
-  office: "assets/images/assistant/rooms/room-office1.png",
-  other: "assets/images/assistant/rooms/room-other1.png"
+  bedroom: "assets/images/assistant/rooms/room-bedroom.svg",
+  living_room: "assets/images/assistant/rooms/room-living.svg",
+  office: "assets/images/assistant/rooms/room-office.svg",
+  other: "assets/images/assistant/rooms/room-other.svg"
 };
 
 const roomSubtypeIds = [
@@ -344,11 +353,11 @@ const roomSubtypeIds = [
 ];
 
 const roomSubtypeIllustrations = {
-  "other-room": "assets/images/assistant/rooms/room-other-submenu main.png",
-  "professional-space": "assets/images/assistant/rooms/local-pro.png",
-  "large-hall": "assets/images/assistant/rooms/local-salle.png",
-  "event-reception": "assets/images/assistant/rooms/local-marriage.png",
-  "unknown-space": "assets/images/assistant/rooms/local-query.png"
+  "other-room": "assets/images/assistant/rooms/room-other-living.svg",
+  "professional-space": "assets/images/assistant/rooms/local-pro.svg",
+  "large-hall": "assets/images/assistant/rooms/local-salle.svg",
+  "event-reception": "assets/images/assistant/rooms/local-marriage.svg",
+  "unknown-space": "assets/images/assistant/rooms/local-query.svg"
 };
 
 const roomConditionIds = [
@@ -359,11 +368,11 @@ const roomConditionIds = [
 ];
 
 const roomConditionIllustrations = {
-  sunny: "assets/images/assistant/environment/condition-sun1.png",
-  top_floor: "assets/images/assistant/environment/condition-roof1.png",
-  large_windows: "assets/images/assistant/environment/condition-glazing1.png",
-  usually_hot: "assets/images/assistant/environment/condition-hot1.png",
-  none: "assets/images/assistant/environment/condition-none.png"
+  sunny: "assets/images/assistant/environment/condition-sun.svg",
+  top_floor: "assets/images/assistant/environment/condition-roof.svg",
+  large_windows: "assets/images/assistant/environment/condition-glazing.svg",
+  usually_hot: "assets/images/assistant/environment/condition-hot.svg",
+  none: "assets/images/assistant/environment/condition-none.svg"
 };
 
 const openingTypeIds = [
@@ -371,10 +380,24 @@ const openingTypeIds = [
   "tilt_turn",
   "sliding",
   "french_door",
+  "sliding_door",
   "velux",
-  "terrace",
   "unsure"
 ];
+
+const openingIllustrations = {
+  casement: "assets/images/assistant/opening/window-classic.svg",
+  tilt_turn: "assets/images/assistant/opening/window-tilt-turn.svg",
+  sliding: "assets/images/assistant/opening/window-sliding.svg",
+  french_door: "assets/images/assistant/opening/window-french-door.svg",
+  sliding_door: "assets/images/assistant/opening/window-sliding-door.svg",
+  velux: "assets/images/assistant/opening/window-velux.svg",
+};
+
+const outdoorSpaceOpeningTypes = new Set([
+  "french_door",
+  "sliding_door"
+]);
 
 function getAssistantElement() {
   return document.querySelector("[data-assistant]");
@@ -912,9 +935,22 @@ function showRoomStage(
         <span
           class="assistant-room-illustration"
           aria-hidden="true">
-          <img
-            src="${roomTypeIllustrations[roomId]}"
-            alt="">
+          ${
+            ["bedroom", "living_room", "office", "other"].includes(roomId)
+              ? `
+                <svg
+                  class="assistant-room-native-svg assistant-room-${roomId.replace("_room", "")}-svg"
+                  viewBox="${roomId === "bedroom" ? "0 0 323 197" : roomId === "other" ? "0 0 256 256" : "0 0 323 224"}"
+                  focusable="false">
+                  <use href="${roomTypeIllustrations[roomId]}#room-${roomId.replace("_room", "")}"></use>
+                </svg>
+              `
+              : `
+                <img
+                  src="${roomTypeIllustrations[roomId]}"
+                  alt="">
+              `
+          }
         </span>
 
         <span class="assistant-room-label-row">
@@ -950,9 +986,28 @@ function showRoomStage(
           <span
             class="assistant-room-subtype-illustration"
             aria-hidden="true">
-            <img
-              src="${roomSubtypeIllustrations[subtypeId]}"
-              alt="">
+            ${
+              [
+                "other-room",
+                "professional-space",
+                "large-hall",
+                "event-reception",
+                "unknown-space"
+              ].includes(subtypeId)
+                ? `
+                  <svg
+                    class="assistant-room-subtype-native-svg assistant-room-subtype-${subtypeId}-svg"
+                    viewBox="0 0 200 160"
+                    focusable="false">
+                    <use href="${roomSubtypeIllustrations[subtypeId]}#room-subtype-${subtypeId}"></use>
+                  </svg>
+                `
+                : `
+                  <img
+                    src="${roomSubtypeIllustrations[subtypeId]}"
+                    alt="">
+                `
+            }
           </span>
 
           <span class="assistant-room-subtype-copy">
@@ -1321,9 +1376,12 @@ function showSituationStage(
           <span
             class="assistant-condition-illustration"
             aria-hidden="true">
-            <img
-              src="${roomConditionIllustrations[conditionId]}"
-              alt="">
+            <svg
+              class="assistant-condition-native-svg assistant-condition-${conditionId.replace("_", "-")}-svg"
+              viewBox="0 0 160 160"
+              focusable="false">
+              <use href="${roomConditionIllustrations[conditionId]}#condition-${conditionId === "sunny" ? "sun" : conditionId === "top_floor" ? "roof" : conditionId === "large_windows" ? "glazing" : "hot"}"></use>
+            </svg>
           </span>
 
           <span class="assistant-condition-label">
@@ -1389,9 +1447,12 @@ function showSituationStage(
                 <span
                   class="assistant-condition-illustration"
                   aria-hidden="true">
-                  <img
-                    src="${roomConditionIllustrations.none}"
-                    alt="">
+                  <svg
+                    class="assistant-condition-native-svg assistant-condition-none-svg"
+                    viewBox="0 0 160 160"
+                    focusable="false">
+                    <use href="${roomConditionIllustrations.none}#condition-none"></use>
+                  </svg>
                 </span>
 
                 <span class="assistant-condition-label">
@@ -1549,6 +1610,18 @@ function showOpeningStage(
             class="assistant-opening-thumbnail"
             data-opening-thumbnail="${openingId}"
             aria-hidden="true">
+            ${
+              openingIllustrations[openingId]
+                ? `
+                  <svg
+                    class="assistant-opening-native-svg assistant-opening-${openingId.replace("_", "-")}-svg"
+                    viewBox="0 0 180 140"
+                    focusable="false">
+                    <use href="${openingIllustrations[openingId]}#opening-${openingId.replace("_", "-")}"></use>
+                  </svg>
+                `
+                : ""
+            }
           </span>
 
           <span class="assistant-opening-label">
@@ -1588,6 +1661,48 @@ function showOpeningStage(
               ${openingButtons}
             </div>
 
+          </fieldset>
+
+          <fieldset
+            class="assistant-fieldset assistant-outdoor-question"
+            data-outdoor-question
+            ${
+              outdoorSpaceOpeningTypes.has(assistantState.openingType)
+                ? ""
+                : "hidden"
+            }>
+            <legend>${copy.outdoorSpace.heading}</legend>
+
+            <p class="assistant-hint">
+              ${copy.outdoorSpace.introduction}
+            </p>
+
+            <div class="assistant-outdoor-options">
+              <label class="assistant-outdoor-option">
+                <input
+                  type="radio"
+                  name="accessible-outdoor-space"
+                  value="true"
+                  ${assistantState.hasAccessibleOutdoorSpace === true ? "checked" : ""}>
+                <span>${copy.outdoorSpace.yes}</span>
+              </label>
+
+              <label class="assistant-outdoor-option">
+                <input
+                  type="radio"
+                  name="accessible-outdoor-space"
+                  value="false"
+                  ${assistantState.hasAccessibleOutdoorSpace === false ? "checked" : ""}>
+                <span>${copy.outdoorSpace.no}</span>
+              </label>
+            </div>
+
+            <p
+              class="assistant-error"
+              role="alert"
+              data-outdoor-error
+              hidden>
+            </p>
           </fieldset>
 
           <p
@@ -1631,6 +1746,37 @@ function showOpeningStage(
       "#assistant-opening-error"
     );
 
+  const outdoorQuestion =
+    assistant.querySelector(
+      "[data-outdoor-question]"
+    );
+
+  const outdoorError =
+    assistant.querySelector(
+      "[data-outdoor-error]"
+    );
+
+  function updateOutdoorQuestion() {
+    const isRelevant =
+      outdoorSpaceOpeningTypes.has(
+        assistantState.openingType
+      );
+
+    outdoorQuestion.hidden = !isRelevant;
+
+    if (!isRelevant) {
+      assistantState.hasAccessibleOutdoorSpace = null;
+      outdoorError.textContent = "";
+      outdoorError.hidden = true;
+
+      outdoorQuestion
+        .querySelectorAll("input")
+        .forEach((input) => {
+          input.checked = false;
+        });
+    }
+  }
+
   function updateOpeningNote() {
     const noteText =
       copy.notes[
@@ -1647,6 +1793,21 @@ function showOpeningStage(
   }
 
   updateOpeningNote();
+  updateOutdoorQuestion();
+
+  outdoorQuestion
+    .querySelectorAll(
+      'input[name="accessible-outdoor-space"]'
+    )
+    .forEach((input) => {
+      input.addEventListener("change", () => {
+        assistantState.hasAccessibleOutdoorSpace =
+          input.value === "true";
+
+        outdoorError.textContent = "";
+        outdoorError.hidden = true;
+      });
+    });
 
   assistant
     .querySelectorAll(
@@ -1658,6 +1819,14 @@ function showOpeningStage(
         () => {
           assistantState.openingType =
             button.dataset.openingType;
+
+          if (
+            !outdoorSpaceOpeningTypes.has(
+              assistantState.openingType
+            )
+          ) {
+            assistantState.hasAccessibleOutdoorSpace = null;
+          }
 
           invalidateRecommendation();
 
@@ -1684,6 +1853,7 @@ function showOpeningStage(
           error.textContent = "";
 
           updateOpeningNote();
+          updateOutdoorQuestion();
         }
       );
     });
@@ -1700,6 +1870,24 @@ function showOpeningStage(
           copy.error;
 
         error.hidden = false;
+
+        return;
+      }
+
+      if (
+        outdoorSpaceOpeningTypes.has(
+          assistantState.openingType
+        ) &&
+        assistantState.hasAccessibleOutdoorSpace === null
+      ) {
+        outdoorError.textContent =
+          copy.outdoorSpace.error;
+
+        outdoorError.hidden = false;
+
+        outdoorQuestion
+          .querySelector("input")
+          ?.focus();
 
         return;
       }
@@ -2886,6 +3074,9 @@ function buildReservationDraft() {
 
     openingType:
       assistantState.openingType,
+
+    hasAccessibleOutdoorSpace:
+      assistantState.hasAccessibleOutdoorSpace,
 
     rentalDates: {
       startDate:

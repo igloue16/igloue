@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140">
+  <style>
+    #sliding-door-opening-reveal { opacity: var(--sliding-door-reveal-opacity, 0); transition: opacity 260ms ease; }
+    #sliding-door-opening-sash { transform: translateX(var(--sliding-door-sash-x, 0px)); transition: transform 340ms cubic-bezier(.2,.75,.25,1); }
+    #sliding-door-opening-sash .opening-frame, #sliding-door-opening-sash .handle { stroke: var(--opening-movable-stroke, #0d4f71); transition: stroke 260ms ease; }
+    .glass { fill: var(--opening-glass-fill, #f7fbfd); transition: fill 260ms ease; }
+    @media (prefers-reduced-motion: reduce) { #sliding-door-opening-reveal, #sliding-door-opening-sash, #sliding-door-opening-sash .opening-frame, #sliding-door-opening-sash .handle, .glass { transition: none; } }
+  </style>
+  <defs>
+    <clipPath id="sliding-door-frame-clip">
+      <rect x="35" y="4" width="110" height="132"/>
+    </clipPath>
+  </defs>
+  <g id="opening-sliding-door" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect id="sliding-door-outer-frame" class="outer-frame fixed-frame" x="34" y="3" width="112" height="134" fill="#ffffff"/>
+    <g clip-path="url(#sliding-door-frame-clip)">
+      <rect id="sliding-door-opening-reveal" class="opening-reveal" x="46" y="15" width="40" height="110" fill="#fff6e9" stroke="none"/>
+      <g id="sliding-door-fixed-pane" class="fixed-pane">
+        <rect class="glass" x="94" y="15" width="40" height="110"/>
+        <rect class="fixed-frame" x="94" y="15" width="40" height="110"/>
+        <path class="reflection" d="M105 73L118 59M105 89L121 72" stroke-width="4"/>
+      </g>
+      <g id="sliding-door-opening-sash" class="opening-sash">
+        <rect class="glass" x="46" y="15" width="40" height="110"/>
+        <rect class="opening-frame" x="46" y="15" width="40" height="110"/>
+        <path class="reflection" d="M57 73L70 59M57 89L73 72" stroke-width="4"/>
+        <path class="handle" d="M88 65V82" stroke-width="7"/>
+      </g>
+    </g>
+    <path class="threshold" d="M34 128H146"/>
+  </g>
+</svg>

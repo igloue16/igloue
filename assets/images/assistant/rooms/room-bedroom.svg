@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 323 197">
+  <style>
+    #lamp-glow {
+      opacity: var(--lamp-glow-opacity, 0);
+      transition: opacity 240ms ease;
+    }
+
+    #lamp-shade-fill {
+      fill: var(--lamp-shade-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    #pillows .pillow-fill {
+      fill: var(--pillow-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #lamp-glow,
+      #lamp-shade-fill,
+      #pillows .pillow-fill {
+        transition: none;
+      }
+    }
+  </style>
+
+  <defs>
+    <filter id="lamp-glow-blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <g id="room-bedroom">
+    <g id="lamp" class="lamp">
+      <circle
+        id="lamp-glow"
+        class="lamp-glow"
+        cx="267"
+        cy="60"
+        r="27"
+        fill="#e6a24a"
+        filter="url(#lamp-glow-blur)"/>
+      <path
+        d="M267 65V96"
+        fill="none"
+        stroke="#0d4f71"
+        stroke-width="6"
+        stroke-linecap="round"/>
+      <g id="lamp-shade" class="lamp-shade">
+        <path
+          id="lamp-shade-fill"
+          d="M250 64L257 37H276L283 64Z"
+          fill="#0d4f71"
+          stroke="#0d4f71"
+          stroke-width="6"
+          stroke-linejoin="round"/>
+      </g>
+    </g>
+
+    <g id="bed" class="bed" fill="#ffffff" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M44 98V69C44 57 53 49 65 49H189C201 49 209 57 209 69V100"/>
+
+      <g id="pillows" class="pillows">
+        <path class="pillow-fill" d="M61 98V87C61 79 67 75 75 75H108C116 75 121 80 121 88V99Z" fill="#0d4f71"/>
+        <path class="pillow-fill" d="M127 99V87C127 79 133 75 141 75H177C185 75 190 80 190 88V100Z" fill="#0d4f71"/>
+      </g>
+
+      <path d="M17 136C19 113 37 98 62 98H198C220 98 234 113 235 136Z"/>
+      <path d="M17 136H235V157H17Z"/>
+      <path d="M17 157V178"/>
+      <path d="M235 157V178"/>
+    </g>
+
+    <g id="bedside-table" class="bedside-table" fill="#ffffff" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M235 98H295V156H235Z"/>
+      <path d="M258 115H271"/>
+      <path d="M295 98V177"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160">
+  <style>
+    #hall-interior .hall-interior-panel {
+      fill: var(--hall-interior-fill, #0d4f71);
+      transition: fill 240ms ease;
+    }
+
+    #hall-flag {
+      transform: translateY(var(--hall-flag-shift, 0px));
+      transition: transform 270ms ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #hall-interior .hall-interior-panel,
+      #hall-flag {
+        transition: none;
+      }
+    }
+  </style>
+
+  <g id="room-subtype-large-hall">
+    <g id="hall" class="hall" stroke="#0d4f71" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M25 75L100 45L175 75Z" fill="#ffffff"/>
+      <path d="M34 76H166V139H34Z" fill="#ffffff"/>
+
+      <g id="hall-interior" class="hall-interior" stroke="none">
+        <rect class="hall-interior-panel" x="47" y="82" width="15" height="48" fill="#0d4f71"/>
+        <rect class="hall-interior-panel" x="76" y="82" width="15" height="48" fill="#0d4f71"/>
+        <rect class="hall-interior-panel" x="109" y="82" width="15" height="48" fill="#0d4f71"/>
+        <rect class="hall-interior-panel" x="138" y="82" width="15" height="48" fill="#0d4f71"/>
+      </g>
+
+      <path d="M26 132H174V143H26Z" fill="#ffffff"/>
+      <path d="M21 143H179V153H21Z" fill="#ffffff"/>
+    </g>
+
+    <g id="hall-flagpole" class="flagpole" fill="none" stroke="#0d4f71" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M100 2V49"/>
+    </g>
+
+    <g id="hall-flag" class="flag" stroke="#0d4f71" stroke-width="5" stroke-linejoin="round">
+      <path d="M101 16H130V29H101Z" fill="#0d4f71"/>
+    </g>
+  </g>
+</svg>
