@@ -57,6 +57,10 @@
     min-height: 520px;
   }
 
+  [data-opening-form] > .assistant-fieldset > .assistant-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .assistant-screen {
     height: auto;
     overflow: visible;
@@ -217,17 +221,17 @@
     grid-template-columns: 1fr;
   }
 
-  .assistant-outdoor-question {
+  .assistant-supplementary-question {
     grid-template-columns: 1fr;
   }
 
-  .assistant-outdoor-question legend,
-  .assistant-outdoor-question .assistant-hint,
-  .assistant-outdoor-options {
+  .assistant-supplementary-question legend,
+  .assistant-supplementary-question .assistant-hint,
+  .assistant-binary-options {
     grid-column: 1;
   }
 
-  .assistant-outdoor-options {
+  .assistant-binary-options {
     grid-row: auto;
     margin-top: 4px;
   }

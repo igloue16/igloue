@@ -840,7 +840,7 @@
 }
 
 [data-opening-form] > .assistant-fieldset > .assistant-options {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .assistant-opening-option:has(.assistant-opening-native-svg) {
@@ -859,6 +859,28 @@
   height: 46px;
   display: block;
   overflow: visible;
+}
+
+.assistant-opening-label {
+  min-width: 0;
+}
+
+.assistant-opening-label strong,
+.assistant-opening-label small {
+  display: block;
+}
+
+.assistant-opening-label strong {
+  color: inherit;
+  font-size: inherit;
+  line-height: 1.2;
+}
+
+.assistant-opening-label small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  line-height: 1.15;
 }
 
 .assistant-opening-native-svg {
@@ -985,7 +1007,21 @@
   }
 }
 
-.assistant-outdoor-question {
+.assistant-opening-guidance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  font-size: 0.67rem;
+  line-height: 1.35;
+}
+
+.assistant-opening-guidance strong {
+  color: var(--text-soft);
+}
+
+.assistant-supplementary-question {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 3px 14px;
@@ -995,18 +1031,18 @@
   border-top: 1px solid var(--tan);
 }
 
-.assistant-outdoor-question[hidden] {
+.assistant-supplementary-question[hidden] {
   display: none;
 }
 
-.assistant-outdoor-question legend {
+.assistant-supplementary-question legend {
   grid-column: 1;
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.25;
 }
 
-.assistant-outdoor-question .assistant-hint {
+.assistant-supplementary-question .assistant-hint {
   grid-column: 1;
   margin: 0;
   max-width: 54ch;
@@ -1014,7 +1050,7 @@
   line-height: 1.35;
 }
 
-.assistant-outdoor-options {
+.assistant-binary-options {
   grid-column: 2;
   grid-row: 1 / span 2;
   display: grid;
@@ -1022,7 +1058,7 @@
   gap: 7px;
 }
 
-.assistant-outdoor-option {
+.assistant-binary-option {
   position: relative;
   display: grid;
   place-items: center;
@@ -1036,12 +1072,12 @@
   cursor: pointer;
 }
 
-.assistant-outdoor-option:has(input:checked) {
+.assistant-binary-option:has(input:checked) {
   border: 2px solid var(--tan);
   background: #ffffff;
 }
 
-.assistant-outdoor-option input {
+.assistant-binary-option input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1049,14 +1085,35 @@
   opacity: 0;
 }
 
-.assistant-outdoor-option:has(input:focus-visible) {
+.assistant-binary-option:has(input:focus-visible) {
   outline: 2px solid var(--blue-dark);
   outline-offset: 3px;
 }
 
-.assistant-outdoor-question .assistant-error {
+.assistant-supplementary-question .assistant-error {
   grid-column: 1 / -1;
   margin: 2px 0 0;
+}
+
+.assistant-installation-assessment {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 3px solid var(--tan);
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.assistant-installation-assessment[hidden] {
+  display: none;
+}
+
+.assistant-installation-assessment strong {
+  flex: 0 0 auto;
+  color: #94653d;
 }
 
 .assistant-check-grid {
@@ -2015,27 +2072,28 @@
   }
 }
 .igloue-calendar {
-  margin-top: 12px;
+  margin-top: 5px;
 }
 
 .igloue-calendar-header {
   display: grid;
-  grid-template-columns: 38px 1fr 38px;
+  grid-template-columns: 32px 1fr 32px;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 4px;
   text-align: center;
 }
 
 .igloue-calendar-header strong {
   font-family: Bahnschrift, "Arial Narrow", sans-serif;
-  font-size: 1.1rem;
+  font-size: 0.94rem;
   text-transform: capitalize;
+  color: var(--text);
 }
 
 .igloue-calendar-nav {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 30px;
   border: 1px solid var(--line);
   border-radius: 3px;
   background: #fff;
@@ -2055,26 +2113,27 @@
 }
 
 .igloue-calendar-weekdays {
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-align: center;
 }
 
 .igloue-calendar-grid {
-  gap: 3px;
+  grid-auto-rows: 32px;
+  gap: 2px;
 }
 
 .igloue-calendar-empty {
-  aspect-ratio: 1;
+  height: 32px;
 }
 
 .igloue-calendar-day {
   position: relative;
   display: grid;
   place-items: center;
-  height: 38px;
+  height: 32px;
   min-width: 0;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -2085,8 +2144,8 @@
 }
 
 .igloue-calendar-day:hover:not(:disabled):not(.is-start):not(.is-end) {
-  border-color: var(--blue);
-  background: var(--surface-blue);
+  border-color: var(--tan);
+  background: #fffaf4;
 }
 
 .igloue-calendar-day.is-past {
@@ -2113,16 +2172,20 @@
 }
 
 .igloue-calendar-day.is-between {
-  background: var(--surface-blue);
-  color: var(--blue-dark);
+  background: #fbf5ed;
+  color: var(--text);
 }
 
 .igloue-calendar-day.is-start,
 .igloue-calendar-day.is-end {
-  border-color: var(--blue);
-  background: var(--blue);
-  color: #fff;
+  border: 2px solid var(--tan);
+  background: #fffaf4;
+  color: var(--text);
   font-weight: 700;
+}
+
+.igloue-calendar-day.is-editing-endpoint {
+  box-shadow: inset 0 0 0 1px var(--text);
 }
 
 .igloue-calendar-day:focus-visible {
@@ -2133,10 +2196,10 @@
 .igloue-calendar-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 5px;
   color: var(--text-soft);
-  font-size: 0.72rem;
+  font-size: 0.62rem;
 }
 
 .igloue-calendar-legend span {
@@ -2157,27 +2220,44 @@
 }
 
 .calendar-legend-selected {
-  background: var(--blue);
+  border: 2px solid var(--tan);
+  background: #fffaf4;
 }
 .assistant-date-selection-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin: 5px 0 2px;
 }
 
-.assistant-date-selection-summary > div {
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--surface);
+.assistant-date-endpoint {
+  min-width: 0;
+  padding: 3px 5px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.assistant-date-endpoint:hover,
+.assistant-date-endpoint:focus-visible {
+  border-bottom-color: var(--tan);
+}
+
+.assistant-date-endpoint:focus-visible,
+.assistant-date-clear:focus-visible {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 2px;
 }
 
 .assistant-date-selection-summary span {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 1px;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -2186,9 +2266,273 @@
   color: var(--text);
 }
 
+.assistant-date-arrow {
+  margin: 0 -2px !important;
+  color: var(--tan);
+  font-size: 0.85rem !important;
+}
+
+.assistant-date-nights {
+  color: #94653d !important;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.assistant-date-clear {
+  margin-left: 2px;
+  padding: 3px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  cursor: pointer;
+}
+
+.assistant-date-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.assistant-date-feedback {
+  min-height: 1em;
+  margin: 2px 0 0 !important;
+  color: #94653d !important;
+  font-size: 0.65rem !important;
+  line-height: 1.25 !important;
+}
+
+.assistant-date-feedback[hidden] {
+  visibility: hidden;
+}
+
+.assistant-date-workspace {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(270px, 320px);
+  gap: 12px;
+  align-items: start;
+}
+
+.assistant-date-selection > .assistant-next {
+  margin-top: 6px;
+}
+
+.assistant-date-side {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.assistant-service-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 5px;
+}
+
+.assistant-service-slots[hidden] {
+  display: none;
+}
+
+.assistant-slot-group {
+  min-width: 0;
+  padding-top: 5px;
+  border-top: 2px solid var(--tan);
+}
+
+.assistant-slot-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.assistant-slot-heading strong {
+  color: var(--text);
+  font-size: 0.7rem;
+}
+
+.assistant-slot-heading span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-slot-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.assistant-slot-option {
+  min-width: 0;
+  min-height: 27px;
+  padding: 4px 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.58rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assistant-slot-option.is-selected,
+.assistant-slot-option[aria-pressed="true"] {
+  border: 2px solid var(--tan);
+  background: #fff;
+}
+
+.assistant-slot-option:focus-visible {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 2px;
+}
+
+.assistant-slot-empty,
+.assistant-slot-feedback {
+  color: var(--text-muted) !important;
+  font-size: 0.6rem !important;
+  line-height: 1.25 !important;
+}
+
+.assistant-slot-empty {
+  grid-column: 1 / -1;
+  margin: 2px 0 !important;
+}
+
+.assistant-slot-feedback {
+  margin: 0 !important;
+}
+
+.assistant-slot-feedback[hidden] {
+  display: none;
+}
+
+.assistant-express-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  margin-top: 5px;
+  padding: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: #ffffff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.assistant-express-option:has(input:checked) {
+  border: 2px solid var(--tan);
+  background: #ffffff;
+}
+
+.assistant-express-option.is-disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+.assistant-express-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.assistant-express-option:has(input:focus-visible) {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 3px;
+}
+
+.assistant-express-icon {
+  --express-speed-shift: 0px;
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.assistant-express-copy {
+  min-width: 0;
+}
+
+.assistant-express-copy strong,
+.assistant-express-copy small {
+  display: block;
+}
+
+.assistant-express-copy strong {
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.assistant-express-copy small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  line-height: 1.3;
+}
+
+.assistant-express-price {
+  color: #94653d;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .assistant-slot-option:hover {
+    border-color: var(--tan);
+  }
+
+  .assistant-express-option:not(.is-disabled):hover {
+    border-color: var(--tan);
+  }
+
+  .assistant-express-option:not(.is-disabled):hover
+    .assistant-express-icon {
+    --express-speed-shift: 1.5px;
+  }
+}
+
 @media (max-width: 640px) {
+  .assistant-date-workspace {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .assistant-date-side {
+    gap: 7px;
+  }
+
+  .assistant-service-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .assistant-slot-option {
+    min-height: 40px;
+    font-size: 0.68rem;
+  }
+
+  .assistant-express-option {
+    margin-top: 2px;
+  }
+
   .igloue-calendar-day {
-    height: 44px;
+    height: 42px;
+  }
+
+  .igloue-calendar-grid {
+    grid-auto-rows: 42px;
+  }
+
+  .igloue-calendar-empty {
+    height: 42px;
   }
 
   .assistant-area-range {

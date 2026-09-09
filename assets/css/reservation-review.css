@@ -1,0 +1,274 @@
+.reservation-review-header {
+  margin-bottom: 10px;
+}
+
+.reservation-review-header h2 {
+  margin-bottom: 3px;
+}
+
+.reservation-review-header p {
+  margin: 0 !important;
+}
+
+.reservation-review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(260px, 0.82fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.reservation-review-details,
+.reservation-review-summary {
+  min-width: 0;
+}
+
+.reservation-review-section {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.reservation-review-section:first-child {
+  padding-top: 5px;
+  border-top: 5px solid var(--tan);
+}
+
+.reservation-review-section-heading,
+.reservation-review-minor-action {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-review-section-heading > span {
+  color: var(--text-muted);
+  font-size: 0.59rem;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.reservation-review-section button,
+.reservation-review-minor-action button {
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--blue-dark);
+  font: inherit;
+  font-size: 0.61rem;
+  cursor: pointer;
+}
+
+.reservation-review-section button:focus-visible,
+.reservation-review-submit:focus-visible {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 3px;
+}
+
+.reservation-review-solution h3 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+.reservation-review-solution > p,
+.reservation-review-section > p {
+  margin: 3px 0 0 !important;
+  font-size: 0.68rem !important;
+  line-height: 1.35 !important;
+}
+
+.reservation-review-recommended,
+.reservation-review-sizing {
+  display: block;
+  margin-top: 5px;
+  color: #94653d;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.reservation-review-weekly-price {
+  color: var(--blue-dark);
+  font-size: 0.72rem;
+}
+
+.reservation-review-minor-action {
+  margin-top: 5px;
+  color: var(--text-soft);
+  font-size: 0.62rem;
+}
+
+.reservation-review-service-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 5px;
+}
+
+.reservation-review-service-grid > div {
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--tan);
+}
+
+.reservation-review-service-grid span,
+.reservation-review-service-grid strong,
+.reservation-review-service-grid b {
+  display: block;
+}
+
+.reservation-review-service-grid span {
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.reservation-review-service-grid strong {
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 0.67rem;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.reservation-review-service-grid b {
+  margin: 2px 0;
+  color: var(--blue-dark);
+  font-size: 0.68rem;
+}
+
+.reservation-review-duration {
+  color: var(--text-soft) !important;
+}
+
+.reservation-review-assessment {
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border-left: 4px solid var(--tan);
+  background: #fffdfa;
+  color: var(--text);
+}
+
+.reservation-review-assessment strong {
+  color: #94653d;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.reservation-review-assessment span {
+  font-size: 0.65rem;
+  line-height: 1.3;
+}
+
+.reservation-review-summary {
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+
+.reservation-review-summary > h3,
+.reservation-review-next h3 {
+  margin: 0 0 5px;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.reservation-review-price-row,
+.reservation-review-total,
+.reservation-review-caution {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.reservation-review-price-row {
+  min-height: 27px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: 0.66rem;
+}
+
+.reservation-review-price-row strong {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.reservation-review-total {
+  padding: 7px 0;
+  border-bottom: 3px solid var(--tan);
+  color: var(--text);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.reservation-review-total strong {
+  color: var(--blue-dark);
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.reservation-review-caution {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 0.61rem;
+}
+
+.reservation-review-caution strong {
+  color: var(--text);
+}
+
+.reservation-review-next {
+  margin-top: 9px;
+}
+
+.reservation-review-next ol {
+  margin: 0;
+  padding-left: 19px;
+  color: var(--text-soft);
+  font-size: 0.63rem;
+  line-height: 1.4;
+}
+
+.reservation-review-notice {
+  margin: 7px 0 0 !important;
+  padding-left: 7px;
+  border-left: 3px solid var(--tan);
+  color: #8a5a2e !important;
+  font-size: 0.64rem !important;
+}
+
+.reservation-review-notice[hidden] {
+  display: none;
+}
+
+.reservation-review-submit {
+  width: 100%;
+  margin-top: 9px;
+}
+
+@media (max-width: 760px) {
+  .reservation-review-layout {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .reservation-review-summary {
+    padding: 12px 0 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .reservation-review-service-grid {
+    gap: 8px;
+  }
+
+  .reservation-review-service-grid strong {
+    font-size: 0.63rem;
+  }
+}

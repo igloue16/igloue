@@ -17,6 +17,12 @@ const IGLOUE_PRODUCTS = [
 
     installationRequired: false,
 
+    installationReach: {
+      supportsExtendedExhaust: null,
+      standardExhaustReachM: null,
+      maximumApprovedExhaustReachM: null
+    },
+
     compatibleOpenings: [
       "casement",
       "tilt-turn",
@@ -52,6 +58,12 @@ const IGLOUE_PRODUCTS = [
 
     installationRequired: false,
 
+    installationReach: {
+      supportsExtendedExhaust: null,
+      standardExhaustReachM: null,
+      maximumApprovedExhaustReachM: null
+    },
+
     compatibleOpenings: [
       "casement",
       "tilt-turn",
@@ -86,6 +98,13 @@ const IGLOUE_PRODUCTS = [
     suitableFor: "Chambres, salons et pièces jusqu’à environ 40 m².",
 
     installationRequired: true,
+
+    installationReach: {
+      supportsExtendedExhaust: false,
+      standardConnectionLengthM: null,
+      requiredOutdoorClearanceM: null,
+      maximumInstallationReachM: null
+    },
 
     compatibleOpenings: [
       "casement",

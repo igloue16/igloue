@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    #express-speed-lines {
+      transform: translateX(var(--express-speed-shift, 0));
+      transition: transform 220ms ease-out;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #express-speed-lines { transition: none; }
+    }
+  </style>
+  <g id="express-stopwatch" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g id="express-speed-lines" stroke="#cf995b" stroke-width="1.8">
+      <path d="M2.5 13.5H7"/>
+      <path d="M1.5 18H6"/>
+    </g>
+    <g id="express-stopwatch-body" stroke="#0d4f71" stroke-width="1.8">
+      <circle cx="18" cy="19" r="9.5"/>
+      <path d="M18 9.5V6.5M14.5 5.5H21.5M24.5 10.5L27 8"/>
+      <path d="M18 19L22.5 15.5"/>
+      <circle cx="18" cy="19" r="1" fill="#cf995b" stroke="none"/>
+    </g>
+  </g>
+</svg>

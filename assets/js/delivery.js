@@ -1,6 +1,11 @@
 const IGLOUE_DELIVERY = {
   serviceArea: "charente",
 
+  sameDayExpress: {
+    timeZone: "Europe/Paris",
+    cutoffHour: 10
+  },
+
   zones: [
     {
       id: "local",
@@ -45,6 +50,100 @@ const IGLOUE_DELIVERY = {
     minimumDistanceKm: 70
   }
 };
+
+function getFranceLocalDateTime(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat(
+    "en-CA",
+    {
+      timeZone:
+        IGLOUE_DELIVERY.sameDayExpress.timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }
+  );
+
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(now)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+    minute: Number(parts.minute)
+  };
+}
+
+function hasAvailableSameDayExpressSlot({
+  postcode,
+  deliveryDate,
+  now = new Date()
+}) {
+  const provider =
+    globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER;
+
+  if (
+    !provider ||
+    typeof provider.hasAvailableSameDaySlot !== "function"
+  ) {
+    return false;
+  }
+
+  return Boolean(
+    provider.hasAvailableSameDaySlot({
+      postcode,
+      deliveryDate,
+      now
+    })
+  );
+}
+
+function getSameDayExpressEligibility({
+  selectedDeliveryDate = "",
+  postcode = "",
+  now = new Date(),
+  hasAvailableSlot
+} = {}) {
+  const franceTime =
+    getFranceLocalDateTime(now);
+
+  const beforeCutoff =
+    franceTime.hour <
+    IGLOUE_DELIVERY.sameDayExpress.cutoffHour;
+
+  const isToday =
+    selectedDeliveryDate === franceTime.date;
+
+  const slotAvailable =
+    typeof hasAvailableSlot === "boolean"
+      ? hasAvailableSlot
+      : hasAvailableSameDayExpressSlot({
+          postcode,
+          deliveryDate: franceTime.date,
+          now
+        });
+
+  return {
+    eligible:
+      beforeCutoff &&
+      isToday &&
+      slotAvailable,
+    beforeCutoff,
+    isToday,
+    slotAvailable,
+    today: franceTime.date
+  };
+}
+
+function isSameDayExpressEligible(options) {
+  return getSameDayExpressEligibility(options).eligible;
+}
 
 const IGLOUE_POSTCODE_ZONES = {
   /*

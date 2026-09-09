@@ -122,6 +122,12 @@ const ASSISTANT_I18N = {
       introduction:
         "Le bon kit dépend de votre fenêtre, porte-fenêtre ou accès extérieur.",
 
+      distanceGuidance: {
+        heading: "Le climatiseur doit rester proche de l'ouverture.",
+        text:
+          "Pour conserver de bonnes performances, nous prévoyons généralement l'appareil à moins de 1,5 m de son point d'évacuation."
+      },
+
       error: "Sélectionnez le type d’ouverture le plus proche de votre situation.",
 
       types: {
@@ -130,7 +136,10 @@ const ASSISTANT_I18N = {
         sliding: "Fenêtre coulissante",
         french_door: "Porte-fenêtre",
         sliding_door: "Baie vitrée coulissante",
-        velux: "Fenêtre de toit / Velux",
+        velux: {
+          primary: "Fenêtre de toit",
+          secondary: "Type VELUX®"
+        },
         unsure: "Je ne sais pas"
       },
 
@@ -144,9 +153,20 @@ const ASSISTANT_I18N = {
         error: "Indiquez si un balcon ou une terrasse est accessible."
       },
 
+      veluxHeight: {
+        heading:
+          "À quelle hauteur se trouve le bas de votre fenêtre de toit ?",
+        introduction:
+          "Pour une installation standard, le bas de l'ouverture doit être accessible à environ 1,5 m maximum du sol.",
+        withinStandard: "1,5 m ou moins",
+        aboveStandard: "Plus de 1,5 m",
+        error: "Indiquez la hauteur approximative de votre fenêtre de toit.",
+        assessmentHeading: "Installation à vérifier",
+        assessmentText:
+          "Votre fenêtre est plus haute que notre configuration standard. IGLOUE vérifiera avec vous la solution d'installation possible."
+      },
+
       notes: {
-        velux:
-          "Les fenêtres de toit nécessitent généralement un kit ou une adaptation spécifique.",
         unsure:
           "Pas de problème. Nous pourrons vérifier votre ouverture avant la livraison."
       }
@@ -160,6 +180,15 @@ const ASSISTANT_I18N = {
 
       start: "Livraison",
       end: "Reprise",
+      clear: "Effacer les dates",
+      nights: (count) => `${count} nuit${count > 1 ? "s" : ""}`,
+      expressHeading: "Livraison Express aujourd’hui",
+      expressIntroduction:
+        "Commande avant 10 h · selon créneaux disponibles",
+      expressAfterCutoff: "Indisponible après 10 h",
+      expressNoSlot: "Aucun créneau disponible aujourd’hui",
+      expressTodayOnly:
+        "Disponible uniquement pour une livraison aujourd’hui",
 
       missingError:
         "Indiquez une date de livraison et une date de reprise.",
@@ -198,6 +227,7 @@ const ASSISTANT_I18N = {
 
       rental: "Location",
       delivery: "Livraison + reprise",
+      sameDayExpress: "Livraison Express aujourd’hui",
       setup: "Mise en service / installation",
 
       total: "À payer",
@@ -312,9 +342,16 @@ const assistantState = {
 
   openingType: "",
   hasAccessibleOutdoorSpace: null,
+  veluxBottomHeightRange: null,
+  installationAssessmentRequired: false,
+  extendedExhaustRequired: false,
 
   startDate: "",
   endDate: "",
+  deliverySlotId: "",
+  collectionSlotId: "",
+  serviceSlotNotice: "",
+  sameDayExpressSelected: false,
 
   recommendedProduct: null,
   idealProduct: null,
@@ -642,6 +679,11 @@ function setDeliveryState(postcode) {
     zone ? zone.price : 0;
 
   if (postcodeChanged) {
+    revalidateAssistantServiceSlots({
+      delivery: true,
+      collection: true,
+      announceInvalidation: true
+    });
     invalidateRecommendation();
   }
 }
@@ -1625,7 +1667,14 @@ function showOpeningStage(
           </span>
 
           <span class="assistant-opening-label">
-            ${copy.types[openingId]}
+            ${
+              typeof copy.types[openingId] === "string"
+                ? copy.types[openingId]
+                : `
+                  <strong>${copy.types[openingId].primary}</strong>
+                  <small>${copy.types[openingId].secondary}</small>
+                `
+            }
           </span>
         </button>
       `)
@@ -1656,6 +1705,11 @@ function showOpeningStage(
               ${copy.introduction}
             </p>
 
+            <p class="assistant-opening-guidance">
+              <strong>${copy.distanceGuidance.heading}</strong>
+              <span>${copy.distanceGuidance.text}</span>
+            </p>
+
             <div
               class="assistant-options">
               ${openingButtons}
@@ -1664,7 +1718,53 @@ function showOpeningStage(
           </fieldset>
 
           <fieldset
-            class="assistant-fieldset assistant-outdoor-question"
+            class="assistant-fieldset assistant-supplementary-question assistant-velux-question"
+            data-velux-question
+            ${assistantState.openingType === "velux" ? "" : "hidden"}>
+            <legend>${copy.veluxHeight.heading}</legend>
+
+            <p class="assistant-hint">
+              ${copy.veluxHeight.introduction}
+            </p>
+
+            <div class="assistant-binary-options">
+              <label class="assistant-binary-option">
+                <input
+                  type="radio"
+                  name="velux-bottom-height"
+                  value="within-standard"
+                  ${assistantState.veluxBottomHeightRange === "within-standard" ? "checked" : ""}>
+                <span>${copy.veluxHeight.withinStandard}</span>
+              </label>
+
+              <label class="assistant-binary-option">
+                <input
+                  type="radio"
+                  name="velux-bottom-height"
+                  value="above-standard"
+                  ${assistantState.veluxBottomHeightRange === "above-standard" ? "checked" : ""}>
+                <span>${copy.veluxHeight.aboveStandard}</span>
+              </label>
+            </div>
+
+            <div
+              class="assistant-installation-assessment"
+              data-installation-assessment
+              ${assistantState.installationAssessmentRequired ? "" : "hidden"}>
+              <strong>${copy.veluxHeight.assessmentHeading}</strong>
+              <span>${copy.veluxHeight.assessmentText}</span>
+            </div>
+
+            <p
+              class="assistant-error"
+              role="alert"
+              data-velux-error
+              hidden>
+            </p>
+          </fieldset>
+
+          <fieldset
+            class="assistant-fieldset assistant-supplementary-question assistant-outdoor-question"
             data-outdoor-question
             ${
               outdoorSpaceOpeningTypes.has(assistantState.openingType)
@@ -1677,8 +1777,8 @@ function showOpeningStage(
               ${copy.outdoorSpace.introduction}
             </p>
 
-            <div class="assistant-outdoor-options">
-              <label class="assistant-outdoor-option">
+            <div class="assistant-binary-options">
+              <label class="assistant-binary-option">
                 <input
                   type="radio"
                   name="accessible-outdoor-space"
@@ -1687,7 +1787,7 @@ function showOpeningStage(
                 <span>${copy.outdoorSpace.yes}</span>
               </label>
 
-              <label class="assistant-outdoor-option">
+              <label class="assistant-binary-option">
                 <input
                   type="radio"
                   name="accessible-outdoor-space"
@@ -1756,6 +1856,44 @@ function showOpeningStage(
       "[data-outdoor-error]"
     );
 
+  const veluxQuestion =
+    assistant.querySelector(
+      "[data-velux-question]"
+    );
+
+  const veluxError =
+    assistant.querySelector(
+      "[data-velux-error]"
+    );
+
+  const installationAssessment =
+    assistant.querySelector(
+      "[data-installation-assessment]"
+    );
+
+  function updateVeluxQuestion() {
+    const isVelux =
+      assistantState.openingType === "velux";
+
+    veluxQuestion.hidden = !isVelux;
+
+    if (!isVelux) {
+      assistantState.veluxBottomHeightRange = null;
+      assistantState.installationAssessmentRequired = false;
+      veluxError.textContent = "";
+      veluxError.hidden = true;
+
+      veluxQuestion
+        .querySelectorAll("input")
+        .forEach((input) => {
+          input.checked = false;
+        });
+    }
+
+    installationAssessment.hidden =
+      !assistantState.installationAssessmentRequired;
+  }
+
   function updateOutdoorQuestion() {
     const isRelevant =
       outdoorSpaceOpeningTypes.has(
@@ -1794,6 +1932,25 @@ function showOpeningStage(
 
   updateOpeningNote();
   updateOutdoorQuestion();
+  updateVeluxQuestion();
+
+  veluxQuestion
+    .querySelectorAll(
+      'input[name="velux-bottom-height"]'
+    )
+    .forEach((input) => {
+      input.addEventListener("change", () => {
+        assistantState.veluxBottomHeightRange =
+          input.value;
+
+        assistantState.installationAssessmentRequired =
+          input.value === "above-standard";
+
+        veluxError.textContent = "";
+        veluxError.hidden = true;
+        updateVeluxQuestion();
+      });
+    });
 
   outdoorQuestion
     .querySelectorAll(
@@ -1828,6 +1985,11 @@ function showOpeningStage(
             assistantState.hasAccessibleOutdoorSpace = null;
           }
 
+          if (assistantState.openingType !== "velux") {
+            assistantState.veluxBottomHeightRange = null;
+            assistantState.installationAssessmentRequired = false;
+          }
+
           invalidateRecommendation();
 
           assistant
@@ -1854,6 +2016,7 @@ function showOpeningStage(
 
           updateOpeningNote();
           updateOutdoorQuestion();
+          updateVeluxQuestion();
         }
       );
     });
@@ -1892,9 +2055,92 @@ function showOpeningStage(
         return;
       }
 
+      if (
+        assistantState.openingType === "velux" &&
+        assistantState.veluxBottomHeightRange === null
+      ) {
+        veluxError.textContent =
+          copy.veluxHeight.error;
+
+        veluxError.hidden = false;
+
+        veluxQuestion
+          .querySelector("input")
+          ?.focus();
+
+        return;
+      }
+
       showDatesStage();
     }
   );
+}
+
+function getAssistantServiceSlots(serviceType) {
+  const date =
+    serviceType === "delivery"
+      ? assistantState.startDate
+      : assistantState.endDate;
+
+  if (
+    !date ||
+    !globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER ||
+    typeof globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER.getAvailableSlots !== "function"
+  ) {
+    return [];
+  }
+
+  return globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER.getAvailableSlots({
+    date,
+    serviceType,
+    postcode: assistantState.postcode,
+    zone: assistantState.deliveryZone,
+    productId: assistantState.recommendedProduct
+      ? assistantState.recommendedProduct.id
+      : null,
+    bookingContext: assistantState
+  });
+}
+
+function revalidateAssistantServiceSlots({
+  delivery = false,
+  collection = false,
+  announceInvalidation = false
+} = {}) {
+  let invalidated = false;
+
+  if (delivery) {
+    const deliverySlotStillAvailable =
+      assistantState.deliverySlotId &&
+      getAssistantServiceSlots("delivery").some(
+        (slot) => slot.id === assistantState.deliverySlotId
+      );
+
+    if (assistantState.deliverySlotId && !deliverySlotStillAvailable) {
+      assistantState.deliverySlotId = "";
+      invalidated = true;
+    }
+  }
+
+  if (collection) {
+    const collectionSlotStillAvailable =
+      assistantState.collectionSlotId &&
+      getAssistantServiceSlots("collection").some(
+        (slot) => slot.id === assistantState.collectionSlotId
+      );
+
+    if (assistantState.collectionSlotId && !collectionSlotStillAvailable) {
+      assistantState.collectionSlotId = "";
+      invalidated = true;
+    }
+  }
+
+  if (invalidated && announceInvalidation) {
+    assistantState.serviceSlotNotice =
+      "Ce créneau n'est plus disponible. Choisissez-en un autre.";
+  }
+
+  return invalidated;
 }
 
 function showDatesStage(
@@ -1906,6 +2152,48 @@ function showDatesStage(
 
   const copy =
     assistantCopy.dates;
+
+  revalidateAssistantServiceSlots({
+    delivery: true,
+    collection: true,
+    announceInvalidation: true
+  });
+
+  const parisToday =
+    getFranceLocalDateTime().date;
+
+  const todayExpressEligibility =
+    getSameDayExpressEligibility({
+      selectedDeliveryDate: parisToday,
+      postcode: assistantState.postcode
+    });
+
+  const initialExpressEligibility =
+    getSameDayExpressEligibility({
+      selectedDeliveryDate:
+        assistantState.startDate,
+      postcode: assistantState.postcode
+    });
+
+  if (!initialExpressEligibility.eligible) {
+    assistantState.sameDayExpressSelected = false;
+  }
+
+  function getExpressStatusText(eligibility) {
+    if (!eligibility.beforeCutoff) {
+      return copy.expressAfterCutoff;
+    }
+
+    if (!eligibility.slotAvailable) {
+      return copy.expressNoSlot;
+    }
+
+    if (!eligibility.isToday) {
+      return copy.expressTodayOnly;
+    }
+
+    return copy.expressIntroduction;
+  }
 
   const assistant = renderAssistant(
     renderStageShell({
@@ -1927,8 +2215,14 @@ function showDatesStage(
           class="assistant-date-selection"
           data-date-selection>
 
-          <div class="assistant-date-selection-summary">
-            <div>
+          <div
+            class="assistant-date-selection-summary"
+            role="group"
+            aria-label="Période de location">
+            <button
+              class="assistant-date-endpoint"
+              type="button"
+              data-edit-start>
               <span>Livraison</span>
               <strong data-selected-start>
                 ${
@@ -1939,9 +2233,14 @@ function showDatesStage(
                     : "À choisir"
                 }
               </strong>
-            </div>
+            </button>
 
-            <div>
+            <span class="assistant-date-arrow" aria-hidden="true">→</span>
+
+            <button
+              class="assistant-date-endpoint"
+              type="button"
+              data-edit-end>
               <span>Reprise</span>
               <strong data-selected-end>
                 ${
@@ -1952,11 +2251,115 @@ function showDatesStage(
                     : "À choisir"
                 }
               </strong>
-            </div>
+            </button>
+
+            <strong
+              class="assistant-date-nights"
+              data-date-nights
+              ${assistantState.startDate && assistantState.endDate ? "" : "hidden"}>
+              ${
+                assistantState.startDate && assistantState.endDate
+                  ? copy.nights(
+                      getRentalNightCount(
+                        assistantState.startDate,
+                        assistantState.endDate
+                      )
+                    )
+                  : ""
+              }
+            </strong>
+
+            <button
+              class="assistant-date-clear"
+              type="button"
+              data-clear-dates
+              ${assistantState.startDate || assistantState.endDate ? "" : "disabled"}>
+              ${copy.clear}
+            </button>
           </div>
 
-          <div
-            data-igloue-calendar>
+          <p
+            class="assistant-date-feedback"
+            role="status"
+            aria-live="polite"
+            data-date-feedback
+            hidden>
+          </p>
+
+          <div class="assistant-date-workspace">
+            <div
+              data-igloue-calendar>
+            </div>
+
+            <div class="assistant-date-side">
+              <div
+                class="assistant-service-slots"
+                data-service-slots
+                ${assistantState.startDate && assistantState.endDate ? "" : "hidden"}>
+                <section
+                  class="assistant-slot-group"
+                  aria-labelledby="assistant-delivery-slots-heading">
+                  <div class="assistant-slot-heading">
+                    <strong id="assistant-delivery-slots-heading">Livraison</strong>
+                    <span data-delivery-slot-date></span>
+                  </div>
+                  <div
+                    class="assistant-slot-options"
+                    data-delivery-slots>
+                  </div>
+                </section>
+
+                <section
+                  class="assistant-slot-group"
+                  aria-labelledby="assistant-collection-slots-heading">
+                  <div class="assistant-slot-heading">
+                    <strong id="assistant-collection-slots-heading">Reprise</strong>
+                    <span data-collection-slot-date></span>
+                  </div>
+                  <div
+                    class="assistant-slot-options"
+                    data-collection-slots>
+                  </div>
+                </section>
+              </div>
+
+              <p
+                class="assistant-slot-feedback"
+                role="status"
+                aria-live="polite"
+                data-slot-feedback
+                ${assistantState.serviceSlotNotice ? "" : "hidden"}>
+                ${assistantState.serviceSlotNotice}
+              </p>
+
+              <label
+                class="assistant-express-option ${initialExpressEligibility.eligible ? "" : "is-disabled"}">
+                <input
+                  type="checkbox"
+                  data-same-day-express
+                  ${assistantState.sameDayExpressSelected ? "checked" : ""}
+                  ${initialExpressEligibility.eligible ? "" : "disabled"}>
+
+                <svg
+                  class="assistant-express-icon"
+                  viewBox="0 0 32 32"
+                  aria-hidden="true"
+                  focusable="false">
+                  <use href="assets/images/assistant/delivery/express-stopwatch.svg#express-stopwatch"></use>
+                </svg>
+
+                <span class="assistant-express-copy">
+                  <strong>${copy.expressHeading}</strong>
+                  <small data-express-status>
+                    ${getExpressStatusText(initialExpressEligibility)}
+                  </small>
+                </span>
+
+                <strong class="assistant-express-price">
+                  +${IGLOUE_PRICING.addOns.sameDayExpress.price} €
+                </strong>
+              </label>
+            </div>
           </div>
 
           <p
@@ -2000,12 +2403,205 @@ function showDatesStage(
       "[data-dates-continue]"
     );
 
+  const nightsDisplay =
+    assistant.querySelector(
+      "[data-date-nights]"
+    );
+
+  const clearButton =
+    assistant.querySelector(
+      "[data-clear-dates]"
+    );
+
+  const feedback =
+    assistant.querySelector(
+      "[data-date-feedback]"
+    );
+
+  const expressInput =
+    assistant.querySelector(
+      "[data-same-day-express]"
+    );
+
+  const expressOption =
+    expressInput.closest(
+      ".assistant-express-option"
+    );
+
+  const expressStatus =
+    assistant.querySelector(
+      "[data-express-status]"
+    );
+
   const error =
     assistant.querySelector(
       "#assistant-dates-error"
     );
 
-  createIgloueCalendar({
+  const serviceSlots =
+    assistant.querySelector(
+      "[data-service-slots]"
+    );
+
+  const deliverySlotsContainer =
+    assistant.querySelector(
+      "[data-delivery-slots]"
+    );
+
+  const collectionSlotsContainer =
+    assistant.querySelector(
+      "[data-collection-slots]"
+    );
+
+  const deliverySlotDate =
+    assistant.querySelector(
+      "[data-delivery-slot-date]"
+    );
+
+  const collectionSlotDate =
+    assistant.querySelector(
+      "[data-collection-slot-date]"
+    );
+
+  const slotFeedback =
+    assistant.querySelector(
+      "[data-slot-feedback]"
+    );
+
+  function showSlotNotice(message = "") {
+    assistantState.serviceSlotNotice = message;
+    slotFeedback.textContent = message;
+    slotFeedback.hidden = !message;
+  }
+
+  function renderSlotOptions(container, slots, serviceType) {
+    const stateProperty =
+      serviceType === "delivery"
+        ? "deliverySlotId"
+        : "collectionSlotId";
+
+    if (slots.length === 0) {
+      container.innerHTML =
+        '<p class="assistant-slot-empty">Aucun créneau disponible</p>';
+      return;
+    }
+
+    container.innerHTML = slots.map((slot) => `
+      <button
+        class="assistant-slot-option ${assistantState[stateProperty] === slot.id ? "is-selected" : ""}"
+        type="button"
+        data-service-type="${serviceType}"
+        data-slot-id="${slot.id}"
+        aria-pressed="${assistantState[stateProperty] === slot.id}">
+        ${slot.label}
+      </button>
+    `).join("");
+
+    container.querySelectorAll("[data-slot-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        assistantState[stateProperty] = button.dataset.slotId;
+        showSlotNotice("");
+        renderServiceSlots();
+        error.hidden = true;
+        error.textContent = "";
+      });
+    });
+  }
+
+  function renderServiceSlots() {
+    const hasCompleteRange = Boolean(
+      assistantState.startDate && assistantState.endDate
+    );
+
+    serviceSlots.hidden = !hasCompleteRange;
+
+    if (!hasCompleteRange) {
+      deliverySlotsContainer.innerHTML = "";
+      collectionSlotsContainer.innerHTML = "";
+      return;
+    }
+
+    revalidateAssistantServiceSlots({
+      delivery: true,
+      collection: true,
+      announceInvalidation: true
+    });
+
+    if (assistantState.serviceSlotNotice) {
+      showSlotNotice(assistantState.serviceSlotNotice);
+    }
+
+    deliverySlotDate.textContent = formatDate(assistantState.startDate);
+    collectionSlotDate.textContent = formatDate(assistantState.endDate);
+
+    renderSlotOptions(
+      deliverySlotsContainer,
+      getAssistantServiceSlots("delivery"),
+      "delivery"
+    );
+    renderSlotOptions(
+      collectionSlotsContainer,
+      getAssistantServiceSlots("collection"),
+      "collection"
+    );
+  }
+
+  function updateDateSummary(startDate, endDate) {
+    startDisplay.textContent =
+      startDate
+        ? formatDate(startDate)
+        : "À choisir";
+
+    endDisplay.textContent =
+      endDate
+        ? formatDate(endDate)
+        : "À choisir";
+
+    const nights =
+      getRentalNightCount(
+        startDate,
+        endDate
+      );
+
+    nightsDisplay.textContent =
+      nights > 0
+        ? copy.nights(nights)
+        : "";
+
+    nightsDisplay.hidden = nights <= 0;
+    clearButton.disabled = !startDate && !endDate;
+  }
+
+  function updateExpressOption() {
+    const eligibility =
+      getSameDayExpressEligibility({
+        selectedDeliveryDate:
+          assistantState.startDate,
+        postcode: assistantState.postcode
+      });
+
+    if (!eligibility.eligible) {
+      assistantState.sameDayExpressSelected = false;
+    }
+
+    expressInput.disabled = !eligibility.eligible;
+    expressInput.checked =
+      assistantState.sameDayExpressSelected;
+
+    expressOption.classList.toggle(
+      "is-disabled",
+      !eligibility.eligible
+    );
+
+    expressStatus.textContent =
+      getExpressStatusText(eligibility);
+
+    return eligibility;
+  }
+
+  renderServiceSlots();
+
+  const calendarController = createIgloueCalendar({
     container:
       calendarContainer,
 
@@ -2015,30 +2611,90 @@ function showDatesStage(
     endDate:
       assistantState.endDate,
 
+    minimumNights:
+      IGLOUE_PRICING.minimumRentalNights,
+
+    allowSameDay:
+      todayExpressEligibility.eligible,
+
     onChange: ({
       startDate,
       endDate
     }) => {
+      const deliveryDateChanged =
+        assistantState.startDate !== startDate;
+      const collectionDateChanged =
+        assistantState.endDate !== endDate;
+
       assistantState.startDate =
         startDate;
 
       assistantState.endDate =
         endDate;
 
-      invalidateRecommendation();
+      revalidateAssistantServiceSlots({
+        delivery: deliveryDateChanged,
+        collection: collectionDateChanged,
+        announceInvalidation: true
+      });
 
-      startDisplay.textContent =
-        startDate
-          ? formatDate(startDate)
-          : "À choisir";
+      updateExpressOption();
 
-      endDisplay.textContent =
-        endDate
-          ? formatDate(endDate)
-          : "À choisir";
+      if (startDate && endDate) {
+        calculateRecommendation();
+      } else {
+        assistantState.pricing = null;
+        assistantState.availability = null;
+      }
+
+      updateDateSummary(startDate, endDate);
+      renderServiceSlots();
 
       error.hidden = true;
       error.textContent = "";
+    },
+
+    onFeedback: (message) => {
+      feedback.textContent = message;
+      feedback.hidden = !message;
+    }
+  });
+
+  assistant
+    .querySelector("[data-edit-start]")
+    .addEventListener("click", () => {
+      calendarController.editEndpoint("start");
+    });
+
+  assistant
+    .querySelector("[data-edit-end]")
+    .addEventListener("click", () => {
+      calendarController.editEndpoint("end");
+    });
+
+  clearButton.addEventListener("click", () => {
+    calendarController.clear();
+  });
+
+  expressInput.addEventListener("change", () => {
+    const requestedSelection =
+      expressInput.checked;
+
+    const eligibility =
+      updateExpressOption();
+
+    assistantState.sameDayExpressSelected =
+      eligibility.eligible &&
+      requestedSelection;
+
+    expressInput.checked =
+      assistantState.sameDayExpressSelected;
+
+    if (
+      assistantState.startDate &&
+      assistantState.endDate
+    ) {
+      calculateRecommendation();
     }
   });
 
@@ -2065,6 +2721,25 @@ function showDatesStage(
       if (nights <= 0) {
         error.textContent =
           copy.orderError;
+
+        error.hidden = false;
+        return;
+      }
+
+      revalidateAssistantServiceSlots({
+        delivery: true,
+        collection: true,
+        announceInvalidation: true
+      });
+
+      renderServiceSlots();
+
+      if (
+        !assistantState.deliverySlotId ||
+        !assistantState.collectionSlotId
+      ) {
+        error.textContent =
+          "Choisissez un créneau de livraison et un créneau de reprise.";
 
         error.hidden = false;
         return;
@@ -2518,6 +3193,17 @@ function calculateCurrentPricing() {
     return;
   }
 
+  const expressEligibility =
+    getSameDayExpressEligibility({
+      selectedDeliveryDate:
+        assistantState.startDate,
+      postcode: assistantState.postcode
+    });
+
+  if (!expressEligibility.eligible) {
+    assistantState.sameDayExpressSelected = false;
+  }
+
   assistantState.pricing =
     calculateBookingTotal({
       weeklyPrice:
@@ -2534,6 +3220,11 @@ function calculateCurrentPricing() {
 
       setupPrice:
         getSetupPrice(),
+
+      sameDayExpressPrice:
+        assistantState.sameDayExpressSelected
+          ? IGLOUE_PRICING.addOns.sameDayExpress.price
+          : 0,
 
       cautionAmount:
         product.cautionAmount
@@ -2849,6 +3540,12 @@ function selectProductChoice(productId) {
   assistantState.recommendedProduct =
     product;
 
+  revalidateAssistantServiceSlots({
+    delivery: true,
+    collection: true,
+    announceInvalidation: true
+  });
+
   assistantState.availability = {
     ...(assistantState.availability || {}),
     selectedAsAlternative:
@@ -3039,69 +3736,9 @@ function updateResultPricing(
 }
 
 function buildReservationDraft() {
-  const product =
-    assistantState.recommendedProduct;
-
-  return {
-    postcode:
-      assistantState.postcode,
-
-    deliveryZone: {
-      id:
-        assistantState
-          .deliveryZone.id,
-
-      name:
-        assistantState
-          .deliveryZone.name
-    },
-
-    room: {
-      type:
-        assistantState.roomType,
-
-      subtype:
-        assistantState.roomSubtype || null,
-
-      area:
-        assistantState.roomArea,
-
-      conditions: [
-        ...assistantState
-          .roomConditions
-      ]
-    },
-
-    openingType:
-      assistantState.openingType,
-
-    hasAccessibleOutdoorSpace:
-      assistantState.hasAccessibleOutdoorSpace,
-
-    rentalDates: {
-      startDate:
-        assistantState.startDate,
-
-      endDate:
-        assistantState.endDate
-    },
-
-    product: {
-      id: product.id,
-      name: product.name
-    },
-
-    setupMode:
-      assistantState.setupMode,
-
-    requiresAssessment:
-      assistantState
-        .requiresAssessment,
-
-    pricing: {
-      ...assistantState.pricing
-    }
-  };
+  return buildNormalizedReservationDraft(
+    assistantState
+  );
 }
 
 function showRecommendationResult(
@@ -3321,6 +3958,19 @@ function showRecommendationResult(
                 </strong>
               </div>
 
+              ${
+                pricing.sameDayExpressPrice > 0
+                  ? `
+                    <div>
+                      <span>${copy.sameDayExpress}</span>
+                      <strong>
+                        ${formatPrice(pricing.sameDayExpressPrice)}
+                      </strong>
+                    </div>
+                  `
+                  : ""
+              }
+
               <div>
                 <span>${copy.setup}</span>
                 <strong data-price-setup>
@@ -3424,30 +4074,7 @@ function showRecommendationResult(
     .addEventListener(
       "click",
       () => {
-        const status =
-          assistant.querySelector(
-            "[data-reservation-status]"
-          );
-
-        assistant.dispatchEvent(
-          new CustomEvent(
-            "igloue:reservation-requested",
-            {
-              bubbles: true,
-              detail:
-                buildReservationDraft()
-            }
-          )
-        );
-
-        status.textContent =
-          copy.reservationStatus;
-
-        status.hidden = false;
-
-        status.focus({
-          preventScroll: true
-        });
+        showReservationReview();
       }
     );
 }

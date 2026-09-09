@@ -103,11 +103,31 @@ function isCalendarDateBetween(
   );
 }
 
+function addCalendarDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function getCalendarNightCount(start, end) {
+  if (!start || !end) {
+    return 0;
+  }
+
+  return Math.round(
+    (end - start) / (1000 * 60 * 60 * 24)
+  );
+}
+
 function createIgloueCalendar({
   container,
   startDate = "",
   endDate = "",
-  onChange
+  minimumNights = 3,
+  allowSameDay = false,
+  isDateAvailable = () => true,
+  onChange,
+  onFeedback
 }) {
   if (!container) {
     return;
@@ -119,11 +139,15 @@ function createIgloueCalendar({
   let selectedEnd =
     calendarValueToDate(endDate);
 
+  let editingEndpoint = null;
+
   const today =
     getCalendarToday();
 
   const firstBookable =
-    getFirstBookableDate();
+    allowSameDay
+      ? today
+      : getFirstBookableDate();
 
   let visibleMonth =
     selectedStart
@@ -138,7 +162,20 @@ function createIgloueCalendar({
           1
         );
 
-  function emitChange() {
+  function emitFeedback(message = "") {
+    if (typeof onFeedback === "function") {
+      onFeedback(message);
+    }
+  }
+
+  function isSelectable(date) {
+    return (
+      date >= firstBookable &&
+      isDateAvailable(calendarDateToValue(date))
+    );
+  }
+
+  function emitChange(adjustedToMinimum = false) {
     if (typeof onChange !== "function") {
       return;
     }
@@ -152,35 +189,152 @@ function createIgloueCalendar({
       endDate:
         selectedEnd
           ? calendarDateToValue(selectedEnd)
-          : ""
+          : "",
+
+      adjustedToMinimum
     });
   }
 
-  function selectDate(date) {
-    if (date < firstBookable) {
-      return;
+  function setCollectionDate(date) {
+    if (!selectedStart || date <= selectedStart) {
+      emitFeedback("La reprise doit être postérieure à la livraison.");
+      return false;
     }
+
+    let nextEnd = date;
+    let adjustedToMinimum = false;
 
     if (
-      !selectedStart ||
-      selectedEnd
+      getCalendarNightCount(selectedStart, nextEnd) <
+      minimumNights
     ) {
-      selectedStart = date;
-      selectedEnd = null;
-    } else if (
-      date <= selectedStart
-    ) {
-      selectedStart = date;
-      selectedEnd = null;
-    } else {
-      selectedEnd = date;
+      nextEnd = addCalendarDays(
+        selectedStart,
+        minimumNights
+      );
+      adjustedToMinimum = true;
     }
 
+    if (!isSelectable(nextEnd)) {
+      emitFeedback("Cette date n'est pas disponible.");
+      return false;
+    }
+
+    selectedEnd = nextEnd;
+    editingEndpoint = null;
+    emitChange(adjustedToMinimum);
+    emitFeedback(
+      adjustedToMinimum
+        ? "Reprise ajustée au minimum de 3 nuits."
+        : ""
+    );
+    return true;
+  }
+
+  function setDeliveryDate(date) {
+    if (!isSelectable(date)) {
+      emitFeedback("Cette date n'est pas disponible.");
+      return false;
+    }
+
+    let nextEnd = selectedEnd;
+    let adjustedToMinimum = false;
+
+    if (
+      nextEnd &&
+      getCalendarNightCount(date, nextEnd) <
+        minimumNights
+    ) {
+      nextEnd = addCalendarDays(
+        date,
+        minimumNights
+      );
+      adjustedToMinimum = true;
+    }
+
+    if (nextEnd && !isSelectable(nextEnd)) {
+      emitFeedback("Cette période n'est pas disponible.");
+      return false;
+    }
+
+    selectedStart = date;
+    selectedEnd = nextEnd;
+    editingEndpoint = null;
+    emitChange(adjustedToMinimum);
+    emitFeedback(
+      adjustedToMinimum
+        ? "Reprise ajustée au minimum de 3 nuits."
+        : ""
+    );
+    return true;
+  }
+
+  function clearSelection() {
+    selectedStart = null;
+    selectedEnd = null;
+    editingEndpoint = null;
     emitChange();
+    emitFeedback("");
     render();
   }
 
-  function render() {
+  function selectDate(date) {
+    if (!isSelectable(date)) {
+      return;
+    }
+
+    if (!selectedStart) {
+      selectedStart = date;
+      selectedEnd = null;
+      editingEndpoint = "end";
+      emitChange();
+      emitFeedback("");
+      render(calendarDateToValue(date));
+      return;
+    }
+
+    if (!selectedEnd) {
+      if (date <= selectedStart) {
+        selectedStart = date;
+        editingEndpoint = "end";
+        emitChange();
+        emitFeedback("");
+      } else {
+        setCollectionDate(date);
+      }
+
+      render(calendarDateToValue(date));
+      return;
+    }
+
+    if (sameCalendarDay(date, selectedStart)) {
+      clearSelection();
+      return;
+    }
+
+    if (sameCalendarDay(date, selectedEnd)) {
+      selectedEnd = null;
+      editingEndpoint = "end";
+      emitChange();
+      emitFeedback("");
+      render(calendarDateToValue(date));
+      return;
+    }
+
+    if (editingEndpoint === "start") {
+      setDeliveryDate(date);
+    } else if (editingEndpoint === "end") {
+      setCollectionDate(date);
+    } else if (date < selectedStart) {
+      setDeliveryDate(date);
+    } else {
+      setCollectionDate(date);
+    }
+
+    render(calendarDateToValue(date));
+  }
+
+  function render(focusValue = "") {
     const year =
       visibleMonth.getFullYear();
 
@@ -248,7 +402,7 @@ function createIgloueCalendar({
         );
 
       const isUnavailable =
-        date < firstBookable;
+        !isSelectable(date);
 
       const isStart =
         selectedStart &&
@@ -299,12 +453,20 @@ function createIgloueCalendar({
         classes.push("is-between");
       }
 
+      if (
+        (editingEndpoint === "start" && isStart) ||
+        (editingEndpoint === "end" && isEnd)
+      ) {
+        classes.push("is-editing-endpoint");
+      }
+
       days.push(`
         <button
           class="${classes.join(" ")}"
           type="button"
           data-calendar-date="${value}"
           ${isUnavailable ? "disabled" : ""}
+          aria-pressed="${Boolean(isStart || isEnd)}"
           aria-label="${date.toLocaleDateString(
             IGLOUE_CALENDAR.locale,
             {
@@ -451,7 +613,51 @@ function createIgloueCalendar({
         render();
       }
     );
+
+    if (focusValue) {
+      container
+        .querySelector(
+          `[data-calendar-date="${focusValue}"]`
+        )
+        ?.focus({ preventScroll: true });
+    }
   }
 
   render();
+
+  return {
+    clear() {
+      clearSelection();
+    },
+
+    editEndpoint(endpoint) {
+      if (
+        endpoint !== "start" &&
+        endpoint !== "end"
+      ) {
+        return;
+      }
+
+      if (
+        (endpoint === "start" && !selectedStart) ||
+        (endpoint === "end" && !selectedEnd)
+      ) {
+        return;
+      }
+
+      editingEndpoint = endpoint;
+      emitFeedback(
+        endpoint === "start"
+          ? "Choisissez la nouvelle date de livraison."
+          : "Choisissez la nouvelle date de reprise."
+      );
+      render(
+        calendarDateToValue(
+          endpoint === "start"
+            ? selectedStart
+            : selectedEnd
+        )
+      );
+    }
+  };
 }

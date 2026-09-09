@@ -14,6 +14,20 @@ const IGLOUE_PRICING = {
     maxPro: 129
   },
 
+  addOns: {
+    extendedExhaust: {
+      id: "extended-exhaust",
+      label: "Rallonge d'évacuation",
+      price: 9
+    },
+
+    sameDayExpress: {
+      id: "same-day-express",
+      label: "Livraison Express aujourd'hui",
+      price: 25
+    }
+  },
+
   setup: {
     none: {
       id: "none",
@@ -114,6 +128,7 @@ function calculateBookingTotal({
   endDate,
   deliveryPrice = 0,
   setupPrice = 0,
+  sameDayExpressPrice = 0,
   cautionAmount = 0
 }) {
   const rental = calculateRentalPrice(
@@ -125,7 +140,8 @@ function calculateBookingTotal({
   const total = roundCurrency(
     rental.rentalPrice +
     deliveryPrice +
-    setupPrice
+    setupPrice +
+    sameDayExpressPrice
   );
 
   return {
@@ -140,6 +156,8 @@ function calculateBookingTotal({
 
     deliveryPrice: roundCurrency(deliveryPrice),
     setupPrice: roundCurrency(setupPrice),
+    sameDayExpressPrice:
+      roundCurrency(sameDayExpressPrice),
 
     total,
 
