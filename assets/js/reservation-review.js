@@ -55,14 +55,23 @@ function getReservationReviewOpeningLabel(openingType) {
 function validateReservationOperationalData(draft) {
   const issues = [];
   const product = getProductById(draft.product.selectedProductId);
-
-  if (
-    !product ||
-    !isProductAvailableForDates(
+  const productInventoryAvailable = Boolean(
+    product &&
+    isProductAvailableForDates(
       product.id,
       draft.rental.deliveryDate,
       draft.rental.collectionDate
     )
+  );
+  const fleetAvailability =
+    productInventoryAvailable &&
+    typeof getProductFleetAvailability === "function"
+      ? getProductFleetAvailability(product.id, draft)
+      : null;
+
+  if (
+    !productInventoryAvailable ||
+    (fleetAvailability && !fleetAvailability.canAllocate)
   ) {
     issues.push({
       code: "product-unavailable",

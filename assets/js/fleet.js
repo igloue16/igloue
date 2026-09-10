@@ -33,6 +33,8 @@ function createPhysicalUnit({
   productId,
   status = "available",
   serialNumber = null,
+  unavailableUntil = null,
+  externalReferences = {},
   metadata = {}
 }) {
   if (
@@ -48,6 +50,8 @@ function createPhysicalUnit({
     productId,
     status,
     serialNumber,
+    unavailableUntil,
+    externalReferences: { ...externalReferences },
     metadata: { ...metadata }
   };
 }
@@ -74,12 +78,17 @@ function transitionPhysicalUnit(unit, nextStatus) {
 }
 
 /*
-  Small operational sample only. Current inventory quantities remain the
-  recommendation/availability source until backend allocation is introduced.
+  Development-only fleet sample. These are not purchased/production assets.
+  Current inventory quantities remain the recommendation source until an
+  authoritative backend allocation adapter is introduced.
 */
 const IGLOUE_MOCK_PHYSICAL_UNITS = Object.freeze([
   createPhysicalUnit({ unitId: "E01", productId: "essential" }),
+  createPhysicalUnit({ unitId: "E02", productId: "essential" }),
   createPhysicalUnit({ unitId: "D01", productId: "mobile-duo" }),
+  createPhysicalUnit({ unitId: "D02", productId: "mobile-duo" }),
   createPhysicalUnit({ unitId: "S01", productId: "split-12" }),
+  createPhysicalUnit({ unitId: "S02", productId: "split-12" }),
+  createPhysicalUnit({ unitId: "S03", productId: "split-12" }),
   createPhysicalUnit({ unitId: "M01", productId: "max-pro" })
 ]);

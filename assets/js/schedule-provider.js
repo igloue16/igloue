@@ -16,14 +16,16 @@ const IGLOUE_MOCK_SCHEDULE_INPUT = [
     date: "2026-09-11",
     startTime: "06:00",
     endTime: "13:30",
-    source: "mock-schedule"
+    source: "mock-schedule",
+    displayLabel: "Calendrier de travail"
   },
   {
     id: "mock-afternoon-shift",
     date: "2026-09-12",
     startTime: "12:30",
     endTime: "19:30",
-    source: "mock-schedule"
+    source: "mock-schedule",
+    displayLabel: "Calendrier de travail"
   }
 ];
 
@@ -50,6 +52,7 @@ function normalizeMockBusyPeriod(record) {
     endTime: record.endTime,
     type: "busy",
     source: record.source || "mock-schedule",
+    displayLabel: record.displayLabel || "Période indisponible",
     resourceId: record.resourceId || "operations-primary",
     resourceType: record.resourceType || "driver"
   };

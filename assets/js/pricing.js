@@ -31,13 +31,13 @@ const IGLOUE_PRICING = {
   setup: {
     none: {
       id: "none",
-      label: "Livraison seule",
+      label: "Sans mise en service (livraison seule)",
       price: 0
     },
 
     basic: {
       id: "basic",
-      label: "Mise en service simple",
+      label: "Mise en service IGLOUE",
       price: 19
     },
 

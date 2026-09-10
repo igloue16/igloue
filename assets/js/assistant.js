@@ -283,6 +283,14 @@ const ASSISTANT_I18N = {
       setupOptional:
         "Vous pouvez installer ce modèle vous-même ou demander notre aide.",
 
+      setupConfirmation: {
+        title: "Vous préférez installer l'appareil vous-même ?",
+        body:
+          "La mise en service IGLOUE permet de vérifier le bon positionnement de l'appareil et son évacuation avant utilisation.",
+        keep: "Conserver la mise en service",
+        continueWithout: "Continuer sans mise en service"
+      },
+
       assessmentHeading: "Vérification nécessaire",
       assessmentText:
         "Votre configuration nécessite une validation avant de confirmer la réservation.",
@@ -357,6 +365,8 @@ const assistantState = {
   idealProduct: null,
 
   setupMode: null,
+  setupChoiceExplicit: false,
+  setupChoiceProductId: null,
 
   pricing: null,
 
@@ -496,7 +506,6 @@ function getEarliestDeliveryDate() {
 function invalidateRecommendation() {
   assistantState.recommendedProduct = null;
   assistantState.idealProduct = null;
-  assistantState.setupMode = null;
   assistantState.pricing = null;
 assistantState.availability = null;
 assistantState.requiresAssessment = false;
@@ -3134,10 +3143,23 @@ function determineDefaultSetupMode() {
   const modes =
     getAvailableSetupModes(product);
 
+  const explicitChoiceStillValid = Boolean(
+    assistantState.setupChoiceExplicit &&
+    assistantState.setupChoiceProductId === product.id &&
+    modes.includes(assistantState.setupMode)
+  );
+
+  if (explicitChoiceStillValid) {
+    return;
+  }
+
   assistantState.setupMode =
     modes.includes("none")
-      ? "none"
+      ? modes.find((mode) => mode !== "none") || "none"
       : modes[0] || null;
+
+  assistantState.setupChoiceExplicit = false;
+  assistantState.setupChoiceProductId = product.id;
 }
 
 function getSetupPrice() {
@@ -3353,6 +3375,16 @@ function buildSetupOptions(
       `;
     })
     .join("");
+}
+
+function productHasOptionalSetupChoice(product) {
+  const modes = getAvailableSetupModes(product);
+
+  return (
+    !product.installationRequired &&
+    modes.includes("none") &&
+    modes.some((mode) => mode !== "none")
+  );
 }
 
 function getIdealProduct() {
@@ -3769,6 +3801,42 @@ function showRecommendationResult(
   const setupOptions =
     buildSetupOptions(product);
 
+  const setupConfirmation =
+    productHasOptionalSetupChoice(product)
+      ? `
+        <dialog
+          class="assistant-setup-confirmation"
+          aria-labelledby="assistant-setup-confirmation-title"
+          aria-describedby="assistant-setup-confirmation-body"
+          data-setup-confirmation>
+          <div class="assistant-setup-confirmation-content">
+            <span class="assistant-step-label">Mise en service</span>
+            <h3 id="assistant-setup-confirmation-title">
+              ${copy.setupConfirmation.title}
+            </h3>
+            <p id="assistant-setup-confirmation-body">
+              ${copy.setupConfirmation.body}
+            </p>
+            <div class="assistant-setup-confirmation-actions">
+              <button
+                class="assistant-next"
+                type="button"
+                data-keep-setup
+                autofocus>
+                ${copy.setupConfirmation.keep}
+              </button>
+              <button
+                class="assistant-setup-confirmation-secondary"
+                type="button"
+                data-confirm-no-setup>
+                ${copy.setupConfirmation.continueWithout}
+              </button>
+            </div>
+          </div>
+        </dialog>
+      `
+      : "";
+
   const productChoices =
     buildProductChoices();
 
@@ -3940,6 +4008,8 @@ function showRecommendationResult(
               ${setupOptions}
             </div>
 
+            ${setupConfirmation}
+
             ${assessmentNotice}
 
             <div class="assistant-result-grid">
@@ -4020,6 +4090,46 @@ function showRecommendationResult(
   connectBackControl(assistant);
   connectInfoControls(assistant);
 
+  const setupDialog = assistant.querySelector(
+    "[data-setup-confirmation]"
+  );
+
+  function selectSetupMode(mode, { explicit = true, focus = true } = {}) {
+    assistantState.setupMode = mode;
+    assistantState.setupChoiceExplicit = explicit;
+    assistantState.setupChoiceProductId = product.id;
+
+    assistant
+      .querySelectorAll("[data-setup-mode]")
+      .forEach((option) => {
+        const selected = option.dataset.setupMode === mode;
+
+        option.classList.toggle("is-selected", selected);
+        option.setAttribute("aria-pressed", String(selected));
+      });
+
+    updateResultPricing(assistant);
+
+    if (focus) {
+      assistant
+        .querySelector(`[data-setup-mode="${mode}"]`)
+        ?.focus();
+    }
+  }
+
+  function retainIgloueSetup() {
+    const retainedMode = getAvailableSetupModes(product)
+      .find((mode) => mode !== "none");
+
+    if (setupDialog && setupDialog.open) {
+      setupDialog.close();
+    }
+
+    if (retainedMode) {
+      selectSetupMode(retainedMode);
+    }
+  }
+
   assistant
     .querySelectorAll("[data-product-choice]")
     .forEach((button) => {
@@ -4038,34 +4148,36 @@ function showRecommendationResult(
       button.addEventListener(
         "click",
         () => {
-          assistantState.setupMode =
-            button.dataset.setupMode;
+          const requestedMode = button.dataset.setupMode;
 
-          assistant
-            .querySelectorAll(
-              "[data-setup-mode]"
-            )
-            .forEach((option) => {
-              const selected =
-                option === button;
+          if (requestedMode === "none" && setupDialog) {
+            setupDialog.showModal();
+            setupDialog.querySelector("[data-keep-setup]").focus();
+            return;
+          }
 
-              option.classList.toggle(
-                "is-selected",
-                selected
-              );
-
-              option.setAttribute(
-                "aria-pressed",
-                String(selected)
-              );
-            });
-
-          updateResultPricing(
-            assistant
-          );
+          selectSetupMode(requestedMode);
         }
       );
     });
+
+  if (setupDialog) {
+    setupDialog
+      .querySelector("[data-keep-setup]")
+      .addEventListener("click", retainIgloueSetup);
+
+    setupDialog
+      .querySelector("[data-confirm-no-setup]")
+      .addEventListener("click", () => {
+        setupDialog.close();
+        selectSetupMode("none");
+      });
+
+    setupDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      retainIgloueSetup();
+    });
+  }
 
   assistant
     .querySelector(
