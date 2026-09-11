@@ -20,7 +20,16 @@ const IGLOUE_OPERATION_TASK_STATUS_LABELS = Object.freeze({
 });
 
 function isOperationalDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) {
+    return false;
+  }
+
+  const parsedDate = new Date(`${value}T00:00:00Z`);
+
+  return (
+    !Number.isNaN(parsedDate.getTime()) &&
+    parsedDate.toISOString().slice(0, 10) === value
+  );
 }
 
 function shiftOperationalDate(date, dayCount) {
