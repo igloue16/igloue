@@ -1358,36 +1358,6 @@
   white-space: nowrap;
 }
 
-.assistant-date-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.assistant-date-grid label > span {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--blue-dark);
-  font-size: 0.69rem;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.assistant-date-grid input {
-  width: 100%;
-  min-height: 42px;
-  padding: 7px 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: #ffffff;
-  color: var(--text);
-  font: inherit;
-  font-size: 0.78rem;
-}
-
-
 /* =========================================================
    ACTIONS AND FOCUS
    ========================================================= */
@@ -1436,7 +1406,6 @@
 .assistant-next:focus-visible,
 .assistant-back:focus-visible,
 .assistant-line-input:focus-visible,
-.assistant-date-grid input:focus-visible,
 .assistant-check-option:has(input:focus-visible),
 .assistant-setup-option:has(input:focus-visible) {
   outline: 3px solid rgb(23 107 148 / 18%);
@@ -2095,14 +2064,8 @@
   }
 
   .assistant-options button,
-  .assistant-next,
-  .assistant-date-grid input {
+  .assistant-next {
     min-height: 44px;
-  }
-
-  .assistant-date-grid {
-    grid-template-columns: 1fr;
-    gap: 9px;
   }
 
   .assistant-result-grid > div {
