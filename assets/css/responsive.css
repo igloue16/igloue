@@ -200,11 +200,6 @@
     min-height: 0;
   }
 
-  .assistant-panel:has(.assistant-screen.is-result) {
-    height: auto;
-    min-height: 0;
-  }
-
   .assistant-hero-assistant:has(.assistant-screen.is-result) {
     min-height: 0;
   }
