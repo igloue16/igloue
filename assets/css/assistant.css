@@ -1162,12 +1162,6 @@
   place-items: center;
 }
 
-.assistant-condition-illustration img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-}
-
 .assistant-condition-native-svg {
   width: 42px;
   height: 42px;
@@ -1273,10 +1267,6 @@
     transition: border-color 180ms ease, box-shadow 180ms ease;
   }
 
-  .assistant-condition-illustration img {
-    transition: transform 180ms ease;
-  }
-
   .assistant-condition-option:hover:not(:has(input:checked)) {
     border-color: var(--line-strong);
     box-shadow: 0 2px 8px rgb(20 34 44 / 6%);
@@ -1284,10 +1274,6 @@
 
   .assistant-condition-option:hover:has(input:checked) {
     box-shadow: 0 2px 10px rgb(20 34 44 / 9%);
-  }
-
-  .assistant-condition-option:hover .assistant-condition-illustration img {
-    transform: scale(1.05);
   }
 
   .assistant-condition-option:hover:has(input[value="sunny"]) .assistant-condition-sunny-svg {
@@ -1321,14 +1307,12 @@
   .assistant-room-subtype-option,
   .assistant-room-illustration img,
   .assistant-room-subtype-illustration img,
-  .assistant-condition-option,
-  .assistant-condition-illustration img {
+  .assistant-condition-option {
     transition: none;
   }
 
   .assistant-room-option:hover .assistant-room-illustration img,
-  .assistant-room-subtype-option:hover .assistant-room-subtype-illustration img,
-  .assistant-condition-option:hover .assistant-condition-illustration img {
+  .assistant-room-subtype-option:hover .assistant-room-subtype-illustration img {
     transform: none;
   }
 }
