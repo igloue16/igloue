@@ -485,24 +485,6 @@ function getRoomAreaProgress(area) {
   return ((Number(area) - 8) / (60 - 8)) * 100;
 }
 
-function getEarliestDeliveryDate() {
-  const tomorrow = new Date();
-
-  tomorrow.setDate(
-    tomorrow.getDate() + 1
-  );
-
-  const offset =
-    tomorrow.getTimezoneOffset();
-
-  return new Date(
-    tomorrow.getTime() -
-    offset * 60 * 1000
-  )
-    .toISOString()
-    .slice(0, 10);
-}
-
 function invalidateRecommendation() {
   assistantState.recommendedProduct = null;
   assistantState.idealProduct = null;
