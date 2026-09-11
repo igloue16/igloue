@@ -1123,8 +1123,7 @@
   margin-top: 10px;
 }
 
-.assistant-check-option,
-.assistant-setup-option {
+.assistant-check-option {
   display: flex;
   align-items: flex-start;
   gap: 9px;
@@ -1334,13 +1333,7 @@
   }
 }
 
-.assistant-setup-option:has(input:checked) {
-  border-color: var(--tan);
-  background: #fffaf4;
-}
-
-.assistant-check-option input,
-.assistant-setup-option input {
+.assistant-check-option input {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
@@ -1406,8 +1399,7 @@
 .assistant-next:focus-visible,
 .assistant-back:focus-visible,
 .assistant-line-input:focus-visible,
-.assistant-check-option:has(input:focus-visible),
-.assistant-setup-option:has(input:focus-visible) {
+.assistant-check-option:has(input:focus-visible) {
   outline: 3px solid rgb(23 107 148 / 18%);
   outline-offset: 3px;
 }
@@ -1899,27 +1891,6 @@
   color: var(--blue-dark) !important;
   font-size: 0.69rem !important;
   font-weight: 750;
-}
-
-.assistant-setup-option {
-  margin-top: 9px;
-  padding: 8px 10px;
-}
-
-.assistant-setup-option span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.assistant-setup-option strong {
-  font-size: 0.72rem;
-}
-
-.assistant-setup-option small {
-  color: var(--text-muted);
-  font-size: 0.63rem;
-  line-height: 1.3;
 }
 
 .assistant-recurring-price {
