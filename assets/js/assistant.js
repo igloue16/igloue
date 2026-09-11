@@ -2490,9 +2490,20 @@ function showDatesStage(
 
     container.querySelectorAll("[data-slot-id]").forEach((button) => {
       button.addEventListener("click", () => {
-        assistantState[stateProperty] = button.dataset.slotId;
+        const selectedSlotId = button.dataset.slotId;
+
+        assistantState[stateProperty] = selectedSlotId;
         showSlotNotice("");
         renderServiceSlots();
+
+        assistant
+          .querySelectorAll(`[data-service-type="${serviceType}"]`)
+          .forEach((renderedButton) => {
+            if (renderedButton.dataset.slotId === selectedSlotId) {
+              renderedButton.focus();
+            }
+          });
+
         error.hidden = true;
         error.textContent = "";
       });
