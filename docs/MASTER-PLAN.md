@@ -253,6 +253,9 @@ Supporting systems:
 - Supabase is the selected PostgreSQL hosting platform for V1.
 - The Supabase project should use the Paris region.
 - Supabase may later provide customer authentication and file storage, but IGLOUE business logic must remain modular and not depend unnecessarily on Supabase-specific features.
+- Supabase project `igloue` has been created on the Free plan.
+- Primary database region: West EU (Paris).
+- Database schema changes should be managed through version-controlled SQL migrations in the IGLOUE repository rather than relying on manual dashboard edits.
 
 ---
 
