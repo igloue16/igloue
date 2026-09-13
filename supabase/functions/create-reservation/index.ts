@@ -6,6 +6,7 @@ import {
   validateDeliveryAddress,
   validateProductId,
   validateRentalDates,
+  validateServiceChoices,
 } from "./validation.ts";
 
 export default {
@@ -65,10 +66,22 @@ export default {
         );
       }
 
+      const serviceValidation = validateServiceChoices(
+        body?.service,
+      );
+
+      if (!serviceValidation.ok) {
+        return Response.json(
+          { error: serviceValidation.error },
+          { status: 400 },
+        );
+      }
+
       const customer = customerValidation.customer;
       const productId = productValidation.productId;
       const deliveryAddress = addressValidation.address;
       const rental = rentalValidation.rental;
+      const service = serviceValidation.service;
 
       const product =
         IGLOUE_SERVER_PRICING.products[
@@ -82,6 +95,7 @@ export default {
         customer,
         deliveryAddress,
         rental,
+        service,
       });
     },
   ),

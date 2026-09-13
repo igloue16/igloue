@@ -220,3 +220,67 @@ export function validateRentalDates(rental: unknown) {
     },
   };
 }
+
+export function validateServiceChoices(service: unknown) {
+  if (
+    typeof service !== "object" ||
+    service === null
+  ) {
+    return {
+      ok: false as const,
+      error: "Invalid service",
+    };
+  }
+
+  const value = service as Record<string, unknown>;
+
+  if (
+    typeof value.deliverySlotId !== "string" ||
+    value.deliverySlotId.trim() === ""
+  ) {
+    return {
+      ok: false as const,
+      error: "Invalid deliverySlotId",
+    };
+  }
+
+  if (
+    typeof value.collectionSlotId !== "string" ||
+    value.collectionSlotId.trim() === ""
+  ) {
+    return {
+      ok: false as const,
+      error: "Invalid collectionSlotId",
+    };
+  }
+
+  if (
+    typeof value.setupMode !== "string" ||
+    !(value.setupMode in IGLOUE_SERVER_PRICING.setup)
+  ) {
+    return {
+      ok: false as const,
+      error: "Invalid setupMode",
+    };
+  }
+
+  if (
+    value.expressSelected !== undefined &&
+    typeof value.expressSelected !== "boolean"
+  ) {
+    return {
+      ok: false as const,
+      error: "Invalid expressSelected",
+    };
+  }
+
+  return {
+    ok: true as const,
+    service: {
+      deliverySlotId: value.deliverySlotId.trim(),
+      collectionSlotId: value.collectionSlotId.trim(),
+      setupMode: value.setupMode,
+      expressSelected: value.expressSelected === true,
+    },
+  };
+}
