@@ -36,3 +36,64 @@ export const IGLOUE_SERVER_PRICING = {
     special: 59,
   },
 } as const;
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function calculateServerRentalPrice(
+  weeklyPrice: number,
+  nights: number,
+) {
+  const chargeableNights = Math.max(
+    nights,
+    IGLOUE_SERVER_PRICING.minimumRentalNights,
+  );
+
+  const nightlyRate = weeklyPrice / 7;
+
+  return roundMoney(
+    nightlyRate * chargeableNights,
+  );
+}
+
+export function calculateServerBookingPrice(input: {
+  productId: keyof typeof IGLOUE_SERVER_PRICING.products;
+  nights: number;
+  deliveryFee: number;
+  setupMode: keyof typeof IGLOUE_SERVER_PRICING.setup;
+  expressSelected: boolean;
+}) {
+  const product =
+    IGLOUE_SERVER_PRICING.products[input.productId];
+
+  const rentalPrice = calculateServerRentalPrice(
+    product.weeklyPrice,
+    input.nights,
+  );
+
+  const setupPrice =
+    IGLOUE_SERVER_PRICING.setup[input.setupMode];
+
+  const expressPrice = input.expressSelected
+    ? IGLOUE_SERVER_PRICING.addOns.sameDayExpress
+    : 0;
+
+  const totalAmount = roundMoney(
+    rentalPrice +
+      input.deliveryFee +
+      setupPrice +
+      expressPrice,
+  );
+
+  return {
+    currency: IGLOUE_SERVER_PRICING.currency,
+    weeklyPrice: product.weeklyPrice,
+    rentalPrice,
+    deliveryFee: roundMoney(input.deliveryFee),
+    setupPrice,
+    expressPrice,
+    depositAmount: product.depositAmount,
+    totalAmount,
+  };
+}

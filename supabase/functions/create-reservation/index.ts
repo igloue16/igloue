@@ -1,6 +1,13 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
-import { IGLOUE_SERVER_PRICING } from "./pricing.ts";
+import {
+  getServerDeliveryZoneByPostcode,
+  isServerProductAvailableInZone,
+} from "./delivery.ts";
+import {
+  calculateServerBookingPrice,
+  IGLOUE_SERVER_PRICING,
+} from "./pricing.ts";
 import {
   validateCustomer,
   validateDeliveryAddress,
@@ -83,10 +90,50 @@ export default {
       const rental = rentalValidation.rental;
       const service = serviceValidation.service;
 
+      const deliveryZone =
+        getServerDeliveryZoneByPostcode(
+          deliveryAddress.postcode,
+        );
+
+      if (!deliveryZone) {
+        return Response.json(
+          {
+            error:
+              "Delivery postcode requires manual review",
+          },
+          { status: 400 },
+        );
+      }
+
+      if (
+        !isServerProductAvailableInZone(
+          productId,
+          deliveryZone.id,
+        )
+      ) {
+        return Response.json(
+          {
+            error:
+              "Product is not available in this delivery zone",
+          },
+          { status: 400 },
+        );
+      }
+
       const product =
         IGLOUE_SERVER_PRICING.products[
           productId as keyof typeof IGLOUE_SERVER_PRICING.products
         ];
+
+      const pricing = calculateServerBookingPrice({
+        productId:
+          productId as keyof typeof IGLOUE_SERVER_PRICING.products,
+        nights: rental.nights,
+        deliveryFee: deliveryZone.price,
+        setupMode:
+          service.setupMode as keyof typeof IGLOUE_SERVER_PRICING.setup,
+        expressSelected: service.expressSelected,
+      });
 
       return Response.json({
         ok: true,
@@ -96,6 +143,11 @@ export default {
         deliveryAddress,
         rental,
         service,
+        deliveryZone: {
+          id: deliveryZone.id,
+          name: deliveryZone.name,
+        },
+        pricing,
       });
     },
   ),
