@@ -249,6 +249,10 @@ Supporting systems:
 - Stripe should handle payment card data.
 - Secrets must never be exposed in frontend JavaScript.
 - Build for 10 machines now, but structure the data so it can scale much further.
+- PostgreSQL will be used as the primary IGLOUE database.
+- Supabase is the selected PostgreSQL hosting platform for V1.
+- The Supabase project should use the Paris region.
+- Supabase may later provide customer authentication and file storage, but IGLOUE business logic must remain modular and not depend unnecessarily on Supabase-specific features.
 
 ---
 
@@ -279,232 +283,465 @@ Build customer account.
 Expand admin and fleet operations.
 
 ---
-## 9. Backend Architecture - Core Entities
-
+## 9. Database Design - Core Entities
 ### Customer
-Represents the person renting from IGLOUE.
 
-Core information:
-- Customer ID
-- Name
-- Email
-- Phone
-- Billing address
-- Delivery address
-- Account / magic-link access status
-- Created date
-- Notes
+Represents a real IGLOUE customer.
+
+Fields:
+
+- `id` — unique customer ID
+- `first_name`
+- `last_name`
+- `email`
+- `phone`
+- `created_at`
+- `updated_at`
+
+The customer record represents the person, not a particular booking or delivery address.
+
+Addresses will be stored with reservations so that a customer can rent to different locations without changing their permanent customer record.
+
+A customer can have many reservations.
+
+Relationship:
+
+`reservations.customer_id`
+→ `customers.id`
 
 ### Product
-Represents the customer-facing rental model.
 
-Examples:
-- Frost 9
-- Frost 12
-- Portable Split
+Represents a customer-facing IGLOUE rental model.
 
-Core information:
-- Product ID
-- Name
-- BTU / cooling capacity
-- Weekly price
-- Deposit amount
-- Active / inactive status
-- Recommendation rules
-- Required accessories
-- Description
+Fields:
+
+- `id` — human-readable product ID, e.g. `split-12`
+- `name`
+- `tagline`
+- `type`
+- `tier`
+- `cooling_capacity_kw`
+- `max_room_size_m2`
+- `weekly_price`
+- `deposit_amount`
+- `installation_required`
+- `service_area`
+- `active`
+- `created_at`
+- `updated_at`
+
+Examples of product IDs:
+
+- `essential`
+- `mobile-duo`
+- `split-12`
+- `max-pro`
+
+A Product describes the model the customer chooses.
+
+A Product can have many physical machines.
+
+Relationship:
+
+`physical_machines.product_id`
+→ `products.id`
 
 ### Physical Machine
+
 Represents one real air-conditioning unit owned by IGLOUE.
 
-Examples:
-- F12-001
-- F12-002
-- PS-001
+Fields:
 
-Core information:
-- Machine ID
-- Product ID
-- Serial number
-- QR code
-- Purchase date
-- Purchase cost
-- Current status
-- Current location
-- Condition
-- Last inspection
-- Maintenance status
-- Notes
+- `id` — human-readable asset ID, e.g. `S03`
+- `product_id` — references `products.id`
+- `serial_number`
+- `status`
+- `purchase_date`
+- `purchase_cost`
+- `current_location`
+- `condition`
+- `unavailable_until`
+- `active`
+- `created_at`
+- `updated_at`
 
-Possible statuses:
-- Available
-- Reserved
-- Allocated
-- Out for delivery
-- Rented
-- Awaiting collection
-- Returned
-- Cleaning
-- Inspection
-- Maintenance
-- Retired
+Relationship:
+
+`physical_machines.product_id`
+→ `products.id`
+
+V1 machine statuses:
+
+- `available`
+- `reserved`
+- `allocated`
+- `rented`
+- `returned`
+- `inspection`
+- `cleaning`
+- `maintenance`
+- `retired`
+
+Operational concepts such as loaded, en-route, delivered and collection-due should normally belong to delivery/collection jobs rather than the machine status itself.
 
 ### Reservation
-Represents the customer's rental agreement / booking.
 
-Core information:
-- Reservation ID
-- Customer ID
-- Product ID
-- Quantity
-- Rental start date
-- Rental end date
-- Reservation status
-- Price
-- Delivery fee
-- Options
-- Deposit requirement
-- Payment status
-- Delivery address
-- Customer notes
-- Internal notes
-- Created date
+Represents one customer rental booking.
+
+Fields:
+
+- `id` — unique reservation ID
+- `customer_id` — references `customers.id`
+- `product_id` — references `products.id`
+- `quantity`
+- `rental_start`
+- `rental_end`
+- `status`
+- `delivery_address_line_1`
+- `delivery_address_line_2`
+- `delivery_postcode`
+- `delivery_city`
+- `delivery_zone`
+- `weekly_price_at_booking`
+- `delivery_fee`
+- `options_total`
+- `deposit_amount`
+- `total_amount`
+- `payment_status`
+- `customer_notes`
+- `internal_notes`
+- `created_at`
+- `updated_at`
+
+Relationships:
+
+`reservations.customer_id`
+→ `customers.id`
+
+`reservations.product_id`
+→ `products.id`
+
+The reservation stores the commercial details of that specific booking.
+
+Prices are copied into the reservation at booking time so that an old reservation does not change if IGLOUE later changes its normal product price.
+
+The delivery address belongs to the reservation, not the customer.
+
+V1 reservation statuses:
+
+- `pending`
+- `confirmed`
+- `ongoing`
+- `completed`
+- `cancelled`
+
+Payment status remains separate from reservation status.
 
 ### Allocation
+
 Connects a reservation to a specific physical machine.
 
-Example:
-Reservation IG-0042
-→ Product Frost 12
-→ Machine F12-003
+Fields:
 
-Core information:
-- Allocation ID
-- Reservation ID
-- Machine ID
-- Allocation date
-- Released date
-- Status
+- `id` — unique allocation ID
+- `reservation_id` — references `reservations.id`
+- `machine_id` — references `physical_machines.id`
+- `status`
+- `allocated_at`
+- `released_at`
+- `created_at`
+- `updated_at`
+
+Relationships:
+
+`allocations.reservation_id`
+→ `reservations.id`
+
+`allocations.machine_id`
+→ `physical_machines.id`
+
+An allocation is what turns a product-level booking into a real-world machine assignment.
+
+Example:
+
+Reservation `IG-0042`
+→ Product `split-12`
+→ Machine `S03`
+
+V1 allocation statuses:
+
+- `held`
+- `reserved`
+- `active`
+- `released`
+- `cancelled`
+
+A machine must not have overlapping active allocations.
 
 ### Delivery / Collection Job
-Represents an operational visit.
 
-Core information:
-- Job ID
-- Reservation ID
-- Job type: Delivery or Collection
-- Scheduled date
-- Time slot
-- Address
-- Status
-- Assigned staff
-- Assigned vehicle
-- Arrival time
-- Completion time
-- Notes
+Represents one operational visit linked to a reservation.
+
+A reservation will normally have:
+
+- one delivery job
+- one collection job
+
+Fields:
+
+- `id` — unique job ID
+- `reservation_id` — references `reservations.id`
+- `job_type`
+- `scheduled_date`
+- `time_slot`
+- `address_line_1`
+- `address_line_2`
+- `postcode`
+- `city`
+- `status`
+- `assigned_staff_id`
+- `assigned_vehicle_id`
+- `arrival_time`
+- `completion_time`
+- `notes`
+- `created_at`
+- `updated_at`
+
+Relationship:
+
+`service_jobs.reservation_id`
+→ `reservations.id`
+
+V1 job types:
+
+- `delivery`
+- `collection`
+
+V1 job statuses:
+
+- `scheduled`
+- `assigned`
+- `in_progress`
+- `completed`
+- `failed`
+- `cancelled`
+
+Delivery and collection must remain separate jobs even though they belong to the same reservation.
+
+Operational states such as en-route, delivered or awaiting collection should be handled by these jobs rather than mixed into the physical machine status.
 
 ### Inspection
-Represents a machine condition check.
 
-Core information:
-- Inspection ID
-- Machine ID
-- Reservation ID
-- Inspection type
-- Date
-- Condition
-- Damage found
-- Cleaning required
-- Maintenance required
-- Notes
+Represents a condition check carried out on a physical machine.
 
-Inspection types:
-- Pre-delivery
-- Delivery
-- Collection
-- Post-return
-- Maintenance
+Fields:
+
+- `id` — unique inspection ID
+- `machine_id` — references `physical_machines.id`
+- `reservation_id` — references `reservations.id`
+- `inspection_type`
+- `condition`
+- `damage_found`
+- `cleaning_required`
+- `maintenance_required`
+- `notes`
+- `inspected_at`
+- `created_at`
+- `updated_at`
+
+Relationships:
+
+`inspections.machine_id`
+→ `physical_machines.id`
+
+`inspections.reservation_id`
+→ `reservations.id`
+
+V1 inspection types:
+
+- `pre_delivery`
+- `delivery`
+- `collection`
+- `post_return`
+- `maintenance`
+
+An inspection records the condition of the exact machine at a specific point in the rental process.
+
+A returned machine must not become available again until the required post-return inspection has been completed and passed.
+
+If cleaning or maintenance is required, the machine remains unavailable until that work is completed and the machine is cleared for service.
 
 ### Photo
-Stores references to operational photos.
 
-Core information:
-- Photo ID
-- Reservation ID
-- Machine ID
-- Inspection ID
-- Photo type
-- File location
-- Date taken
-- Uploaded by
+Stores references to photos captured during IGLOUE operations.
+
+Fields:
+
+- `id` — unique photo ID
+- `reservation_id` — references `reservations.id`
+- `machine_id` — references `physical_machines.id`
+- `inspection_id` — references `inspections.id`
+- `photo_type`
+- `file_location`
+- `taken_at`
+- `uploaded_by`
+- `created_at`
+
+Relationships:
+
+`photos.reservation_id`
+→ `reservations.id`
+
+`photos.machine_id`
+→ `physical_machines.id`
+
+`photos.inspection_id`
+→ `inspections.id`
+
+V1 photo types:
+
+- `pre_delivery`
+- `delivery`
+- `installation`
+- `collection`
+- `damage`
+- `post_return`
+- `maintenance`
+
+Photos should be stored in file/object storage.
+
+The database should store the photo reference and metadata, not the actual image file itself.
+
+Photos provide evidence of machine condition, installation, delivery and collection.
 
 ### Signature
-Represents a customer or staff signature.
 
-Core information:
-- Signature ID
-- Reservation ID
-- Signature type
-- Signed by
-- Date
-- File / signature data reference
+Represents a customer or staff signature linked to a reservation.
 
-Signature types:
-- Delivery
-- Collection
-- Contract
+Fields:
+
+- `id` — unique signature ID
+- `reservation_id` — references `reservations.id`
+- `signature_type`
+- `signed_by_name`
+- `signed_by_role`
+- `file_location`
+- `signed_at`
+- `created_at`
+
+Relationship:
+
+`signatures.reservation_id`
+→ `reservations.id`
+
+V1 signature types:
+
+- `contract`
+- `delivery`
+- `collection`
+
+A signature proves that a specific action or document was acknowledged.
+
+The database should store the signature reference and metadata rather than embedding a large image directly in the reservation record.
+
+Delivery and collection signatures should remain separate so there is a clear audit trail for each stage of the rental.
 
 ### Payment
-Represents payment activity.
 
-Core information:
-- Payment ID
-- Reservation ID
-- Payment provider reference
-- Amount
-- Payment type
-- Status
-- Date
+Represents a financial transaction or payment authorisation linked to a reservation.
 
-Payment types:
-- Rental payment
-- Deposit / card guarantee
-- Extension
-- Damage charge
-- Refund
+Fields:
+
+- `id` — unique payment ID
+- `reservation_id` — references `reservations.id`
+- `provider`
+- `provider_reference`
+- `payment_type`
+- `amount`
+- `currency`
+- `status`
+- `paid_at`
+- `created_at`
+- `updated_at`
+
+Relationship:
+
+`payments.reservation_id`
+→ `reservations.id`
+
+V1 payment types:
+
+- `rental_payment`
+- `deposit_authorisation`
+- `extension`
+- `damage_charge`
+- `refund`
+
+V1 payment statuses:
+
+- `pending`
+- `authorised`
+- `paid`
+- `partially_refunded`
+- `refunded`
+- `failed`
+- `cancelled`
+
+Payment status must remain separate from reservation status.
+
+IGLOUE should store payment references and results from the payment provider, but must never store full card details.
+
+Stripe or another payment provider will remain responsible for secure card handling.
 
 ### Accessory / Kit
-Represents reusable accessories supplied with machines.
+
+Represents a reusable accessory or kit supplied with a rental.
 
 Examples:
-- Exhaust hose
-- Window kit
-- Remote control
-- Drain hose
-- Extension hose
 
-Core information:
-- Accessory ID
-- Type
-- Asset ID if individually tracked
-- Current status
-- Associated machine
-- Associated reservation
-- Condition
+- exhaust hose
+- window kit
+- remote control
+- drain hose
+- extension hose
 
-### Maintenance Record
-Represents work performed on a physical machine.
+Fields:
 
-Core information:
-- Maintenance ID
-- Machine ID
-- Date
-- Issue
-- Work completed
-- Cost
-- Performed by
-- Next action
-- Machine returned to service date
+- `id` — unique accessory ID
+- `accessory_type`
+- `asset_id`
+- `status`
+- `condition`
+- `associated_machine_id`
+- `associated_reservation_id`
+- `notes`
+- `created_at`
+- `updated_at`
+
+Relationships:
+
+`accessories.associated_machine_id`
+→ `physical_machines.id`
+
+`accessories.associated_reservation_id`
+→ `reservations.id`
+
+V1 accessory statuses:
+
+- `available`
+- `reserved`
+- `rented`
+- `returned`
+- `inspection`
+- `cleaning`
+- `maintenance`
+- `retired`
+
+Not every accessory needs its own asset ID.
+
+Cheap consumable items can remain untracked individually, while important reusable items can be given an asset ID and tracked like equipment.
+
+Accessories should not be assumed to be part of a machine permanently unless that relationship is explicitly recorded.
 
 ---
 
@@ -528,9 +765,6 @@ Allocation
 Reservation
 → has Delivery / Collection Jobs
 
-Physical Machine
-→ has Inspections
-
 Inspection
 → can have Photos
 
@@ -545,6 +779,107 @@ Reservation / Machine
 
 Physical Machine
 → has Maintenance Records
+
+## Existing Codebase Audit - 2026-09-12
+
+A read-only Codex audit was completed before backend development.
+
+All six existing test suites passed and the repository remained unchanged.
+
+### What Already Exists
+
+The current frontend already contains useful domain models for:
+
+- Product
+- Physical Machine
+- Reservation
+- Allocation
+- Delivery / Collection services
+- Availability
+- Reservation lifecycle
+- Fleet allocation
+- Pricing
+
+These existing concepts should be preserved and migrated behind the future backend rather than unnecessarily rebuilt.
+
+### What Does Not Yet Exist
+
+Production implementations are still required for:
+
+- Persistent database
+- Real Customer records
+- Secure backend API
+- Persistent reservations
+- Authoritative availability
+- Payment processing
+- Customer authentication / magic links
+- Photo storage
+- Signature capture
+- Inspection records
+- Persistent operational history
+
+Current operational and fleet information is developmental/mock data.
+
+### Important Audit Findings
+
+The future backend must establish a single source of truth for:
+
+- Product catalogue
+- Product pricing
+- Physical machine inventory
+- Availability
+- Delivery pricing
+- Reservation status
+- Machine allocation
+- Delivery / collection services
+- Date and time rules
+
+Known prototype inconsistencies include:
+
+- Configured inventory and mock physical fleet quantities differ
+- Product and delivery prices are duplicated in several places
+- Allocation records and reservation assigned-unit IDs can diverge
+- Customer and operations slot-capacity rules are not completely aligned
+- Setup terminology differs between parts of the code
+- Some business/date rules are duplicated
+
+These should be resolved gradually as backend authority replaces prototype data.
+
+### Backend Milestone 1
+
+Build the smallest persistent reservation and availability system.
+
+Success means:
+
+1. A customer can submit the existing normalized reservation draft.
+2. The backend validates the reservation.
+3. The reservation is stored persistently.
+4. The reservation survives browser reload.
+5. It appears in IGLOUE Operations.
+6. It affects availability consistently.
+7. Physical machine commitments cannot be double-booked.
+8. Cancelling the reservation releases its commitments.
+
+Backend Milestone 1 does NOT require:
+
+- Stripe
+- Magic-link customer accounts
+- QR codes
+- Photo uploads
+- Signatures
+- Full inspection workflow
+- Advanced routing
+- Advanced reporting
+
+These will be separate later milestones.
+
+### Backend Integration Principle
+
+The existing normalized reservation draft will be retained as the initial frontend-to-backend integration boundary.
+
+The frontend should progressively stop owning authoritative business data.
+
+The backend/database will become the source of truth, while the customer website and operations/admin interfaces consume that data.
 
 ## 10. Session Log
 
@@ -721,3 +1056,39 @@ Payment status answers:
 "Has the required money/payment authorisation been successfully handled?"
 
 These states must not be combined into one status field.
+
+### Availability And Turnaround Rules
+
+IGLOUE should support same-day turnaround.
+
+A fixed 24-hour turnaround buffer will NOT be required by default.
+
+Instead, a physical machine becomes available for another reservation only when:
+
+- the previous rental has ended
+- the machine has been collected or returned
+- the required post-return inspection has been completed
+- the machine has passed inspection
+- any required cleaning has been completed
+- the machine is not in maintenance
+- the machine status has returned to Available
+
+This allows a machine collected in the morning to be re-rented later the same day if it is inspected and cleared in time.
+
+A machine must never be considered available merely because the previous reservation end time has passed.
+
+### Availability Rule
+
+A machine is bookable only if:
+
+- it belongs to the requested product
+- it is active
+- it is not retired
+- it is not in maintenance
+- it is not in cleaning
+- it has no overlapping allocation that blocks the requested rental period
+- it will be available and cleared before the next reservation begins
+
+Product availability is calculated from the number of eligible physical machines.
+
+Manual stock quantities must not be used as the primary source of truth once individual machine tracking is active.
