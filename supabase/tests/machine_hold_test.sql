@@ -16,12 +16,14 @@ values
 -- Create one test customer.
 insert into public.customers (
     id,
+    organisation_id,
     first_name,
     last_name,
     email
 )
 values (
     '00000000-0000-0000-0000-000000000010',
+    (select id from public.organisations where slug = 'igloue'),
     'Machine',
     'Hold Test',
     'machine-hold-test@example.com'

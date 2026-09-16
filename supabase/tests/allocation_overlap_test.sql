@@ -29,12 +29,14 @@ values (
 
 insert into public.customers (
     id,
+    organisation_id,
     first_name,
     last_name,
     email
 )
 values (
     '00000000-0000-0000-0000-000000000001',
+    (select id from public.organisations where slug = 'igloue'),
     'Test',
     'Customer',
     'test@example.com'
