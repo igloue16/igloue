@@ -26,14 +26,14 @@ select is(
 );
 
 select ok(
-    not coalesce((
+    coalesce((
         select is_nullable = 'NO'
         from information_schema.columns
         where table_schema = 'public'
           and table_name = 'customers'
           and column_name = 'organisation_id'
     ), false),
-    'organisation_id remains nullable'
+    'organisation_id is not nullable'
 );
 
 select ok(
