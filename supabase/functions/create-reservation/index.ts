@@ -254,6 +254,20 @@ export default {
           error,
         );
 
+        if (
+          error.code === "P0001" &&
+          error.message === "No eligible machine available"
+        ) {
+          return Response.json(
+            {
+              error:
+                "No machine available for these dates",
+              code: "NO_MACHINE_AVAILABLE",
+            },
+            { status: 409 },
+          );
+        }
+
         return Response.json(
           {
             error:
