@@ -1,5 +1,20 @@
 import { IGLOUE_SERVER_PRICING } from "./pricing.ts";
 
+export const IGLOUE_SERVER_SERVICE_WINDOWS = Object.freeze([
+  { id: "0830-1030", startTime: "08:30", endTime: "10:30" },
+  { id: "1030-1230", startTime: "10:30", endTime: "12:30" },
+  { id: "1230-1430", startTime: "12:30", endTime: "14:30" },
+  { id: "1430-1630", startTime: "14:30", endTime: "16:30" },
+  { id: "1630-1830", startTime: "16:30", endTime: "18:30" },
+  { id: "1830-2030", startTime: "18:30", endTime: "20:30" },
+]);
+
+function isValidServiceWindowId(slotId: string) {
+  return IGLOUE_SERVER_SERVICE_WINDOWS.some(
+    (serviceWindow) => serviceWindow.id === slotId,
+  );
+}
+
 export function validateProductId(productId: unknown) {
   if (
     typeof productId !== "string" ||
@@ -236,7 +251,7 @@ export function validateServiceChoices(service: unknown) {
 
   if (
     typeof value.deliverySlotId !== "string" ||
-    value.deliverySlotId.trim() === ""
+    !isValidServiceWindowId(value.deliverySlotId.trim())
   ) {
     return {
       ok: false as const,
@@ -246,7 +261,7 @@ export function validateServiceChoices(service: unknown) {
 
   if (
     typeof value.collectionSlotId !== "string" ||
-    value.collectionSlotId.trim() === ""
+    !isValidServiceWindowId(value.collectionSlotId.trim())
   ) {
     return {
       ok: false as const,
