@@ -5,6 +5,9 @@ import {
   isServerProductAvailableInZone,
 } from "./delivery.ts";
 import {
+  buildServerOperationalPeriod,
+} from "./operations.ts";
+import {
   calculateServerBookingPrice,
   IGLOUE_SERVER_PRICING,
 } from "./pricing.ts";
@@ -133,6 +136,24 @@ export default {
         addressValidation.address;
       const rental = rentalValidation.rental;
       const service = serviceValidation.service;
+
+      const operationalPeriodResult =
+        buildServerOperationalPeriod(
+          rental.startDate,
+          service.deliverySlotId,
+          rental.endDate,
+          service.collectionSlotId,
+        );
+
+      if (!operationalPeriodResult.ok) {
+        return Response.json(
+          { error: operationalPeriodResult.error },
+          { status: 400 },
+        );
+      }
+
+      const operationalPeriod =
+        operationalPeriodResult.operationalPeriod;
 
       const deliveryZone =
         getServerDeliveryZoneByPostcode(
@@ -267,6 +288,7 @@ export default {
           },
           productId,
           rental,
+          operationalPeriod,
           deliveryZone: {
             id: deliveryZone.id,
             name: deliveryZone.name,
