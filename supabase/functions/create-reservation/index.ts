@@ -241,6 +241,10 @@ export default {
               service.collectionSlotId,
             p_idempotency_key:
               idempotencyKey,
+            p_operational_start:
+              operationalPeriod.operationalStart,
+            p_operational_end:
+              operationalPeriod.operationalEnd,
           },
         );
 
@@ -282,6 +286,8 @@ export default {
           ok: true,
           reservationId: created.reservation_id,
           customerId: created.customer_id,
+          allocationId: created.allocation_id,
+          machineId: created.machine_id,
           serviceJobs: {
             deliveryId: created.delivery_job_id,
             collectionId: created.collection_job_id,
