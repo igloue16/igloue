@@ -32,6 +32,7 @@ values (
 -- Create three reservations for the same product and period.
 insert into public.reservations (
     id,
+    organisation_id,
     customer_id,
     product_id,
     quantity,
@@ -47,6 +48,7 @@ insert into public.reservations (
 values
 (
     '00000000-0000-0000-0000-000000000201',
+    (select organisation_id from public.customers where id = '00000000-0000-0000-0000-000000000010'),
     '00000000-0000-0000-0000-000000000010',
     'essential',
     1,
@@ -61,6 +63,7 @@ values
 ),
 (
     '00000000-0000-0000-0000-000000000202',
+    (select organisation_id from public.customers where id = '00000000-0000-0000-0000-000000000010'),
     '00000000-0000-0000-0000-000000000010',
     'essential',
     1,
@@ -75,6 +78,7 @@ values
 ),
 (
     '00000000-0000-0000-0000-000000000203',
+    (select organisation_id from public.customers where id = '00000000-0000-0000-0000-000000000010'),
     '00000000-0000-0000-0000-000000000010',
     'essential',
     1,

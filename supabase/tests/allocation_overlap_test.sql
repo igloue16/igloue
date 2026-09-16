@@ -44,6 +44,7 @@ values (
 
 insert into public.reservations (
     id,
+    organisation_id,
     customer_id,
     product_id,
     quantity,
@@ -59,6 +60,7 @@ insert into public.reservations (
 values
 (
     '00000000-0000-0000-0000-000000000101',
+    (select organisation_id from public.customers where id = '00000000-0000-0000-0000-000000000001'),
     '00000000-0000-0000-0000-000000000001',
     'test-product',
     1,
@@ -73,6 +75,7 @@ values
 ),
 (
     '00000000-0000-0000-0000-000000000102',
+    (select organisation_id from public.customers where id = '00000000-0000-0000-0000-000000000001'),
     '00000000-0000-0000-0000-000000000001',
     'test-product',
     1,

@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(23);
 
 select ok(
     exists (
@@ -27,13 +27,13 @@ select is(
 
 select ok(
     coalesce((
-        select is_nullable = 'YES'
+        select is_nullable = 'NO'
         from information_schema.columns
         where table_schema = 'public'
           and table_name = 'reservations'
           and column_name = 'organisation_id'
     ), false),
-    'reservations.organisation_id remains nullable in Batch 6'
+    'reservations.organisation_id is NOT NULL'
 );
 
 select ok(
@@ -195,34 +195,18 @@ select throws_ok(
     'database rejects a reservation/customer organisation mismatch'
 );
 
-update public.reservations
-set organisation_id = null
-where idempotency_key = 'batch6-organisation-key-001';
-
-select throws_ok(
-    $$ select * from public.create_reservation_transaction(
-        'Batch6', 'Organisation', 'batch6-organisation@example.com', '0600000006',
-        'essential', '2026-12-10 12:00:00+00', '2026-12-13 12:00:00+00',
-        '6 Rue Batch6', null, '16000', 'Angouleme', 'local', 59, 29, 19,
-        250, 73.29, '2026-12-10', '0830-1030', '2026-12-13', '1630-1830',
-        'batch6-organisation-key-001', '2026-12-10 06:30:00',
-        '2026-12-13 22:30:00') $$,
-    'P0001', null,
-    'retry rejects NULL reservation ownership'
-);
-
 select is(
     (select count(*)::integer from public.reservations
      where idempotency_key = 'batch6-organisation-key-001'),
     1,
-    'failed ownership checks create no additional reservation'
+    'failed mismatch check creates no additional reservation'
 );
 
 select is(
     (select count(*)::integer from public.customers
      where email = 'batch6-organisation@example.com'),
     1,
-    'failed ownership checks create no additional customer'
+    'failed mismatch check creates no additional customer'
 );
 
 select ok(
@@ -232,7 +216,7 @@ select ok(
     and (select count(*)::integer from public.allocations a
          join public.reservations r on r.id = a.reservation_id
          where r.idempotency_key = 'batch6-organisation-key-001') = 1,
-    'failed ownership checks create no partial jobs or allocations'
+    'failed mismatch check creates no partial jobs or allocations'
 );
 
 select * from finish();

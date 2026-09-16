@@ -1,6 +1,6 @@
 begin;
 
-select plan(16);
+select plan(15);
 
 select ok(
     exists (
@@ -54,10 +54,10 @@ select ok(
 );
 
 select ok(
-    coalesce((select is_nullable = 'YES' from information_schema.columns
+    coalesce((select is_nullable = 'NO' from information_schema.columns
               where table_schema = 'public' and table_name = 'reservations'
                 and column_name = 'organisation_id'), false),
-    'reservations.organisation_id remains nullable'
+    'reservations.organisation_id is NOT NULL'
 );
 
 select ok(
@@ -119,7 +119,7 @@ select throws_ok(
     'mismatched customer and reservation organisation fails'
 );
 
-select lives_ok(
+select throws_ok(
     $$
         insert into public.reservations (
             id, customer_id, product_id, rental_start, rental_end,
@@ -132,7 +132,9 @@ select lives_ok(
             '7 Rue Batch7', '16000', 'Angouleme', 59, 250, 59
         )
     $$,
-    'NULL reservation organisation remains permitted in Batch 7'
+    '23502',
+    null,
+    'direct reservation insert without organisation_id fails'
 );
 
 insert into public.physical_machines (id, product_id, serial_number, status, active)
@@ -171,19 +173,6 @@ select * from public.create_reservation_transaction(
 select is((select reservation_id from batch7_retry_result), (select reservation_id from batch7_rpc_result), 'valid idempotent retry succeeds');
 
 select is((select customer_id from batch7_retry_result), (select customer_id from batch7_rpc_result), 'valid retry uses the same customer');
-
-update public.reservations set organisation_id = null where idempotency_key = 'batch7-rpc-key-001';
-
-select throws_ok(
-    $$ select * from public.create_reservation_transaction(
-        'Batch7', 'RPC', 'batch7-rpc@example.com', '0600000007', 'essential',
-        '2027-02-10 12:00:00+00', '2027-02-13 12:00:00+00', '7 Rue Batch7', null,
-        '16000', 'Angouleme', 'local', 59, 29, 19, 250, 73.29, '2027-02-10',
-        '0830-1030', '2027-02-13', '1630-1830', 'batch7-rpc-key-001',
-        '2027-02-10 06:30:00', '2027-02-13 22:30:00') $$,
-    'P0001', null,
-    'Batch 6 retry validation still rejects NULL ownership'
-);
 
 select is((select count(*)::integer from public.service_jobs j join public.reservations r on r.id = j.reservation_id where r.idempotency_key = 'batch7-rpc-key-001'), 2, 'service jobs remain correct');
 
