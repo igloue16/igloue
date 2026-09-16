@@ -184,20 +184,15 @@ select ok(
 insert into public.organisations (slug, name)
 values ('batch6-other', 'Batch 6 Other');
 
-update public.reservations
-set organisation_id = (select id from public.organisations where slug = 'batch6-other')
-where idempotency_key = 'batch6-organisation-key-001';
-
 select throws_ok(
-    $$ select * from public.create_reservation_transaction(
-        'Batch6', 'Organisation', 'batch6-organisation@example.com', '0600000006',
-        'essential', '2026-12-10 12:00:00+00', '2026-12-13 12:00:00+00',
-        '6 Rue Batch6', null, '16000', 'Angouleme', 'local', 59, 29, 19,
-        250, 73.29, '2026-12-10', '0830-1030', '2026-12-13', '1630-1830',
-        'batch6-organisation-key-001', '2026-12-10 06:30:00',
-        '2026-12-13 22:30:00') $$,
-    'P0001', null,
-    'retry rejects reservation/customer organisation mismatch'
+    $$
+        update public.reservations
+        set organisation_id = (select id from public.organisations where slug = 'batch6-other')
+        where idempotency_key = 'batch6-organisation-key-001'
+    $$,
+    '23503',
+    null,
+    'database rejects a reservation/customer organisation mismatch'
 );
 
 update public.reservations
