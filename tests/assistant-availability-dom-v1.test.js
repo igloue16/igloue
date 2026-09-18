@@ -142,7 +142,7 @@ context.window = context;
   "pricing.js", "delivery.js", "schedule-provider.js", "bookings-provider.js",
   "availability.js", "reservation.js", "products.js", "inventory.js",
   "fleet.js", "fleet-allocation.js", "calendar.js", "supabase-config.js",
-  "availability-state.js", "assistant.js"
+  "availability-state.js", "alternative-availability-state.js", "assistant.js"
 ].forEach((filename) => {
   vm.runInContext(fs.readFileSync(path.join(root, "assets/js", filename), "utf8"), context, { filename });
 });
@@ -203,6 +203,157 @@ assert.equal(assistantRoot.querySelector("[data-assistant-stage=\"recommendation
 assert.equal(vm.runInContext("assistantState.availability.status", context), "available");
 assert.equal(vm.runInContext("assistantState.availability.key", context), "essential|2027-07-12|2027-07-19|0830-1030|1630-1830");
 assert.equal(calls.length, 1);
+assert.equal(
+  vm.runInContext("alternativeAvailabilityState.getState().status", context),
+  "idle",
+  "an available ideal product does not trigger alternative checks"
+);
 
-console.log("Assistant availability DOM flow passed (9 assertions).");
+const alternativeCalls = [];
+let resolveIdealUnavailable;
+let resolveMobileDuo;
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    alternativeCalls.push({ ...selection });
+    if (selection.productId === "essential") {
+      return new Promise((resolve) => { resolveIdealUnavailable = resolve; });
+    }
+    return new Promise((resolve) => { resolveMobileDuo = resolve; });
+  }
+};
+
+vm.runInContext(`
+  availabilityState.reset();
+  alternativeAvailabilityState.reset();
+  assistantState.recommendedProduct = getProductById("essential");
+  assistantState.idealProduct = assistantState.recommendedProduct;
+  showDatesStage(false);
+`, context);
+
+const unavailableContinue = assistantRoot.querySelector("[data-dates-continue]");
+assert.ok(unavailableContinue, "the unavailable flow starts from the real Continue control");
+unavailableContinue.click();
+await Promise.resolve();
+assert.equal(alternativeCalls.length, 1, "the ideal product availability check starts first");
+resolveIdealUnavailable({ status: "unavailable", available: false, productId: "essential" });
+await new Promise((resolve) => setImmediate(resolve));
+assert.match(
+  assistantRoot.innerHTML,
+  /Nous vérifions les alternatives/,
+  "the assistant shows the alternative checking state"
+);
+assert.equal(alternativeCalls.length, 2, "the suitable alternative check follows the ideal result");
+assert.deepEqual(alternativeCalls[1], {
+  productId: "mobile-duo",
+  startDate: "2027-07-12",
+  endDate: "2027-07-19",
+  deliverySlotId: "0830-1030",
+  collectionSlotId: "1630-1830"
+});
+resolveMobileDuo({ status: "available", available: true, productId: "mobile-duo" });
+await new Promise((resolve) => setImmediate(resolve));
+for (const callback of animationCallbacks.splice(0)) callback();
+
+const alternativeButton = assistantRoot.querySelector("[data-select-alternative]");
+assert.ok(alternativeButton, "a server-confirmed alternative is rendered");
+alternativeButton.click();
+assert.equal(
+  vm.runInContext("assistantState.recommendedProduct.id", context),
+  "mobile-duo"
+);
+assert.equal(
+  vm.runInContext("assistantState.availability.key", context),
+  "mobile-duo|2027-07-12|2027-07-19|0830-1030|1630-1830",
+  "the confirmed alternative is promoted to the primary exact availability key"
+);
+assert.equal(alternativeCalls.length, 2, "selecting a confirmed alternative does not recheck it");
+
+function resetDatesForBranch({ productId = "essential", roomArea = 20, openingType = "casement" } = {}) {
+  vm.runInContext(`
+    availabilityState.reset();
+    alternativeAvailabilityState.reset();
+    assistantState.roomArea = ${roomArea};
+    assistantState.openingType = "${openingType}";
+    assistantState.recommendedProduct = getProductById("${productId}");
+    assistantState.idealProduct = assistantState.recommendedProduct;
+    showDatesStage(false);
+  `, context);
+}
+
+const allUnavailableCalls = [];
+let resolveUnavailableIdeal;
+let resolveUnavailableAlternative;
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    allUnavailableCalls.push({ ...selection });
+    if (selection.productId === "essential") {
+      return new Promise((resolve) => { resolveUnavailableIdeal = resolve; });
+    }
+    return new Promise((resolve) => { resolveUnavailableAlternative = resolve; });
+  }
+};
+resetDatesForBranch();
+assistantRoot.querySelector("[data-dates-continue]").click();
+await Promise.resolve();
+resolveUnavailableIdeal({ status: "unavailable", available: false, productId: "essential" });
+await new Promise((resolve) => setImmediate(resolve));
+resolveUnavailableAlternative({ status: "unavailable", available: false, productId: "mobile-duo" });
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(assistantRoot.querySelector("[data-select-alternative]"), null, "unavailable alternatives are not offered");
+assert.match(assistantRoot.innerHTML, /Aucun modèle adapté disponible/, "no-stock wording appears after all checks finish");
+assert.doesNotMatch(assistantRoot.innerHTML, /ne peut pas être vérifiée/, "all-unavailable is not shown as a technical error");
+
+let retryCalls = 0;
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    retryCalls += 1;
+    return Promise.resolve(
+      selection.productId === "essential"
+        ? { status: "unavailable", available: false, productId: selection.productId }
+        : { status: "error", available: null, productId: selection.productId }
+    );
+  }
+};
+resetDatesForBranch();
+assistantRoot.querySelector("[data-dates-continue]").click();
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(retryCalls, 2, "all-error branch checks each suitable candidate once");
+assert.match(assistantRoot.innerHTML, /Réessayer/, "all-error branch exposes a retry action");
+assert.doesNotMatch(assistantRoot.innerHTML, /Aucun modèle adapté disponible/, "technical errors never become no-stock wording");
+assistantRoot.querySelector("[data-retry-alternatives]").click();
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(retryCalls, 3, "retry performs a fresh real alternative check");
+
+let mixedCalls = 0;
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    mixedCalls += 1;
+    if (selection.productId === "mobile-duo") {
+      return Promise.resolve({ status: "unavailable", available: false, productId: selection.productId });
+    }
+    if (selection.productId === "split-12") {
+      return Promise.resolve({ status: "available", available: true, productId: selection.productId });
+    }
+    return Promise.resolve({ status: "error", available: null, productId: selection.productId });
+  }
+};
+resetDatesForBranch({ productId: "mobile-duo", roomArea: 21 });
+assistantRoot.querySelector("[data-dates-continue]").click();
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(mixedCalls, 3, "mixed branch checks the ideal and both suitable adjacent candidates");
+assert.ok(assistantRoot.querySelector("[data-select-alternative=\"split-12\"]"), "confirmed available alternative is shown");
+assert.match(assistantRoot.innerHTML, /ne peut pas être vérifiée/, "technical uncertainty remains visible");
+assistantRoot.querySelector("[data-select-alternative=\"split-12\"]").click();
+assert.equal(vm.runInContext("assistantState.availability.key", context), "split-12|2027-07-12|2027-07-19|0830-1030|1630-1830");
+assert.equal(mixedCalls, 3, "selecting the confirmed alternative does not duplicate its request");
+
+vm.runInContext(`
+  assistantState.roomArea = 20;
+  assistantState.openingType = "terrace";
+  assistantState.recommendedProduct = getProductById("essential");
+  assistantState.idealProduct = assistantState.recommendedProduct;
+`, context);
+assert.equal(vm.runInContext("getAlternativeCandidates().length", context), 0, "unsuitable adjacent products are filtered without searching farther");
+
+console.log("Assistant availability DOM flow passed (34 assertions).");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

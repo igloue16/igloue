@@ -304,7 +304,13 @@ const ASSISTANT_I18N = {
       unavailableHeading: "Notre recommandation n’est plus disponible",
 
       unavailableText: (product) =>
-        `Nous vous recommanderions normalement ${product} pour cette configuration, mais tous nos appareils de ce modèle sont déjà réservés pour vos dates.`,
+        `Nous vous recommanderions normalement ${product} pour cette configuration, mais ce modèle n’est pas disponible pour vos dates.`,
+
+      checkingAlternatives:
+        "Nous vérifions les alternatives disponibles pour vos dates…",
+
+      alternativeCheckError:
+        "La disponibilité des alternatives ne peut pas être vérifiée pour le moment. Réessayez.",
 
       largerAlternative:
         "Plus puissant que nécessaire, mais parfaitement capable de rafraîchir votre pièce.",
@@ -385,6 +391,11 @@ const assistantHistory = [];
 
 const availabilityState =
   globalThis.IGLOUE_AVAILABILITY_STATE.create((selection) =>
+    globalThis.IGLOUE_AVAILABILITY_CLIENT.checkAvailability(selection)
+  );
+
+const alternativeAvailabilityState =
+  globalThis.IGLOUE_ALTERNATIVE_AVAILABILITY_STATE.create((selection) =>
     globalThis.IGLOUE_AVAILABILITY_CLIENT.checkAvailability(selection)
   );
 
@@ -501,6 +512,7 @@ function invalidateRecommendation() {
   assistantState.idealProduct = null;
   assistantState.pricing = null;
   availabilityState.reset();
+  alternativeAvailabilityState.reset();
   assistantState.availability = availabilityState.getState();
   assistantState.requiresAssessment = false;
 }
@@ -2506,6 +2518,7 @@ function showDatesStage(
 
         assistantState[stateProperty] = selectedSlotId;
         availabilityState.reset();
+        alternativeAvailabilityState.reset();
         assistantState.availability = availabilityState.getState();
         showSlotNotice("");
         renderServiceSlots();
@@ -2661,6 +2674,7 @@ function showDatesStage(
       } else {
         assistantState.pricing = null;
         availabilityState.reset();
+        alternativeAvailabilityState.reset();
         assistantState.availability = availabilityState.getState();
       }
 
@@ -2811,6 +2825,7 @@ function calculateAvailability({ forceAvailability = false } = {}) {
 
   if (!product || !availabilityState.isComplete(selection)) {
     availabilityState.reset();
+    alternativeAvailabilityState.reset();
     assistantState.availability = availabilityState.getState();
     return Promise.resolve(assistantState.availability);
   }
@@ -2841,6 +2856,87 @@ function isCurrentAvailabilityResult(result) {
     assistantState.availability.key === result.key;
 }
 
+function getAlternativeSelection() {
+  return {
+    startDate: assistantState.startDate,
+    endDate: assistantState.endDate,
+    deliverySlotId: assistantState.deliverySlotId,
+    collectionSlotId: assistantState.collectionSlotId
+  };
+}
+
+function getAlternativeCandidates() {
+  const idealProduct = getIdealProduct();
+
+  if (!idealProduct) {
+    return [];
+  }
+
+  const smallerProduct = getPreviousProduct(idealProduct.id);
+  const largerProduct = getNextProduct(idealProduct.id);
+  const candidates = [largerProduct, smallerProduct];
+
+  return candidates.filter((product, index) => {
+    if (!product || !isProductAvailableForPostcode(product.id, assistantState.postcode)) {
+      return false;
+    }
+
+    if (
+      assistantState.openingType !== "unsure" &&
+      !productSupportsOpening(product, assistantState.openingType)
+    ) {
+      return false;
+    }
+
+    if (getAvailableSetupModes(product).length === 0) {
+      return false;
+    }
+
+    if (index === 1 && product.maxRoomSize) {
+      return assistantState.roomArea <= product.maxRoomSize * 1.15;
+    }
+
+    if (
+      product.maxRoomSize &&
+      assistantState.roomArea > product.maxRoomSize &&
+      !product.requiresAssessmentAbove
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function startAlternativeAvailabilityChecks() {
+  const candidates = getAlternativeCandidates();
+  const selection = getAlternativeSelection();
+  const promise = alternativeAvailabilityState.check(selection, candidates);
+
+  promise.then((result) => {
+    const currentSelection = getAlternativeSelection();
+    const currentKey =
+      globalThis.IGLOUE_ALTERNATIVE_AVAILABILITY_STATE.candidateKey(
+        currentSelection,
+        candidates
+      );
+
+    if (
+      result &&
+      result.key === currentKey &&
+      alternativeAvailabilityState.getState().key === currentKey &&
+      assistantState.availability.status === "unavailable"
+    ) {
+      showUnavailableRecommendation(false);
+    }
+  });
+
+  return {
+    candidates,
+    promise
+  };
+}
+
 function showUnavailableRecommendation(
   addToHistory = true
 ) {
@@ -2867,55 +2963,79 @@ function showUnavailableRecommendation(
     return;
   }
 
+  const alternativeCandidates = getAlternativeCandidates();
+  const alternativeState = alternativeAvailabilityState.getState();
+  const alternativeKey =
+    globalThis.IGLOUE_ALTERNATIVE_AVAILABILITY_STATE.candidateKey(
+      getAlternativeSelection(),
+      alternativeCandidates
+    );
+
+  if (
+    alternativeState.key !== alternativeKey ||
+    alternativeState.status === "idle"
+  ) {
+    startAlternativeAvailabilityChecks();
+  }
+
+  const currentAlternativeState = alternativeAvailabilityState.getState();
+
+  if (currentAlternativeState.status === "checking") {
+    const checkingAssistant = renderAssistant(
+      renderStageShell({
+        stage: 5,
+        mascotState: "unavailable",
+        isResult: true,
+        content: `
+          ${renderBackControl()}
+
+          <span class="assistant-step-label">Disponibilité</span>
+
+          <h2 data-assistant-heading tabindex="-1">
+            ${copy.unavailableHeading}
+          </h2>
+
+          <p>${copy.unavailableText(idealProduct.name)}</p>
+
+          <p class="assistant-note" role="status">
+            ${copy.checkingAlternatives}
+          </p>
+        `
+      })
+    );
+
+    connectBackControl(checkingAssistant);
+    return;
+  }
+
   const alternatives = [];
 
-  if (
-    availability.largerAlternative
-  ) {
-    alternatives.push({
-      product:
-        availability.largerAlternative,
-
-      type: "larger",
-
-      explanation:
-        copy.largerAlternative
-    });
-  }
-
-  /*
-    Only offer the smaller machine when
-    the customer's room is reasonably
-    close to that machine's intended range.
-
-    We currently allow up to 15% above
-    its normal room-size recommendation.
-  */
-  if (
-    availability.smallerAlternative
-  ) {
-    const smaller =
-      availability.smallerAlternative;
-
-    const maximumCompromiseArea =
-      smaller.maxRoomSize
-        ? smaller.maxRoomSize * 1.15
-        : 0;
-
-    if (
-      assistantState.roomArea <=
-      maximumCompromiseArea
-    ) {
-      alternatives.push({
-        product: smaller,
-
-        type: "smaller",
-
-        explanation:
-          copy.smallerAlternative
-      });
+  currentAlternativeState.results.forEach((result) => {
+    if (result.status !== "available" || !result.available) {
+      return;
     }
-  }
+
+    const product = getProductById(result.productId);
+    if (!product) {
+      return;
+    }
+
+    const isLarger =
+      IGLOUE_PRODUCTS.findIndex((candidate) => candidate.id === product.id) >
+      IGLOUE_PRODUCTS.findIndex((candidate) => candidate.id === idealProduct.id);
+
+    alternatives.push({
+      product,
+      type: isLarger ? "larger" : "smaller",
+      explanation: isLarger
+        ? copy.largerAlternative
+        : copy.smallerAlternative
+    });
+  });
+
+  const hasAlternativeError = currentAlternativeState.results.some(
+    (result) => result.status === "error"
+  );
 
   const alternativesMarkup =
     alternatives.length
@@ -2959,14 +3079,27 @@ function showUnavailableRecommendation(
       : `
         <div class="assistant-note">
           <strong>
-            ${copy.noAlternativeHeading}
+            ${hasAlternativeError
+              ? copy.alternativeCheckError
+              : copy.noAlternativeHeading}
           </strong>
 
           <br>
 
-          ${copy.noAlternativeText}
+          ${hasAlternativeError
+            ? copy.alternativeCheckError
+            : copy.noAlternativeText}
+
+          ${hasAlternativeError
+            ? '<button class="assistant-next" type="button" data-retry-alternatives>Réessayer</button>'
+            : ''}
         </div>
       `;
+
+  const alternativeErrorNotice =
+    hasAlternativeError && alternatives.length
+      ? `<p class="assistant-note" role="status">${copy.alternativeCheckError}</p>`
+      : "";
 
   const assistant =
     renderAssistant(
@@ -3022,12 +3155,24 @@ function showUnavailableRecommendation(
             )}
           </p>
 
+          ${alternativeErrorNotice}
+
           ${alternativesMarkup}
         `
       })
     );
 
   connectBackControl(assistant);
+
+  const retryAlternativesButton =
+    assistant.querySelector("[data-retry-alternatives]");
+
+  if (retryAlternativesButton) {
+    retryAlternativesButton.addEventListener("click", () => {
+      alternativeAvailabilityState.reset();
+      showUnavailableRecommendation(false);
+    });
+  }
 
   assistant
     .querySelectorAll(
@@ -3047,6 +3192,20 @@ function showUnavailableRecommendation(
             return;
           }
 
+          const confirmedAlternative =
+            alternativeAvailabilityState
+              .getState()
+              .results
+              .find((result) => (
+                result.productId === product.id &&
+                result.status === "available" &&
+                result.available === true
+              ));
+
+          if (!confirmedAlternative) {
+            return;
+          }
+
           assistantState
             .recommendedProduct =
               product;
@@ -3056,7 +3215,17 @@ function showUnavailableRecommendation(
             selected a fallback product.
           */
           assistantState.availability = {
-            ...assistantState.availability,
+            status: "available",
+            key: [
+              product.id,
+              assistantState.startDate,
+              assistantState.endDate,
+              assistantState.deliverySlotId,
+              assistantState.collectionSlotId
+            ].map((value) => String(value || "")).join("|"),
+            productId: product.id,
+            available: true,
+            error: "",
             selectedAsAlternative: true
           };
 
@@ -3609,6 +3778,7 @@ function selectProductChoice(productId) {
   });
 
   availabilityState.reset();
+  alternativeAvailabilityState.reset();
   assistantState.availability = availabilityState.getState();
 
   updateSelectedProductAssessment(product);
