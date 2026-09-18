@@ -1,0 +1,266 @@
+import {
+  getServerDeliveryZoneByPostcode,
+  isServerProductAvailableInZone,
+} from "./delivery.ts";
+import { buildServerOperationalPeriod } from "./operations.ts";
+import { calculateServerBookingPrice, IGLOUE_SERVER_PRICING } from "./pricing.ts";
+import {
+  validateCustomer,
+  validateDeliveryAddress,
+  validateProductId,
+  validateRentalDates,
+  validateServiceChoices,
+} from "./validation.ts";
+
+const MAX_BODY_BYTES = 16 * 1024;
+const CORS_HEADERS = Object.freeze({
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST, OPTIONS",
+  "access-control-allow-headers": "apikey, content-type, x-client-info",
+  "access-control-max-age": "86400",
+});
+
+export type ReservationRpcClient = {
+  rpc(name: string, parameters: Record<string, unknown>): Promise<{
+    data: unknown;
+    error: { code?: string; message?: string } | null;
+  }>;
+};
+
+type Dependencies = {
+  supabaseAdmin: ReservationRpcClient;
+  now?: Date;
+  logError?: (...args: unknown[]) => void;
+};
+
+function response(body: unknown, status: number) {
+  return Response.json(body, { status, headers: CORS_HEADERS });
+}
+
+function errorResponse(status: number, code: string) {
+  return response({ ok: false, error: { code } }, status);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]) {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function readBoundedJson(request: Request): Promise<unknown> {
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength && Number(declaredLength) > MAX_BODY_BYTES) {
+    throw new Error("PAYLOAD_TOO_LARGE");
+  }
+  if (!request.body) {
+    return null;
+  }
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new Error("PAYLOAD_TOO_LARGE");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error("INVALID_REQUEST");
+  }
+}
+
+function validationError(result: { code?: string }) {
+  return result.code || "INVALID_REQUEST";
+}
+
+function holdExpiry(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
+}
+
+export function createOptionsResponse() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+export async function handleReservationRequest(
+  request: Request,
+  dependencies: Dependencies,
+) {
+  if (request.method === "OPTIONS") return createOptionsResponse();
+  if (request.method !== "POST") {
+    return errorResponse(405, "METHOD_NOT_ALLOWED");
+  }
+
+  let body: unknown;
+  try {
+    body = await readBoundedJson(request);
+  } catch (error) {
+    if (error instanceof Error && error.message === "PAYLOAD_TOO_LARGE") {
+      return errorResponse(413, "PAYLOAD_TOO_LARGE");
+    }
+    return errorResponse(400, "INVALID_REQUEST");
+  }
+
+  if (!isObject(body) || !hasOnlyKeys(body, [
+    "idempotencyKey", "customer", "productId", "deliveryAddress", "rental", "service",
+  ])) {
+    return errorResponse(400, "INVALID_REQUEST");
+  }
+  const idempotencyKey = typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
+  if (!idempotencyKey || idempotencyKey.length > 200) {
+    return errorResponse(400, "INVALID_REQUEST");
+  }
+
+  if (isObject(body.customer) && !hasOnlyKeys(body.customer, ["firstName", "lastName", "email", "phone"])) {
+    return errorResponse(400, "INVALID_CUSTOMER");
+  }
+  if (isObject(body.deliveryAddress) && !hasOnlyKeys(body.deliveryAddress, ["line1", "line2", "postcode", "city"])) {
+    return errorResponse(400, "INVALID_ADDRESS");
+  }
+  if (isObject(body.rental) && !hasOnlyKeys(body.rental, ["startDate", "endDate"])) {
+    return errorResponse(400, "INVALID_DATES");
+  }
+  if (isObject(body.service) && !hasOnlyKeys(body.service, ["deliverySlotId", "collectionSlotId", "setupMode", "expressSelected"])) {
+    return errorResponse(400, "INVALID_REQUEST");
+  }
+
+  const customerValidation = validateCustomer(body.customer);
+  if (!customerValidation.ok) return errorResponse(400, validationError(customerValidation));
+  const productValidation = validateProductId(body.productId);
+  if (!productValidation.ok) return errorResponse(400, validationError(productValidation));
+  const productId = productValidation.productId;
+  const addressValidation = validateDeliveryAddress(body.deliveryAddress);
+  if (!addressValidation.ok) return errorResponse(400, validationError(addressValidation));
+  const rentalValidation = validateRentalDates(body.rental, dependencies.now ?? new Date());
+  if (!rentalValidation.ok) return errorResponse(400, validationError(rentalValidation));
+  const serviceValidation = validateServiceChoices(body.service, productId);
+  if (!serviceValidation.ok) return errorResponse(400, validationError(serviceValidation));
+
+  const operationalPeriodResult = buildServerOperationalPeriod(
+    rentalValidation.rental.startDate,
+    serviceValidation.service.deliverySlotId,
+    rentalValidation.rental.endDate,
+    serviceValidation.service.collectionSlotId,
+  );
+  if (!operationalPeriodResult.ok) return errorResponse(400, "INVALID_SERVICE_WINDOW");
+
+  const deliveryZone = getServerDeliveryZoneByPostcode(addressValidation.address.postcode);
+  if (!deliveryZone) return errorResponse(400, "INVALID_ADDRESS");
+  if (!isServerProductAvailableInZone(productId, deliveryZone.id)) {
+    return errorResponse(400, "INVALID_PRODUCT");
+  }
+
+  const pricing = calculateServerBookingPrice({
+    productId: productId as keyof typeof IGLOUE_SERVER_PRICING.products,
+    nights: rentalValidation.rental.nights,
+    deliveryFee: deliveryZone.price,
+    setupMode: serviceValidation.service.setupMode as keyof typeof IGLOUE_SERVER_PRICING.setup,
+    expressSelected: serviceValidation.service.expressSelected,
+  });
+
+  let data: unknown;
+  let error: { code?: string; message?: string } | null;
+  try {
+    ({ data, error } = await dependencies.supabaseAdmin.rpc("create_reservation_transaction", {
+    p_first_name: customerValidation.customer.firstName,
+    p_last_name: customerValidation.customer.lastName,
+    p_email: customerValidation.customer.email,
+    p_phone: customerValidation.customer.phone,
+    p_product_id: productId,
+    p_rental_start: `${rentalValidation.rental.startDate}T12:00:00Z`,
+    p_rental_end: `${rentalValidation.rental.endDate}T12:00:00Z`,
+    p_delivery_address_line_1: addressValidation.address.line1,
+    p_delivery_address_line_2: addressValidation.address.line2,
+    p_delivery_postcode: addressValidation.address.postcode,
+    p_delivery_city: addressValidation.address.city,
+    p_delivery_zone: deliveryZone.id,
+    p_weekly_price_at_booking: pricing.weeklyPrice,
+    p_delivery_fee: pricing.deliveryFee,
+    p_options_total: pricing.setupPrice + pricing.expressPrice,
+    p_deposit_amount: pricing.depositAmount,
+    p_total_amount: pricing.totalAmount,
+    p_delivery_date: rentalValidation.rental.startDate,
+    p_delivery_time_slot: serviceValidation.service.deliverySlotId,
+    p_collection_date: rentalValidation.rental.endDate,
+    p_collection_time_slot: serviceValidation.service.collectionSlotId,
+    p_idempotency_key: idempotencyKey,
+    p_operational_start: operationalPeriodResult.operationalPeriod.operationalStart,
+    p_operational_end: operationalPeriodResult.operationalPeriod.operationalEnd,
+    }));
+  } catch (exception) {
+    dependencies.logError?.("create_reservation_transaction threw", exception);
+    return errorResponse(500, "INTERNAL_ERROR");
+  }
+
+  if (error) {
+    dependencies.logError?.("create_reservation_transaction failed", error);
+    if (error.code === "P0003") {
+      return errorResponse(409, "IDEMPOTENCY_CONFLICT");
+    }
+    if (
+      error.code === "P0001" && error.message === "No eligible machine available" ||
+      error.code === "23P01"
+    ) return errorResponse(409, "NO_MACHINE_AVAILABLE");
+    return errorResponse(500, "INTERNAL_ERROR");
+  }
+
+  const created = Array.isArray(data) ? data[0] : data;
+  if (!isObject(created) || typeof created.reservation_id !== "string" || typeof created.reservation_status !== "string") {
+    dependencies.logError?.("create_reservation_transaction returned malformed data");
+    return errorResponse(500, "INTERNAL_ERROR");
+  }
+  if (created.reservation_status === "cancelled") {
+    return errorResponse(409, "RESERVATION_EXPIRED");
+  }
+  if (!["pending", "confirmed", "ongoing", "completed"].includes(created.reservation_status)) {
+    return errorResponse(503, "RESERVATION_UNAVAILABLE");
+  }
+  const expires = created.reservation_status === "pending"
+    ? holdExpiry(created.hold_expires_at)
+    : null;
+  if (created.reservation_status === "pending") {
+    if (!expires) return errorResponse(503, "RESERVATION_UNAVAILABLE");
+    const now = (dependencies.now ?? new Date()).getTime();
+    if (Date.parse(expires) <= now) return errorResponse(409, "RESERVATION_EXPIRED");
+  }
+
+  return response({
+    ok: true,
+    reservation: {
+      reference: created.reservation_id,
+      status: created.reservation_status,
+      holdExpiresAt: expires,
+    },
+    productId,
+    rental: rentalValidation.rental,
+    deliveryZone: { name: deliveryZone.name },
+    pricing: {
+      currency: pricing.currency,
+      rentalPrice: pricing.rentalPrice,
+      deliveryFee: pricing.deliveryFee,
+      setupPrice: pricing.setupPrice,
+      expressPrice: pricing.expressPrice,
+      totalAmount: pricing.totalAmount,
+      depositAmount: pricing.depositAmount,
+    },
+  }, 201);
+}
