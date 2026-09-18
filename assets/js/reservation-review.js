@@ -55,29 +55,26 @@ function getReservationReviewOpeningLabel(openingType) {
 function validateReservationOperationalData(draft) {
   const issues = [];
   const product = getProductById(draft.product.selectedProductId);
-  const productInventoryAvailable = Boolean(
-    product &&
-    isProductAvailableForDates(
-      product.id,
-      draft.rental.deliveryDate,
-      draft.rental.collectionDate
-    )
-  );
-  const fleetAvailability =
-    productInventoryAvailable &&
-    typeof getProductFleetAvailability === "function"
-      ? getProductFleetAvailability(product.id, draft)
-      : null;
+  const realAvailabilityKey = [
+    draft.product.selectedProductId,
+    draft.rental.deliveryDate,
+    draft.rental.collectionDate,
+    draft.delivery.slotId,
+    draft.collection.slotId
+  ].map((value) => String(value || "")).join("|");
+  const realAvailability = assistantState.availability;
 
   if (
-    !productInventoryAvailable ||
-    (fleetAvailability && !fleetAvailability.canAllocate)
+    !product ||
+    !realAvailability ||
+    realAvailability.status !== "available" ||
+    realAvailability.key !== realAvailabilityKey
   ) {
     issues.push({
-      code: "product-unavailable",
+      code: "availability-not-confirmed",
       section: "product",
       message:
-        "Ce modèle n'est plus disponible pour ces dates. Choisissez une alternative."
+        "La disponibilité doit être vérifiée avant de poursuivre."
     });
   }
 
@@ -149,16 +146,16 @@ function routeReservationReviewIssue(issue) {
   }
 
   if (issue.section === "product") {
-    calculateAvailability();
-
-    if (
-      assistantState.availability &&
-      !assistantState.availability.idealAvailable
-    ) {
-      showUnavailableRecommendation();
-    } else {
-      showRecommendationResult(false);
-    }
+    calculateAvailability({ forceAvailability: true }).then((availability) => {
+      if (availability.status === "available") {
+        showRecommendationResult(false);
+      } else if (availability.status === "unavailable") {
+        showUnavailableRecommendation(false);
+      } else {
+        assistantState.serviceSlotNotice = issue.message;
+        showDatesStage(false);
+      }
+    });
     return;
   }
 

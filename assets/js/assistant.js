@@ -370,12 +370,23 @@ const assistantState = {
 
   pricing: null,
 
-availability: null,
+  availability: {
+    status: "idle",
+    key: "",
+    productId: null,
+    available: null,
+    error: ""
+  },
 
-requiresAssessment: false
+  requiresAssessment: false
 };
 
 const assistantHistory = [];
+
+const availabilityState =
+  globalThis.IGLOUE_AVAILABILITY_STATE.create((selection) =>
+    globalThis.IGLOUE_AVAILABILITY_CLIENT.checkAvailability(selection)
+  );
 
 const roomTypeIds = [
   "bedroom",
@@ -489,8 +500,9 @@ function invalidateRecommendation() {
   assistantState.recommendedProduct = null;
   assistantState.idealProduct = null;
   assistantState.pricing = null;
-assistantState.availability = null;
-assistantState.requiresAssessment = false;
+  availabilityState.reset();
+  assistantState.availability = availabilityState.getState();
+  assistantState.requiresAssessment = false;
 }
 
 function renderProgress(activeStep, isResult = false) {
@@ -2493,6 +2505,8 @@ function showDatesStage(
         const selectedSlotId = button.dataset.slotId;
 
         assistantState[stateProperty] = selectedSlotId;
+        availabilityState.reset();
+        assistantState.availability = availabilityState.getState();
         showSlotNotice("");
         renderServiceSlots();
 
@@ -2646,7 +2660,8 @@ function showDatesStage(
         calculateRecommendation();
       } else {
         assistantState.pricing = null;
-        assistantState.availability = null;
+        availabilityState.reset();
+        assistantState.availability = availabilityState.getState();
       }
 
       updateDateSummary(startDate, endDate);
@@ -2747,46 +2762,83 @@ function showDatesStage(
         return;
       }
 
-      calculateRecommendation();
+      const forceAvailability =
+        assistantState.availability.status === "error";
+      const availabilityPromise =
+        calculateRecommendation({ forceAvailability });
 
-      if (
-        assistantState.availability &&
-        !assistantState
-          .availability
-          .idealAvailable
-      ) {
+      if (assistantState.availability.status === "checking") {
+        continueButton.disabled = true;
+        error.textContent =
+          "Vérification de la disponibilité…";
+        error.hidden = false;
+
+        availabilityPromise.then((availability) => {
+          continueButton.disabled = false;
+          if (!isCurrentAvailabilityResult(availability)) {
+            return;
+          }
+          if (availability.status === "available") {
+            showRecommendationResult();
+          } else if (availability.status === "unavailable") {
+            showUnavailableRecommendation();
+          } else {
+            error.textContent =
+              "La disponibilité ne peut pas être vérifiée pour le moment. Réessayez.";
+            error.hidden = false;
+          }
+        });
+        return;
+      }
+
+      if (assistantState.availability.status === "unavailable") {
         showUnavailableRecommendation();
-      } else {
+      } else if (assistantState.availability.status === "available") {
         showRecommendationResult();
       }
     }
   );
 }
-function calculateAvailability() {
-  const product =
-    assistantState.recommendedProduct;
+function calculateAvailability({ forceAvailability = false } = {}) {
+  const product = assistantState.recommendedProduct;
+  const selection = {
+    productId: product ? product.id : "",
+    startDate: assistantState.startDate,
+    endDate: assistantState.endDate,
+    deliverySlotId: assistantState.deliverySlotId,
+    collectionSlotId: assistantState.collectionSlotId
+  };
 
-  if (!product) {
-    assistantState.availability = null;
-    return;
+  if (!product || !availabilityState.isComplete(selection)) {
+    availabilityState.reset();
+    assistantState.availability = availabilityState.getState();
+    return Promise.resolve(assistantState.availability);
   }
 
-  assistantState.availability =
-    getAlternativeAvailability({
-      idealProduct: product,
+  const promise = availabilityState.check(selection, {
+    force: forceAvailability
+  });
+  assistantState.availability = availabilityState.getState();
 
-      postcode:
-        assistantState.postcode,
+  return promise.then((result) => {
+    assistantState.availability = availabilityState.getState();
+    return result;
+  });
+}
 
-      openingType:
-        assistantState.openingType,
+function isCurrentAvailabilityResult(result) {
+  const product = assistantState.recommendedProduct;
+  const currentSelection = {
+    productId: product ? product.id : "",
+    startDate: assistantState.startDate,
+    endDate: assistantState.endDate,
+    deliverySlotId: assistantState.deliverySlotId,
+    collectionSlotId: assistantState.collectionSlotId
+  };
 
-      startDate:
-        assistantState.startDate,
-
-      endDate:
-        assistantState.endDate
-    });
+  return result &&
+    result.key === availabilityState.selectionKey(currentSelection) &&
+    assistantState.availability.key === result.key;
 }
 
 function showUnavailableRecommendation(
@@ -3083,7 +3135,7 @@ function findOpeningCompatibleProduct(
   return startingProduct;
 }
 
-function calculateRecommendation() {
+function calculateRecommendation(options = {}) {
   const hasDifficultConditions =
     assistantState.roomConditions.length > 0;
 
@@ -3110,18 +3162,10 @@ function calculateRecommendation() {
       true;
   }
 
-  calculateAvailability();
+  determineDefaultSetupMode();
+  calculateCurrentPricing();
 
-if (
-  assistantState.availability &&
-  !assistantState.availability.idealAvailable
-) {
-  return;
-}
-
-determineDefaultSetupMode();
-
-calculateCurrentPricing();
+  return calculateAvailability(options);
 }
 
 function determineDefaultSetupMode() {
@@ -3445,16 +3489,9 @@ function getProductSizing(product) {
 }
 
 function isProductChoiceAvailable(product) {
-  return (
-    isProductAvailableForPostcode(
-      product.id,
-      assistantState.postcode
-    ) &&
-    isProductAvailableForDates(
-      product.id,
-      assistantState.startDate,
-      assistantState.endDate
-    )
+  return isProductAvailableForPostcode(
+    product.id,
+    assistantState.postcode
   );
 }
 
@@ -3571,16 +3608,26 @@ function selectProductChoice(productId) {
     announceInvalidation: true
   });
 
-  assistantState.availability = {
-    ...(assistantState.availability || {}),
-    selectedAsAlternative:
-      product.id !== getIdealProduct().id
-  };
+  availabilityState.reset();
+  assistantState.availability = availabilityState.getState();
 
   updateSelectedProductAssessment(product);
   determineDefaultSetupMode();
   calculateCurrentPricing();
+  const availabilityPromise = calculateAvailability();
   showRecommendationResult(false);
+  availabilityPromise.then((availability) => {
+    if (!isCurrentAvailabilityResult(availability)) {
+      return;
+    }
+    if (availability.status === "unavailable") {
+      showUnavailableRecommendation(false);
+    } else if (availability.status === "error") {
+      showRecommendationResult(false);
+    } else if (availability.status === "available") {
+      showRecommendationResult(false);
+    }
+  });
 }
 
 function connectInfoControls(assistant) {
@@ -3864,6 +3911,13 @@ function showRecommendationResult(
       `
       : "";
 
+  const availabilityNotice =
+    assistantState.availability.status === "checking"
+      ? `<p class="assistant-note" role="status">Vérification de la disponibilité…</p>`
+      : assistantState.availability.status === "error"
+        ? `<p class="assistant-note" role="alert">La disponibilité ne peut pas être vérifiée pour le moment. Réessayez.</p>`
+        : "";
+
   const assistant = renderAssistant(
     renderStageShell({
       stage: 5,
@@ -3965,6 +4019,8 @@ function showRecommendationResult(
               )}
             </p>
 
+            ${availabilityNotice}
+
             <div class="assistant-result-action-bar">
               <div>
                 <strong data-sticky-total>
@@ -3980,6 +4036,7 @@ function showRecommendationResult(
               <button
                 class="assistant-next assistant-booking-action"
                 type="button"
+                ${assistantState.availability.status === "available" ? "" : "disabled"}
                 data-reservation-request>
                 ${copy.request}
               </button>

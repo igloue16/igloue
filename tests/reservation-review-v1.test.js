@@ -41,7 +41,13 @@ vm.runInContext(`
     collectionSlotId: "1030-1230",
     sameDayExpressSelected: true,
     serviceSlotNotice: "",
-    availability: { idealAvailable: true }
+    availability: {
+      status: "available",
+      key: "essential|2026-09-10|2026-09-15|0830-1030|1030-1230",
+      productId: "essential",
+      available: true,
+      error: ""
+    }
   };
 
   globalThis.productAvailable = true;
@@ -110,7 +116,9 @@ vm.runInContext(`
     globalThis.currentDraft.pricing.total = 71.14;
   }
 
-  function calculateAvailability() {}
+  function calculateAvailability() {
+    return Promise.resolve(assistantState.availability);
+  }
   function showDeliveryStage() {}
   function showOpeningStage() {}
   function showRecommendationResult() {}
@@ -187,6 +195,22 @@ assert.equal(
   evaluate("assistantState.collectionSlotId"),
   "",
   "H: only the unavailable collection slot is cleared"
+);
+
+vm.runInContext(`
+  assistantState.collectionSlotId = "1030-1230";
+  assistantState.availability = {
+    status: "checking",
+    key: "essential|2026-09-10|2026-09-15|0830-1030|1030-1230",
+    productId: "essential",
+    available: null,
+    error: ""
+  };
+`, context);
+assert.equal(
+  evaluate("prepareReservationReview()"),
+  null,
+  "I: missing confirmed real availability blocks review"
 );
 
 console.log("Reservation review V1 Express and slot revalidation scenarios passed.");
