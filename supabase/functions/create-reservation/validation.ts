@@ -1,4 +1,5 @@
 import { IGLOUE_SERVER_PRICING } from "./pricing.ts";
+import { validateBookingDates } from "./date-rules.ts";
 
 export const IGLOUE_SERVER_SERVICE_WINDOWS = Object.freeze([
   { id: "0830-1030", startTime: "08:30", endTime: "10:30" },
@@ -8,6 +9,19 @@ export const IGLOUE_SERVER_SERVICE_WINDOWS = Object.freeze([
   { id: "1630-1830", startTime: "16:30", endTime: "18:30" },
   { id: "1830-2030", startTime: "18:30", endTime: "20:30" },
 ]);
+
+export const IGLOUE_SERVER_ALLOWED_SETUP_MODES = Object.freeze({
+  essential: ["none", "basic", "adapted-opening"],
+  "mobile-duo": ["none", "basic", "adapted-opening"],
+  "split-12": ["terrace-split", "window-split", "special"],
+  "max-pro": [
+    "basic",
+    "terrace-split",
+    "window-split",
+    "adapted-opening",
+    "special",
+  ],
+} as const);
 
 function isValidServiceWindowId(slotId: string) {
   return IGLOUE_SERVER_SERVICE_WINDOWS.some(
@@ -157,7 +171,7 @@ export function validateDeliveryAddress(address: unknown) {
   };
 }
 
-export function validateRentalDates(rental: unknown) {
+export function validateRentalDates(rental: unknown, now = new Date()) {
   if (
     typeof rental !== "object" ||
     rental === null
@@ -190,53 +204,30 @@ export function validateRentalDates(rental: unknown) {
     };
   }
 
-  const startDate = value.startDate.trim();
-  const endDate = value.endDate.trim();
-
-  const start = new Date(`${startDate}T12:00:00Z`);
-  const end = new Date(`${endDate}T12:00:00Z`);
-
-  if (
-    Number.isNaN(start.getTime()) ||
-    Number.isNaN(end.getTime())
-  ) {
-    return {
-      ok: false as const,
-      error: "Invalid rental dates",
-    };
-  }
-
-  if (end <= start) {
-    return {
-      ok: false as const,
-      error: "Rental endDate must be after startDate",
-    };
-  }
-
-  const millisecondsPerDay = 1000 * 60 * 60 * 24;
-  const nights = Math.round(
-    (end.getTime() - start.getTime()) /
-      millisecondsPerDay,
+  const result = validateBookingDates(
+    value.startDate,
+    value.endDate,
+    now,
   );
 
-  if (nights < IGLOUE_SERVER_PRICING.minimumRentalNights) {
-    return {
-      ok: false as const,
-      error: `Minimum rental is ${IGLOUE_SERVER_PRICING.minimumRentalNights} nights`,
-    };
+  if (!result.ok) {
+    return result;
   }
 
   return {
     ok: true as const,
     rental: {
-      startDate,
-      endDate,
-      nights,
+      startDate: result.startDate,
+      endDate: result.endDate,
+      nights: result.nights,
     },
   };
 }
 
-export function validateServiceChoices(service: unknown) {
+export function validateServiceChoices(
+  service: unknown,
+  productId?: string,
+) {
   if (
     typeof service !== "object" ||
     service === null
@@ -280,12 +271,32 @@ export function validateServiceChoices(service: unknown) {
   }
 
   if (
+    productId &&
+    !(IGLOUE_SERVER_ALLOWED_SETUP_MODES[productId as keyof typeof IGLOUE_SERVER_ALLOWED_SETUP_MODES] as readonly string[])
+      ?.includes(value.setupMode)
+  ) {
+    return {
+      ok: false as const,
+      code: "INVALID_SETUP" as const,
+      error: "Setup mode is not compatible with this product",
+    };
+  }
+
+  if (
     value.expressSelected !== undefined &&
     typeof value.expressSelected !== "boolean"
   ) {
     return {
       ok: false as const,
       error: "Invalid expressSelected",
+    };
+  }
+
+  if (value.expressSelected === true) {
+    return {
+      ok: false as const,
+      code: "EXPRESS_NOT_ALLOWED" as const,
+      error: "Express delivery is not available for real reservations",
     };
   }
 

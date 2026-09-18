@@ -2,10 +2,10 @@ begin;
 
 select plan(21);
 
-select ok(has_function_privilege('service_role', 'public.check_product_machine_availability(text,timestamp with time zone,timestamp with time zone)', 'EXECUTE'), 'service_role can check machine availability');
-select ok(not has_function_privilege('public', 'public.check_product_machine_availability(text,timestamp with time zone,timestamp with time zone)', 'EXECUTE'), 'PUBLIC cannot check machine availability');
-select ok(not has_function_privilege('anon', 'public.check_product_machine_availability(text,timestamp with time zone,timestamp with time zone)', 'EXECUTE'), 'anon cannot check machine availability');
-select ok(not has_function_privilege('authenticated', 'public.check_product_machine_availability(text,timestamp with time zone,timestamp with time zone)', 'EXECUTE'), 'authenticated cannot check machine availability');
+select ok(has_function_privilege('service_role', 'public.check_product_machine_availability(text,timestamp without time zone,timestamp without time zone)', 'EXECUTE'), 'service_role can check machine availability');
+select ok(not has_function_privilege('public', 'public.check_product_machine_availability(text,timestamp without time zone,timestamp without time zone)', 'EXECUTE'), 'PUBLIC cannot check machine availability');
+select ok(not has_function_privilege('anon', 'public.check_product_machine_availability(text,timestamp without time zone,timestamp without time zone)', 'EXECUTE'), 'anon cannot check machine availability');
+select ok(not has_function_privilege('authenticated', 'public.check_product_machine_availability(text,timestamp without time zone,timestamp without time zone)', 'EXECUTE'), 'authenticated cannot check machine availability');
 select ok((select relrowsecurity from pg_class where oid = 'public.physical_machines'::regclass), 'fleet RLS remains enabled');
 select ok(not has_table_privilege('anon', 'public.physical_machines', 'SELECT'), 'anon cannot inspect physical machines');
 select ok(not has_table_privilege('anon', 'public.allocations', 'SELECT'), 'anon cannot inspect allocations');
@@ -37,11 +37,11 @@ update public.products set active = true where id = 'essential';
 
 insert into public.allocations (reservation_id, machine_id, status, operational_start, operational_end)
 values
-    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M1', 'held', '2035-01-09 10:00+00', '2035-01-14 10:00+00'),
-    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M2', 'reserved', '2035-01-09 10:00+00', '2035-01-14 10:00+00'),
-    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M3', 'active', '2035-01-09 10:00+00', '2035-01-14 10:00+00'),
-    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M4', 'released', '2035-01-09 10:00+00', '2035-01-14 10:00+00'),
-    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M5', 'cancelled', '2035-01-09 10:00+00', '2035-01-14 10:00+00');
+    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M1', 'held', '2035-01-09 09:00+00', '2035-01-14 09:00+00'),
+    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M2', 'reserved', '2035-01-09 09:00+00', '2035-01-14 09:00+00'),
+    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M3', 'active', '2035-01-09 09:00+00', '2035-01-14 09:00+00'),
+    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M4', 'released', '2035-01-09 09:00+00', '2035-01-14 09:00+00'),
+    ('00000000-0000-0000-0000-000000008801', 'AVAIL-M5', 'cancelled', '2035-01-09 09:00+00', '2035-01-14 09:00+00');
 select is((select available_count from public.check_product_machine_availability('essential', '2035-01-10 10:00+00', '2035-01-13 10:00+00')), 4, 'held reserved and active allocations block while released/cancelled do not');
 select ok((select available = false and available_count = 4 from public.check_product_machine_availability('essential', '2035-01-10 10:00+00', '2035-01-13 10:00+00')) is false, 'availability result includes boolean and count');
 select is((select available_count from public.check_product_machine_availability('essential', '2035-01-14 10:00+00', '2035-01-15 10:00+00')), 7, 'exact half-open boundary does not conflict');
@@ -50,10 +50,10 @@ update public.allocations set hold_expires_at = now() - interval '1 minute' wher
 select is((select available_count from public.check_product_machine_availability('essential', '2035-01-10 10:00+00', '2035-01-13 10:00+00')), 4, 'expired held allocation remains blocking for consistency with booking authority');
 
 insert into public.allocations (reservation_id, machine_id, status, operational_start, operational_end)
-values ('00000000-0000-0000-0000-000000008801', 'AVAIL-M6', 'reserved', '2035-02-01 10:00+00', '2035-02-05 10:00+00');
+values ('00000000-0000-0000-0000-000000008801', 'AVAIL-M6', 'reserved', '2035-02-01 09:00+00', '2035-02-05 09:00+00');
 select is((select available_count from public.check_product_machine_availability('essential', '2035-01-10 10:00+00', '2035-01-13 10:00+00')), 4, 'non-overlapping future allocation does not block');
 insert into public.allocations (reservation_id, machine_id, status, operational_start, operational_end)
-values ('00000000-0000-0000-0000-000000008801', 'AVAIL-M7', 'reserved', '2035-01-09 10:00+00', '2035-01-14 10:00+00');
+values ('00000000-0000-0000-0000-000000008801', 'AVAIL-M7', 'reserved', '2035-01-09 09:00+00', '2035-01-14 09:00+00');
 select is((select available_count from public.check_product_machine_availability('essential', '2035-01-10 10:00+00', '2035-01-13 10:00+00')), 3, 'conflicting future allocation blocks');
 select is((select count(*)::integer from information_schema.columns where table_schema = 'public' and table_name = 'check_product_machine_availability'), 0, 'result is not a table exposing machine identifiers');
 select ok(exists (select 1 from pg_constraint where conname = 'allocations_no_machine_overlap'), 'atomic booking exclusion constraint remains intact');

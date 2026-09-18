@@ -95,6 +95,8 @@ export default {
         );
       }
 
+      const productId = productValidation.productId;
+
       const addressValidation =
         validateDeliveryAddress(
           requestBody.deliveryAddress,
@@ -121,6 +123,7 @@ export default {
       const serviceValidation =
         validateServiceChoices(
           requestBody.service,
+          productId,
         );
 
       if (!serviceValidation.ok) {
@@ -131,7 +134,6 @@ export default {
       }
 
       const customer = customerValidation.customer;
-      const productId = productValidation.productId;
       const deliveryAddress =
         addressValidation.address;
       const rental = rentalValidation.rental;

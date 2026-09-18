@@ -7,9 +7,11 @@ import {
 import {
   IGLOUE_SERVER_SERVICE_WINDOWS,
 } from "../create-reservation/validation.ts";
+import {
+  validateBookingDates,
+} from "../create-reservation/date-rules.ts";
 
 const MAX_REQUEST_BYTES = 8_192;
-const MILLISECONDS_PER_DAY = 86_400_000;
 
 const CORS_HEADERS = Object.freeze({
   "Access-Control-Allow-Origin": "*",
@@ -98,41 +100,6 @@ function hasOnlyKeys(
   );
 }
 
-function parseIsoDate(value: unknown) {
-  if (
-    typeof value !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(value)
-  ) {
-    return null;
-  }
-
-  const date = new Date(`${value}T12:00:00Z`);
-
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.toISOString().slice(0, 10) !== value
-  ) {
-    return null;
-  }
-
-  return date;
-}
-
-function getParisDateValue(now: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
 function isServiceWindowId(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -214,38 +181,14 @@ export async function handleAvailabilityRequest(
     return errorResponse(400, "INVALID_DATES", "Invalid rental dates");
   }
 
-  const start = parseIsoDate(body.rental.startDate);
-  const end = parseIsoDate(body.rental.endDate);
-
-  if (!start || !end || end <= start) {
-    return errorResponse(400, "INVALID_DATES", "Invalid rental dates");
-  }
-
-  const nights = Math.round(
-    (end.getTime() - start.getTime()) / MILLISECONDS_PER_DAY,
-  );
-  const today = parseIsoDate(
-    getParisDateValue(dependencies.now ?? new Date()),
+  const dateValidation = validateBookingDates(
+    body.rental.startDate,
+    body.rental.endDate,
+    dependencies.now ?? new Date(),
   );
 
-  if (!today) {
-    dependencies.logError?.("Unable to determine current booking date");
-    return errorResponse(
-      503,
-      "AVAILABILITY_UNAVAILABLE",
-      "Availability is temporarily unavailable",
-    );
-  }
-
-  const firstBookable = new Date(
-    today.getTime() + MILLISECONDS_PER_DAY,
-  );
-
-  if (
-    start < firstBookable ||
-    nights < IGLOUE_SERVER_PRICING.minimumRentalNights
-  ) {
-    return errorResponse(400, "INVALID_DATES", "Invalid rental dates");
+  if (!dateValidation.ok) {
+    return errorResponse(400, "INVALID_DATES", dateValidation.error);
   }
 
   if (
