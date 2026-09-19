@@ -216,6 +216,9 @@ export async function handleReservationRequest(
     if (error.code === "P0003") {
       return errorResponse(409, "IDEMPOTENCY_CONFLICT");
     }
+    if (error.code === "P1001" && error.message === "Too many active holds") {
+      return errorResponse(409, "TOO_MANY_ACTIVE_HOLDS");
+    }
     if (
       error.code === "P0001" && error.message === "No eligible machine available" ||
       error.code === "23P01"

@@ -120,6 +120,24 @@ Deno.test("maps a dedicated idempotency conflict and thrown RPC error", async ()
   assert.deepEqual(await json(thrownResponse), { ok: false, error: { code: "INTERNAL_ERROR" } });
 });
 
+Deno.test("maps only the dedicated contact hold limit and keeps public errors sanitized", async () => {
+  const limited = rpc(null, { code: "P1001", message: "Too many active holds" });
+  const limitedResponse = await handleReservationRequest(request(body()), { supabaseAdmin: limited.client, now: NOW });
+  const limitedBody = await json(limitedResponse);
+  assert.equal(limitedResponse.status, 409);
+  assert.equal(limitedResponse.headers.get("access-control-allow-origin"), "*");
+  assert.deepEqual(limitedBody, { ok: false, error: { code: "TOO_MANY_ACTIVE_HOLDS" } });
+  const serialized = JSON.stringify(limitedBody);
+  for (const secret of ["P1001", "Too many active holds", "2", "ada@example.com", "customer", "reservation", "allocation"]) {
+    assert.equal(serialized.includes(secret), false, `public response does not expose ${secret}`);
+  }
+
+  const unrelated = rpc(null, { code: "P1001", message: "unrelated database failure" });
+  const unrelatedResponse = await handleReservationRequest(request(body()), { supabaseAdmin: unrelated.client, now: NOW });
+  assert.equal(unrelatedResponse.status, 500);
+  assert.deepEqual(await json(unrelatedResponse), { ok: false, error: { code: "INTERNAL_ERROR" } });
+});
+
 Deno.test("maps confirmed retries and unexpected database failures safely", async () => {
   const confirmed = rpc([{ reservation_id: "res-confirmed", reservation_status: "confirmed", hold_expires_at: "2027-07-12T10:30:00Z" }]);
   const confirmedResponse = await handleReservationRequest(request(body()), { supabaseAdmin: confirmed.client, now: NOW });
