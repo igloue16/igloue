@@ -202,6 +202,25 @@ const ASSISTANT_I18N = {
       submit: "Voir ma recommandation →"
     },
 
+    customerDetails: {
+      heading: "Vos coordonnées et votre adresse",
+      introduction:
+        "Ces informations nous permettront de préparer votre demande de réservation.",
+      firstName: "Prénom",
+      lastName: "Nom",
+      email: "E-mail",
+      phone: "Téléphone",
+      line1: "Adresse",
+      line2: "Complément d’adresse",
+      city: "Ville",
+      optional: "facultatif",
+      postcode: "Code postal de livraison",
+      changePostcode: "Modifier le code postal",
+      requiredError: "Ce champ est requis.",
+      emailError: "Saisissez une adresse e-mail valide.",
+      submit: "Voir le récapitulatif →"
+    },
+
     result: {
       eyebrow: "Recommandation IGLOUE",
 
@@ -326,7 +345,7 @@ const ASSISTANT_I18N = {
       noAlternativeText:
         "Nous n’avons malheureusement plus de climatiseur suffisamment adapté à votre configuration pour ces dates.",
 
-      request: "Demander une réservation →",
+      request: "Continuer la réservation →",
 
       reservationStatus:
         "La réservation en ligne sera connectée à cette étape prochainement.",
@@ -345,6 +364,19 @@ const assistantCopy =
 
 const assistantState = {
   postcode: "",
+
+  customerDetails: {
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: ""
+  },
+
+  deliveryAddress: {
+    line1: "",
+    line2: "",
+    city: ""
+  },
 
   deliveryZone: null,
   deliveryPrice: 0,
@@ -482,6 +514,15 @@ function formatDate(dateValue) {
     month: "2-digit",
     year: "numeric"
   }).format(new Date(`${dateValue}T12:00:00`));
+}
+
+function escapeAssistantHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function getRoomDimensionsExample(area) {
@@ -3977,6 +4018,150 @@ function updateResultPricing(
   }
 }
 
+function showCustomerDetailsStage(addToHistory = true) {
+  if (addToHistory) {
+    pushStage(showCustomerDetailsStage);
+  }
+
+  const copy = assistantCopy.customerDetails;
+  const customer = assistantState.customerDetails;
+  const address = assistantState.deliveryAddress;
+
+  const assistant = renderAssistant(
+    renderStageShell({
+      stage: 5,
+      mascotState: "customer-details",
+      isResult: true,
+      content: `
+        ${renderBackControl()}
+
+        <span class="assistant-step-label">Coordonnées</span>
+
+        <h2 data-assistant-heading tabindex="-1">${copy.heading}</h2>
+
+        <p>${copy.introduction}</p>
+
+        <form class="assistant-customer-form" data-customer-details-form novalidate>
+          <div class="assistant-customer-fields">
+            <div class="assistant-customer-field">
+              <label class="assistant-label" for="assistant-first-name">${copy.firstName}</label>
+              <input class="assistant-line-input" id="assistant-first-name" name="firstName" type="text" autocomplete="given-name" required aria-describedby="assistant-first-name-error" aria-invalid="false" value="${escapeAssistantHtml(customer.firstName)}">
+              <p class="assistant-error" id="assistant-first-name-error" role="alert" hidden></p>
+            </div>
+
+            <div class="assistant-customer-field">
+              <label class="assistant-label" for="assistant-last-name">${copy.lastName}</label>
+              <input class="assistant-line-input" id="assistant-last-name" name="lastName" type="text" autocomplete="family-name" required aria-describedby="assistant-last-name-error" aria-invalid="false" value="${escapeAssistantHtml(customer.lastName)}">
+              <p class="assistant-error" id="assistant-last-name-error" role="alert" hidden></p>
+            </div>
+
+            <div class="assistant-customer-field">
+              <label class="assistant-label" for="assistant-email">${copy.email}</label>
+              <input class="assistant-line-input" id="assistant-email" name="email" type="email" autocomplete="email" required aria-describedby="assistant-email-error" aria-invalid="false" value="${escapeAssistantHtml(customer.email)}">
+              <p class="assistant-error" id="assistant-email-error" role="alert" hidden></p>
+            </div>
+
+            <div class="assistant-customer-field">
+              <label class="assistant-label" for="assistant-phone">${copy.phone} <span class="assistant-optional">(${copy.optional})</span></label>
+              <input class="assistant-line-input" id="assistant-phone" name="phone" type="tel" autocomplete="tel" aria-describedby="assistant-phone-error" aria-invalid="false" value="${escapeAssistantHtml(customer.phone)}">
+              <p class="assistant-error" id="assistant-phone-error" role="alert" hidden></p>
+            </div>
+
+            <div class="assistant-customer-field assistant-customer-field-wide">
+              <label class="assistant-label" for="assistant-address-line1">${copy.line1}</label>
+              <input class="assistant-line-input" id="assistant-address-line1" name="line1" type="text" autocomplete="address-line1" required aria-describedby="assistant-address-line1-error" aria-invalid="false" value="${escapeAssistantHtml(address.line1)}">
+              <p class="assistant-error" id="assistant-address-line1-error" role="alert" hidden></p>
+            </div>
+
+            <div class="assistant-customer-field assistant-customer-field-wide">
+              <label class="assistant-label" for="assistant-address-line2">${copy.line2} <span class="assistant-optional">(${copy.optional})</span></label>
+              <input class="assistant-line-input" id="assistant-address-line2" name="line2" type="text" autocomplete="address-line2" value="${escapeAssistantHtml(address.line2)}">
+            </div>
+
+            <div class="assistant-customer-field">
+              <label class="assistant-label" for="assistant-city">${copy.city}</label>
+              <input class="assistant-line-input" id="assistant-city" name="city" type="text" autocomplete="address-level2" required aria-describedby="assistant-city-error" aria-invalid="false" value="${escapeAssistantHtml(address.city)}">
+              <p class="assistant-error" id="assistant-city-error" role="alert" hidden></p>
+            </div>
+
+            <div class="assistant-customer-postcode" aria-label="${copy.postcode}">
+              <span class="assistant-label">${copy.postcode}</span>
+              <strong>${escapeAssistantHtml(assistantState.postcode)}</strong>
+              <button class="assistant-inline-action" type="button" data-change-postcode>${copy.changePostcode}</button>
+            </div>
+          </div>
+
+          <button class="assistant-next" type="submit">${copy.submit}</button>
+        </form>
+      `
+    }),
+    "#assistant-first-name"
+  );
+
+  connectBackControl(assistant);
+
+  const fields = {
+    firstName: ["#assistant-first-name", "#assistant-first-name-error"],
+    lastName: ["#assistant-last-name", "#assistant-last-name-error"],
+    email: ["#assistant-email", "#assistant-email-error"],
+    phone: ["#assistant-phone", "#assistant-phone-error"],
+    line1: ["#assistant-address-line1", "#assistant-address-line1-error"],
+    line2: ["#assistant-address-line2", null],
+    city: ["#assistant-city", "#assistant-city-error"]
+  };
+
+  Object.entries(fields).forEach(([name, [inputSelector]]) => {
+    const input = assistant.querySelector(inputSelector);
+    if (!input) return;
+
+    input.addEventListener("input", () => {
+      if (name in assistantState.customerDetails) {
+        assistantState.customerDetails[name] = input.value;
+      } else {
+        assistantState.deliveryAddress[name] = input.value;
+      }
+    });
+  });
+
+  assistant.querySelector("[data-change-postcode]").addEventListener(
+    "click",
+    () => showDeliveryStage()
+  );
+
+  assistant.querySelector("[data-customer-details-form]").addEventListener(
+    "submit",
+    (event) => {
+      event.preventDefault();
+
+      const errors = [];
+      const requiredFields = ["firstName", "lastName", "email", "line1", "city"];
+
+      requiredFields.forEach((name) => {
+        const [inputSelector, errorSelector] = fields[name];
+        const input = assistant.querySelector(inputSelector);
+        const value = input.value.trim();
+        let message = "";
+
+        if (!value) {
+          message = copy.requiredError;
+        } else if (name === "email" && !/^\S+@\S+\.\S+$/.test(value)) {
+          message = copy.emailError;
+        }
+
+        setFieldError(assistant, inputSelector, errorSelector, message);
+        if (message) errors.push(input);
+      });
+
+      if (errors.length) {
+        errors[0].focus();
+        return;
+      }
+
+      showReservationReview();
+    }
+  );
+}
+
 function buildReservationDraft() {
   return buildNormalizedReservationDraft(
     assistantState
@@ -4406,7 +4591,7 @@ function showRecommendationResult(
     .addEventListener(
       "click",
       () => {
-        showReservationReview();
+        showCustomerDetailsStage();
       }
     );
 }

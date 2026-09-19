@@ -208,6 +208,18 @@
     width: 100%;
   }
 
+  .assistant-customer-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-customer-field-wide {
+    grid-column: auto;
+  }
+
+  .assistant-customer-postcode {
+    padding-top: 10px;
+  }
+
   .assistant-options {
     grid-template-columns: 1fr;
   }
