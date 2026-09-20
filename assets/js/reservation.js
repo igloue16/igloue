@@ -132,6 +132,19 @@ function getReservationBookingMode(reservation) {
   return "instant";
 }
 
+function normalizeReservationRequiredText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeReservationOptionalText(value) {
+  const normalized = normalizeReservationRequiredText(value);
+  return normalized || null;
+}
+
+function isBasicReservationEmail(value) {
+  return /^\S+@\S+\.\S+$/.test(value);
+}
+
 function validateNormalizedReservationDraft(reservation, minimumNights = 3) {
   const issues = [];
   const addIssue = (code, section, message) => {
@@ -148,6 +161,40 @@ function validateNormalizedReservationDraft(reservation, minimumNights = 3) {
       "Vérifiez votre code postal et votre zone de livraison."
     );
   }
+
+  const customer = reservation.customer || {};
+  const deliveryAddress = reservation.deliveryAddress || {};
+
+  [
+    ["firstName", "Précisez votre prénom."],
+    ["lastName", "Précisez votre nom."],
+    ["email", "Précisez votre adresse e-mail."]
+  ].forEach(([field, message]) => {
+    if (!normalizeReservationRequiredText(customer[field])) {
+      addIssue("customer-missing", "customer", message);
+    }
+  });
+
+  if (
+    normalizeReservationRequiredText(customer.email) &&
+    !isBasicReservationEmail(normalizeReservationRequiredText(customer.email))
+  ) {
+    addIssue(
+      "customer-email-invalid",
+      "customer",
+      "Vérifiez votre adresse e-mail."
+    );
+  }
+
+  [
+    ["line1", "Précisez votre adresse."],
+    ["postcode", "Vérifiez votre code postal."],
+    ["city", "Précisez votre ville."]
+  ].forEach(([field, message]) => {
+    if (!normalizeReservationRequiredText(deliveryAddress[field])) {
+      addIssue("delivery-address-missing", "customer", message);
+    }
+  });
 
   if (!reservation.product.selectedProductId) {
     addIssue(
@@ -253,7 +300,32 @@ function buildNormalizedReservationDraft(state) {
     status: "draft",
 
     customer: {
-      customerId: null
+      customerId: null,
+      firstName: normalizeReservationRequiredText(
+        state.customerDetails && state.customerDetails.firstName
+      ),
+      lastName: normalizeReservationRequiredText(
+        state.customerDetails && state.customerDetails.lastName
+      ),
+      email: normalizeReservationRequiredText(
+        state.customerDetails && state.customerDetails.email
+      ),
+      phone: normalizeReservationOptionalText(
+        state.customerDetails && state.customerDetails.phone
+      )
+    },
+
+    deliveryAddress: {
+      line1: normalizeReservationRequiredText(
+        state.deliveryAddress && state.deliveryAddress.line1
+      ),
+      line2: normalizeReservationOptionalText(
+        state.deliveryAddress && state.deliveryAddress.line2
+      ),
+      postcode: normalizeReservationRequiredText(state.postcode),
+      city: normalizeReservationRequiredText(
+        state.deliveryAddress && state.deliveryAddress.city
+      )
     },
 
     location: {

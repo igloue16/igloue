@@ -38,7 +38,18 @@ context.assistantLikeState = {
   recommendedProduct: { id: "mobile-duo", name: "IGLOUE Mobile Duo" },
   idealProduct: { id: "mobile-duo", name: "IGLOUE Mobile Duo" },
   setupMode: "basic",
-  pricing: { total: 143, caution: { amount: 350 } }
+  pricing: { total: 143, caution: { amount: 350 } },
+  customerDetails: {
+    firstName: " Ada ",
+    lastName: "O'Connor",
+    email: " ada@example.com ",
+    phone: " +33 6 12 34 56 78 "
+  },
+  deliveryAddress: {
+    line1: " 1 rue des Lilas ",
+    line2: " Bâtiment A ",
+    city: " Angoulême "
+  }
 };
 
 evaluate("globalThis.testDraft = buildNormalizedReservationDraft(assistantLikeState)");
@@ -51,6 +62,20 @@ assert.equal(draft.rental.deliveryDate, "2026-09-18", "A: delivery date");
 assert.equal(draft.rental.collectionDate, "2026-09-25", "A: collection date");
 assert.equal(draft.rental.nights, 7, "A: night count");
 assert.equal(draft.product.selectedProductId, "mobile-duo", "A: product");
+assert.deepEqual(draft.customer, {
+  customerId: null,
+  firstName: "Ada",
+  lastName: "O'Connor",
+  email: "ada@example.com",
+  phone: "+33 6 12 34 56 78"
+}, "A: normalized customer details");
+assert.deepEqual(draft.deliveryAddress, {
+  line1: "1 rue des Lilas",
+  line2: "Bâtiment A",
+  postcode: "16000",
+  city: "Angoulême"
+}, "A: normalized delivery address");
+assert.equal(draft.customer.firstName.includes("<"), false, "A: normalization does not HTML-escape values");
 assert.equal(draft.delivery.slotId, "0830-1030", "A: delivery slot");
 assert.equal(draft.collection.slotId, "1630-1830", "A: collection slot");
 assert.equal(draft.delivery.expressSelected, true, "A: Express selection");
@@ -60,6 +85,41 @@ assert.equal(
   true,
   "A: complete draft validation"
 );
+
+for (const path of [
+  "customer.firstName",
+  "customer.lastName",
+  "customer.email",
+  "deliveryAddress.line1",
+  "deliveryAddress.postcode",
+  "deliveryAddress.city"
+]) {
+  const invalid = JSON.parse(JSON.stringify(context.testDraft));
+  const parts = path.split(".");
+  invalid[parts[0]][parts[1]] = "";
+  context.invalidCustomerDraft = invalid;
+  assert.equal(
+    evaluate("validateNormalizedReservationDraft(invalidCustomerDraft, 3).valid"),
+    false,
+    `A: missing ${path} blocks review readiness`
+  );
+}
+
+context.optionalCustomerDraft = JSON.parse(JSON.stringify(context.testDraft));
+context.optionalCustomerDraft.customer.phone = null;
+context.optionalCustomerDraft.deliveryAddress.line2 = null;
+assert.equal(
+  evaluate("validateNormalizedReservationDraft(optionalCustomerDraft, 3).valid"),
+  true,
+  "A: optional phone and address complement may be null"
+);
+
+context.blankOptionalState = JSON.parse(JSON.stringify(context.assistantLikeState));
+context.blankOptionalState.customerDetails.phone = "   ";
+context.blankOptionalState.deliveryAddress.line2 = "\t";
+evaluate("globalThis.blankOptionalDraft = buildNormalizedReservationDraft(blankOptionalState)");
+assert.equal(context.blankOptionalDraft.customer.phone, null, "A: blank phone normalizes to null");
+assert.equal(context.blankOptionalDraft.deliveryAddress.line2, null, "A: blank address complement normalizes to null");
 
 assert.equal(
   evaluate(`

@@ -52,6 +52,15 @@ function getReservationReviewOpeningLabel(openingType) {
     : openingCopy.primary;
 }
 
+function escapeReservationReviewHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function validateReservationOperationalData(draft) {
   const issues = [];
   const product = getProductById(draft.product.selectedProductId);
@@ -135,6 +144,11 @@ function validateReservationOperationalData(draft) {
 }
 
 function routeReservationReviewIssue(issue) {
+  if (issue.section === "customer") {
+    showCustomerDetailsStage(false);
+    return;
+  }
+
   if (issue.section === "delivery") {
     showDeliveryStage(false);
     return;
@@ -218,6 +232,63 @@ function prepareReservationReview() {
   };
 }
 
+function buildReservationRequestPayload(draft) {
+  return {
+    customer: {
+      firstName: draft.customer.firstName,
+      lastName: draft.customer.lastName,
+      email: draft.customer.email,
+      phone: draft.customer.phone
+    },
+    productId: draft.product.selectedProductId,
+    deliveryAddress: {
+      line1: draft.deliveryAddress.line1,
+      line2: draft.deliveryAddress.line2,
+      postcode: draft.deliveryAddress.postcode,
+      city: draft.deliveryAddress.city
+    },
+    rental: {
+      startDate: draft.rental.deliveryDate,
+      endDate: draft.rental.collectionDate
+    },
+    service: {
+      deliverySlotId: draft.delivery.slotId,
+      collectionSlotId: draft.collection.slotId,
+      setupMode: draft.delivery.setupMode,
+      expressSelected: draft.delivery.expressSelected
+    }
+  };
+}
+
+function getReservationSubmissionMessage(result) {
+  const messages = {
+    NO_MACHINE_AVAILABLE:
+      "Ce modèle n'est plus disponible pour ces dates. Modifiez vos dates ou choisissez une autre solution.",
+    RESERVATION_EXPIRED:
+      "Cette disponibilité a expiré. Vérifiez à nouveau vos dates avant de continuer.",
+    IDEMPOTENCY_CONFLICT:
+      "Cette tentative a changé. Vérifiez vos informations avant de réessayer.",
+    INVALID_REQUEST:
+      "Certains détails ne sont plus valides. Vérifiez votre réservation avant de réessayer.",
+    INVALID_CUSTOMER:
+      "Vérifiez vos coordonnées avant de réessayer.",
+    INVALID_ADDRESS:
+      "Vérifiez votre adresse de livraison avant de réessayer.",
+    INVALID_DATES:
+      "Vérifiez vos dates de location avant de réessayer.",
+    INVALID_SERVICE_WINDOW:
+      "Vérifiez vos créneaux de livraison et de reprise avant de réessayer.",
+    INVALID_SETUP:
+      "Vérifiez votre choix d'installation avant de réessayer.",
+    TOO_MANY_ACTIVE_HOLDS:
+      "Une demande similaire est déjà en cours. Réessayez dans quelques instants.",
+    INTERNAL_ERROR:
+      "La finalisation est momentanément indisponible. Vous pouvez réessayer."
+  };
+
+  return messages[result && result.code] || messages.INTERNAL_ERROR;
+}
+
 function buildReservationReviewPriceRows(draft) {
   const pricing = draft.pricing;
   const rows = [
@@ -290,7 +361,17 @@ function showReservationReview(addToHistory = true) {
         "Nous vérifions une dernière fois la disponibilité.",
         "Vous finalisez votre réservation en toute sécurité.",
         "IGLOUE livre et prépare votre climatiseur."
-      ];
+    ];
+
+  const customer = draft.customer;
+  const deliveryAddress = draft.deliveryAddress;
+  const customerName = `${escapeReservationReviewHtml(customer.firstName)} ${escapeReservationReviewHtml(customer.lastName)}`;
+  const customerPhone = customer.phone
+    ? `<div><span>Téléphone</span><strong>${escapeReservationReviewHtml(customer.phone)}</strong></div>`
+    : "";
+  const addressLine2 = deliveryAddress.line2
+    ? `<br>${escapeReservationReviewHtml(deliveryAddress.line2)}`
+    : "";
 
   const assistant = renderAssistant(
     renderStageShell({
@@ -370,6 +451,26 @@ function showReservationReview(addToHistory = true) {
               <p>${openingLabel}</p>
             </section>
 
+            <section class="reservation-review-section reservation-review-customer">
+              <div class="reservation-review-section-heading">
+                <span>Vos coordonnées</span>
+                <button type="button" data-review-edit="customer">Modifier</button>
+              </div>
+              <div class="reservation-review-customer-grid">
+                <div>
+                  <span>Client</span>
+                  <strong>${customerName}</strong>
+                  <b>${escapeReservationReviewHtml(customer.email)}</b>
+                  ${customerPhone}
+                </div>
+                <div>
+                  <span>Adresse de livraison</span>
+                  <strong>${escapeReservationReviewHtml(deliveryAddress.line1)}${addressLine2}</strong>
+                  <b>${escapeReservationReviewHtml(deliveryAddress.postcode)} · ${escapeReservationReviewHtml(deliveryAddress.city)}</b>
+                </div>
+              </div>
+            </section>
+
             ${manualReview
               ? `
                 <aside class="reservation-review-assessment" role="note">
@@ -443,39 +544,92 @@ function showReservationReview(addToHistory = true) {
         showRoomStage(false);
       } else if (target === "opening") {
         showOpeningStage(false);
+      } else if (target === "customer") {
+        showCustomerDetailsStage(false);
       } else {
         showDatesStage(false);
       }
     });
   });
 
-  assistant.querySelector("[data-review-submit]").addEventListener(
-    "click",
-    () => {
-      /*
-        Client validation is only a usability check. A future backend must
-        authoritatively revalidate and lock product, slots and price before
-        secure booking/payment. This event is the single Louez/backend handoff.
-      */
-      const latestReview = prepareReservationReview();
+  const submitButton = assistant.querySelector("[data-review-submit]");
+  const status = assistant.querySelector("[data-reservation-status]");
+  let submissionPending = false;
+  let submissionCompleted = false;
 
-      if (!latestReview) {
-        return;
-      }
+  submitButton.addEventListener("click", async () => {
+    if (submissionPending || submissionCompleted) {
+      return;
+    }
 
+    const latestReview = prepareReservationReview();
+
+    if (!latestReview) {
+      return;
+    }
+
+    const requestPayload = buildReservationRequestPayload(latestReview.draft);
+    const attempt = globalThis.IGLOUE_RESERVATION_ATTEMPT;
+    const client = globalThis.IGLOUE_RESERVATION_CLIENT;
+    const idempotencyKey = attempt &&
+      typeof attempt.prepareAttempt === "function"
+      ? attempt.prepareAttempt(requestPayload)
+      : null;
+
+    if (!idempotencyKey || !client || typeof client.createReservation !== "function") {
+      status.textContent = "La finalisation est momentanément indisponible. Vous pouvez réessayer.";
+      status.hidden = false;
+      status.focus({ preventScroll: true });
+      return;
+    }
+
+    submissionPending = true;
+    submitButton.disabled = true;
+    submitButton.setAttribute("aria-busy", "true");
+    submitButton.textContent = "Enregistrement en cours…";
+    status.textContent = "Nous enregistrons votre demande en vérifiant la disponibilité…";
+    status.hidden = false;
+
+    if (typeof assistant.dispatchEvent === "function" &&
+        typeof CustomEvent === "function") {
       assistant.dispatchEvent(
         new CustomEvent("igloue:reservation-requested", {
           bubbles: true,
           detail: latestReview.draft
         })
       );
-
-      const status = assistant.querySelector("[data-reservation-status]");
-      status.textContent = manualReview
-        ? "Votre demande est prête. La transmission sécurisée sera connectée prochainement."
-        : "La finalisation sécurisée sera connectée à cette étape prochainement.";
-      status.hidden = false;
-      status.focus({ preventScroll: true });
     }
-  );
+
+    let result;
+    try {
+      result = await client.createReservation({
+        ...requestPayload,
+        idempotencyKey
+      });
+    } catch {
+      result = { status: "error", code: "INTERNAL_ERROR" };
+    }
+
+    submissionPending = false;
+    submitButton.removeAttribute("aria-busy");
+
+    if (result && result.status === "success") {
+      submissionCompleted = true;
+      submitButton.disabled = true;
+      submitButton.textContent = "Demande enregistrée";
+      status.textContent = result.reservation &&
+        result.reservation.status === "pending"
+        ? "Votre demande est enregistrée et la disponibilité est tenue temporairement. Aucun paiement n'a été effectué."
+        : "Votre demande est enregistrée. Aucun paiement n'a été effectué.";
+    } else {
+      submitButton.disabled = false;
+      submitButton.textContent = manualReview
+        ? "Envoyer ma demande"
+        : "Continuer la réservation";
+      status.textContent = getReservationSubmissionMessage(result);
+    }
+
+    status.hidden = false;
+    status.focus({ preventScroll: true });
+  });
 }

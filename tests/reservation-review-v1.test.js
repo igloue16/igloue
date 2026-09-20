@@ -56,6 +56,19 @@ vm.runInContext(`
   globalThis.currentDraft = {
     status: "draft",
     bookingMode: "instant",
+    customer: {
+      customerId: null,
+      firstName: "Ada",
+      lastName: "O'Connor",
+      email: "ada@example.com",
+      phone: null
+    },
+    deliveryAddress: {
+      line1: "1 rue des Lilas",
+      line2: null,
+      postcode: "16000",
+      city: "Angoulême"
+    },
     location: {
       postcode: "16000",
       zone: { id: "local", name: "Angoulême proche" }
@@ -196,6 +209,65 @@ assert.equal(
   "",
   "H: only the unavailable collection slot is cleared"
 );
+
+let renderedReview = "";
+let customerEditTriggered = false;
+const reviewButtons = [];
+const reviewSubmit = { addEventListener() {} };
+const reviewAssistant = {
+  querySelectorAll(selector) {
+    return selector === "[data-review-edit]" ? reviewButtons : [];
+  },
+  querySelector(selector) {
+    return selector === "[data-review-submit]" ? reviewSubmit : null;
+  }
+};
+
+context.renderStageShell = ({ content }) => content;
+context.renderAssistant = (markup) => {
+  renderedReview = markup;
+  return reviewAssistant;
+};
+context.connectBackControl = () => {};
+context.showCustomerDetailsStage = () => { customerEditTriggered = true; };
+context.getSetupDefinition = () => ({ label: "Livraison seule" });
+context.renderBackControl = () => "";
+context.formatPrice = (value) => `${Number(value).toFixed(2)} €`;
+reviewButtons.push({
+  dataset: { reviewEdit: "customer" },
+  addEventListener(type, handler) {
+    if (type === "click") this.click = handler;
+  }
+});
+
+context.collectionSlotAvailable = true;
+vm.runInContext(`
+  assistantState.collectionSlotId = "1030-1230";
+  assistantState.availability = {
+    status: "available",
+    key: "essential|2026-09-10|2026-09-15|0830-1030|1030-1230",
+    productId: "essential",
+    available: true,
+    error: ""
+  };
+`, context);
+evaluate("showReservationReview(false)");
+assert.match(renderedReview, /Ada O&#039;Connor/, "I: customer name is escaped and displayed");
+assert.match(renderedReview, /ada@example\.com/, "I: customer email is displayed");
+assert.match(renderedReview, /1 rue des Lilas/, "I: delivery address is displayed");
+assert.match(renderedReview, /16000 · Angoulême/, "I: postcode and city are displayed");
+assert.doesNotMatch(renderedReview, /customerId/, "I: internal customer ID is not displayed");
+assert.doesNotMatch(renderedReview, /Téléphone/, "I: blank phone is omitted");
+assert.doesNotMatch(renderedReview, /Bâtiment/, "I: blank address complement is omitted");
+assert.match(renderedReview, /data-review-edit="customer"/, "I: customer edit action exists");
+reviewButtons[0].click();
+assert.equal(customerEditTriggered, true, "I: customer edit routes to the details stage");
+
+context.currentDraft.customer.phone = "+33 6 12 34 56 78";
+context.currentDraft.deliveryAddress.line2 = "<script>alert(1)</script>";
+evaluate("showReservationReview(false)");
+assert.match(renderedReview, /\+33 6 12 34 56 78/, "I: provided phone is displayed");
+assert.match(renderedReview, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/, "I: address HTML is escaped");
 
 vm.runInContext(`
   assistantState.collectionSlotId = "1030-1230";
