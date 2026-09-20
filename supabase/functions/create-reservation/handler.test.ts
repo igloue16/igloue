@@ -183,3 +183,68 @@ Deno.test("rejects nested unknown fields and invalid email before the RPC", asyn
   assert.equal(await errorCode(invalidEmail), "INVALID_CUSTOMER");
   assert.equal(mock.calls.length, 0);
 });
+
+Deno.test("uses created_new as the sole verification orchestration gate", async () => {
+  const calls: string[] = [];
+  let replay = false;
+  let lookups = 0;
+  let deliveries = 0;
+  const client = {
+    async rpc(name: string) {
+      calls.push(name);
+      if (name === "create_reservation_transaction") {
+        return {
+          data: [{
+            reservation_id: "00000000-0000-4000-8000-000000000001",
+            customer_id: "00000000-0000-4000-8000-000000000002",
+            reservation_status: "pending",
+            hold_expires_at: "2027-07-12T10:30:00Z",
+            created_new: !replay,
+          }],
+          error: null,
+        };
+      }
+      return {
+        data: [{
+          token_id: "00000000-0000-4000-8000-000000000003",
+          reservation_id: "00000000-0000-4000-8000-000000000001",
+          customer_id: "00000000-0000-4000-8000-000000000002",
+          organisation_id: "00000000-0000-4000-8000-000000000004",
+          expires_at: "2027-07-12T10:30:00Z",
+        }],
+        error: null,
+      };
+    },
+  };
+  const dependencies = {
+    supabaseAdmin: client,
+    now: NOW,
+    publicBaseUrl: "https://igloue.example",
+    lookupCustomerEmail: async () => {
+      lookups += 1;
+      return "customer@example.com";
+    },
+    verificationDelivery: {
+      async sendVerificationEmail(input: { destination: string; verificationUrl: string; expiresAt: string }) {
+        deliveries += 1;
+        assert.equal(input.destination, "customer@example.com");
+        assert.match(input.verificationUrl, /#credential=/);
+        return { status: "delivered" as const };
+      },
+    },
+  };
+
+  const first = await handleReservationRequest(request(body()), dependencies);
+  assert.equal(first.status, 201);
+  assert.equal(lookups, 1);
+  assert.equal(deliveries, 1);
+  assert.equal(calls.filter((name) => name === "issue_email_verification_token").length, 1);
+  assert.equal((await json(first)).created_new, undefined);
+
+  replay = true;
+  const second = await handleReservationRequest(request(body()), dependencies);
+  assert.equal(second.status, 201);
+  assert.equal(lookups, 1);
+  assert.equal(deliveries, 1);
+  assert.equal(calls.filter((name) => name === "issue_email_verification_token").length, 1);
+});

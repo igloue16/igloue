@@ -159,8 +159,9 @@ The verification transaction must, while holding the reservation lock:
 
 If cleanup obtains the lock first, releases the allocation, and cancels the
 reservation, verification fails without changing anything. If verification
-obtains the lock first, cleanup observes the verified reservation and must not
-cancel it merely because an old token was pending.
+obtains the lock first, the original hold deadline remains authoritative;
+cleanup may still release the unpaid hold and cancel the still-pending
+reservation when that deadline is reached.
 
 No operation may recreate an allocation or extend `hold_expires_at` as a side
 effect of verification.

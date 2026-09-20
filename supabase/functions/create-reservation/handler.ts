@@ -11,6 +11,8 @@ import {
   validateRentalDates,
   validateServiceChoices,
 } from "./validation.ts";
+import { noOpVerificationEmailDelivery, type VerificationEmailDelivery } from "../issue-email-verification/delivery.ts";
+import { orchestrateEmailVerification } from "../issue-email-verification/orchestrate.ts";
 
 const MAX_BODY_BYTES = 16 * 1024;
 const CORS_HEADERS = Object.freeze({
@@ -31,6 +33,9 @@ type Dependencies = {
   supabaseAdmin: ReservationRpcClient;
   now?: Date;
   logError?: (...args: unknown[]) => void;
+  lookupCustomerEmail?: (reservationId: string, customerId: string) => Promise<string | null>;
+  publicBaseUrl?: string;
+  verificationDelivery?: VerificationEmailDelivery;
 };
 
 function response(body: unknown, status: number) {
@@ -231,6 +236,27 @@ export async function handleReservationRequest(
     dependencies.logError?.("create_reservation_transaction returned malformed data");
     return errorResponse(500, "INTERNAL_ERROR");
   }
+
+  if (created.created_new === true && dependencies.lookupCustomerEmail && dependencies.publicBaseUrl) {
+    try {
+      const destination = await dependencies.lookupCustomerEmail(
+        created.reservation_id,
+        typeof created.customer_id === "string" ? created.customer_id : "",
+      );
+      if (destination) {
+        await orchestrateEmailVerification({
+          reservationId: created.reservation_id,
+          destination,
+          publicBaseUrl: dependencies.publicBaseUrl,
+          rpc: dependencies.supabaseAdmin,
+          delivery: dependencies.verificationDelivery ?? noOpVerificationEmailDelivery,
+        });
+      }
+    } catch (exception) {
+      dependencies.logError?.("email verification orchestration failed", exception);
+    }
+  }
+
   if (created.reservation_status === "cancelled") {
     return errorResponse(409, "RESERVATION_EXPIRED");
   }
