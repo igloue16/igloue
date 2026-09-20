@@ -12,7 +12,9 @@ returns table(customer_id uuid, reservation_id uuid, delivery_job_id uuid,
     collection_job_id uuid, allocation_id uuid, machine_id text,
     reservation_status text, hold_expires_at timestamptz)
 language sql as $$
-    select * from public.create_reservation_transaction(
+    select customer_id, reservation_id, delivery_job_id, collection_job_id,
+        allocation_id, machine_id, reservation_status, hold_expires_at
+    from public.create_reservation_transaction(
         'Contact', 'Limit', email, '0600000000', product,
         '2036-07-12 12:00:00+00', '2036-07-19 12:00:00+00',
         '10 Rue Test', null, '16000', 'Angouleme', 'local',

@@ -1,6 +1,6 @@
 begin;
 
-select plan(41);
+select plan(43);
 
 -- Product required by the reservation and machine foreign keys.
 insert into public.products (
@@ -84,6 +84,7 @@ from public.create_reservation_transaction(
 
 select is((select reservation_status from tx_first), 'pending', 'RPC returns authoritative pending status');
 select ok((select hold_expires_at is not null from tx_first), 'RPC returns authoritative hold expiry');
+select is((select created_new from tx_first), true, 'first reservation reports created_new true');
 
 select is(
     (
@@ -253,6 +254,7 @@ from public.create_reservation_transaction(
 
 select is((select reservation_status from tx_retry), 'pending', 'idempotent retry returns current pending status');
 select is((select hold_expires_at from tx_retry), (select hold_expires_at from tx_first), 'idempotent retry preserves authoritative hold expiry');
+select is((select created_new from tx_retry), false, 'idempotent replay reports created_new false');
 select is((select reservation_id from tx_retry), (select reservation_id from tx_first), 'pending retry returns the original reservation');
 select is((select allocation_id from tx_retry), (select allocation_id from tx_first), 'pending retry returns the original allocation');
 select is((select machine_id from tx_retry), (select machine_id from tx_first), 'pending retry returns the original machine');

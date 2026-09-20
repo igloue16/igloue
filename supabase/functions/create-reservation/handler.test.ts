@@ -34,12 +34,27 @@ function rpc(result: unknown, error: { code?: string; message?: string } | null 
   };
 }
 
-async function json(response: Response) {
+type ErrorPayload = { error: { code: string } };
+
+function hasErrorCode(value: unknown): value is ErrorPayload {
+  if (typeof value !== "object" || value === null || !("error" in value)) return false;
+  const error = value.error;
+  return typeof error === "object" && error !== null &&
+    "code" in error && typeof error.code === "string";
+}
+
+async function json(response: Response): Promise<Record<string, unknown>> {
   return await response.json() as Record<string, unknown>;
 }
 
+async function errorCode(response: Response): Promise<string> {
+  const value: unknown = await response.json();
+  assert.ok(hasErrorCode(value));
+  return value.error.code;
+}
+
 Deno.test("returns an allowlisted success with authoritative state and pricing", async () => {
-  const mock = rpc([{ reservation_id: "res-1", reservation_status: "pending", hold_expires_at: "2027-07-12T10:30:00Z", customer_id: "customer-secret", allocation_id: "allocation-secret", machine_id: "machine-secret", delivery_job_id: "job-secret", collection_job_id: "job-secret-2" }]);
+  const mock = rpc([{ reservation_id: "res-1", reservation_status: "pending", hold_expires_at: "2027-07-12T10:30:00Z", created_new: true, customer_id: "customer-secret", allocation_id: "allocation-secret", machine_id: "machine-secret", delivery_job_id: "job-secret", collection_job_id: "job-secret-2" }]);
   const response = await handleReservationRequest(request(body()), { supabaseAdmin: mock.client, now: NOW });
   const result = await json(response);
   assert.equal(response.status, 201);
@@ -56,6 +71,7 @@ Deno.test("returns an allowlisted success with authoritative state and pricing",
   assert.equal(JSON.stringify(result).includes("allocation"), false);
   assert.equal(JSON.stringify(result).includes("serviceJobs"), false);
   assert.equal(JSON.stringify(result).includes("operational"), false);
+  assert.equal(JSON.stringify(result).includes("created_new"), false);
 });
 
 Deno.test("supports CORS OPTIONS and rejects unsupported methods", async () => {
@@ -65,33 +81,33 @@ Deno.test("supports CORS OPTIONS and rejects unsupported methods", async () => {
   assert.equal(options.status, 204);
   assert.equal(options.headers.get("access-control-allow-origin"), "*");
   assert.equal(get.status, 405);
-  assert.equal((await json(get)).error.code, "METHOD_NOT_ALLOWED");
+  assert.equal(await errorCode(get), "METHOD_NOT_ALLOWED");
 });
 
 Deno.test("rejects malformed, unknown, and oversized requests", async () => {
   const mock = rpc(null);
   const malformed = await handleReservationRequest(new Request("http://localhost", { method: "POST", body: "{" }), { supabaseAdmin: mock.client });
-  assert.equal((await json(malformed)).error.code, "INVALID_REQUEST");
+  assert.equal(await errorCode(malformed), "INVALID_REQUEST");
   const unknown = await handleReservationRequest(request({ ...body(), extra: true }), { supabaseAdmin: mock.client });
-  assert.equal((await json(unknown)).error.code, "INVALID_REQUEST");
+  assert.equal(await errorCode(unknown), "INVALID_REQUEST");
   const oversized = await handleReservationRequest(request({ ...body(), customer: { ...body().customer, firstName: "x".repeat(17000) } }), { supabaseAdmin: mock.client });
   assert.equal(oversized.status, 413);
-  assert.equal((await json(oversized)).error.code, "PAYLOAD_TOO_LARGE");
+  assert.equal(await errorCode(oversized), "PAYLOAD_TOO_LARGE");
 });
 
 Deno.test("maps stock conflicts and expired retries without false hold claims", async () => {
   const stock = rpc(null, { code: "P0001", message: "No eligible machine available" });
   const stockResponse = await handleReservationRequest(request(body()), { supabaseAdmin: stock.client, now: NOW });
   assert.equal(stockResponse.status, 409);
-  assert.equal((await json(stockResponse)).error.code, "NO_MACHINE_AVAILABLE");
+  assert.equal(await errorCode(stockResponse), "NO_MACHINE_AVAILABLE");
   const conflict = rpc(null, { code: "23P01", message: "private detail" });
   const conflictResponse = await handleReservationRequest(request(body()), { supabaseAdmin: conflict.client, now: NOW });
   assert.equal(conflictResponse.status, 409);
-  assert.equal((await json(conflictResponse)).error.code, "NO_MACHINE_AVAILABLE");
+  assert.equal(await errorCode(conflictResponse), "NO_MACHINE_AVAILABLE");
   const expired = rpc([{ reservation_id: "res-expired", reservation_status: "cancelled", hold_expires_at: null }]);
   const expiredResponse = await handleReservationRequest(request(body()), { supabaseAdmin: expired.client, now: NOW });
   assert.equal(expiredResponse.status, 409);
-  assert.equal((await json(expiredResponse)).error.code, "RESERVATION_EXPIRED");
+  assert.equal(await errorCode(expiredResponse), "RESERVATION_EXPIRED");
 });
 
 Deno.test("fails closed for missing or elapsed pending holds", async () => {
@@ -99,7 +115,7 @@ Deno.test("fails closed for missing or elapsed pending holds", async () => {
     const mock = rpc([{ reservation_id: "res-pending", reservation_status: "pending", hold_expires_at }]);
     const response = await handleReservationRequest(request(body()), { supabaseAdmin: mock.client, now: NOW });
     assert.equal(response.status, hold_expires_at === null ? 503 : 409);
-    assert.equal((await json(response)).error.code, hold_expires_at === null ? "RESERVATION_UNAVAILABLE" : "RESERVATION_EXPIRED");
+    assert.equal(await errorCode(response), hold_expires_at === null ? "RESERVATION_UNAVAILABLE" : "RESERVATION_EXPIRED");
   }
 });
 
@@ -156,14 +172,14 @@ Deno.test("maps confirmed retries and unexpected database failures safely", asyn
 Deno.test("rejects nested unknown fields and invalid email before the RPC", async () => {
   const mock = rpc(null);
   const nested = await handleReservationRequest(request({ ...body(), customer: { ...body().customer, secret: true } }), { supabaseAdmin: mock.client });
-  assert.equal((await json(nested)).error.code, "INVALID_CUSTOMER");
+  assert.equal(await errorCode(nested), "INVALID_CUSTOMER");
   const address = await handleReservationRequest(request({ ...body(), deliveryAddress: { ...body().deliveryAddress, secret: true } }), { supabaseAdmin: mock.client });
-  assert.equal((await json(address)).error.code, "INVALID_ADDRESS");
+  assert.equal(await errorCode(address), "INVALID_ADDRESS");
   const rental = await handleReservationRequest(request({ ...body(), rental: { ...body().rental, secret: true } }), { supabaseAdmin: mock.client });
-  assert.equal((await json(rental)).error.code, "INVALID_DATES");
+  assert.equal(await errorCode(rental), "INVALID_DATES");
   const service = await handleReservationRequest(request({ ...body(), service: { ...body().service, secret: true } }), { supabaseAdmin: mock.client });
-  assert.equal((await json(service)).error.code, "INVALID_REQUEST");
+  assert.equal(await errorCode(service), "INVALID_REQUEST");
   const invalidEmail = await handleReservationRequest(request({ ...body(), customer: { ...body().customer, email: "not-an-email" } }), { supabaseAdmin: mock.client });
-  assert.equal((await json(invalidEmail)).error.code, "INVALID_CUSTOMER");
+  assert.equal(await errorCode(invalidEmail), "INVALID_CUSTOMER");
   assert.equal(mock.calls.length, 0);
 });

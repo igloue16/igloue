@@ -131,13 +131,14 @@ export function validateServiceChoices(service: unknown, productId?: string) {
   if (typeof value.setupMode !== "string" || !(value.setupMode in IGLOUE_SERVER_PRICING.setup)) {
     return invalid("INVALID_SETUP", "Invalid setupMode");
   }
+  const expressSelected = value.expressSelected;
   if (productId && !(IGLOUE_SERVER_ALLOWED_SETUP_MODES[productId as keyof typeof IGLOUE_SERVER_ALLOWED_SETUP_MODES] as readonly string[])?.includes(value.setupMode)) {
     return invalid("INVALID_SETUP", "Setup mode is not compatible with this product");
   }
-  if (value.expressSelected !== undefined && typeof value.expressSelected !== "boolean") {
+  if (expressSelected !== undefined && typeof expressSelected !== "boolean") {
     return invalid("INVALID_REQUEST", "Invalid expressSelected");
   }
-  if (value.expressSelected === true) {
+  if (expressSelected === true) {
     return invalid("EXPRESS_NOT_ALLOWED", "Express delivery is not available for real reservations");
   }
   return {
@@ -146,7 +147,7 @@ export function validateServiceChoices(service: unknown, productId?: string) {
       deliverySlotId: value.deliverySlotId.trim(),
       collectionSlotId: value.collectionSlotId.trim(),
       setupMode: value.setupMode,
-      expressSelected: value.expressSelected === true,
+      expressSelected: false,
     },
   };
 }
