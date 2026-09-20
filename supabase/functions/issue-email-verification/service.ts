@@ -1,3 +1,5 @@
+import { encodeVerificationToken, tokenHashBytea } from "./token.ts";
+
 const TOKEN_BYTE_LENGTH = 32;
 const TOKEN_LIFETIME_MS = 30 * 60 * 1000;
 
@@ -7,16 +9,6 @@ export type EmailVerificationRpc = {
     error: { code?: string; message?: string } | null;
   }>;
 };
-
-function toBase64Url(bytes: Uint8Array) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function toByteaLiteral(bytes: Uint8Array) {
-  return `\\x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-}
 
 function isUuid(value: unknown): value is string {
   return typeof value === "string" &&
@@ -33,14 +25,14 @@ export async function issueEmailVerificationToken(
 
   const rawBytes = new Uint8Array(TOKEN_BYTE_LENGTH);
   crypto.getRandomValues(rawBytes);
-  const rawToken = toBase64Url(rawBytes);
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", rawBytes));
+  const rawToken = encodeVerificationToken(rawBytes);
+  const tokenHash = await tokenHashBytea(rawBytes);
   const now = dependencies.now ?? new Date();
   const requestedExpiry = new Date(now.getTime() + TOKEN_LIFETIME_MS).toISOString();
 
   const { data, error } = await dependencies.rpc.rpc("issue_email_verification_token", {
     p_reservation_id: reservationId,
-    p_token_hash: toByteaLiteral(digest),
+    p_token_hash: tokenHash,
     p_requested_expires_at: requestedExpiry,
   });
 
