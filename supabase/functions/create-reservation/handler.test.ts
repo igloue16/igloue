@@ -6,7 +6,7 @@ const NOW = new Date("2027-01-01T12:00:00Z");
 function body(overrides: Record<string, unknown> = {}) {
   return {
     idempotencyKey: "handler-test-1",
-    customer: { firstName: "Ada", lastName: "Loue", email: "ada@example.com", phone: null },
+    customer: { firstName: "Ada", lastName: "Loue", email: "ada@example.com", phone: "06 12 34 56 78" },
     productId: "essential",
     deliveryAddress: { line1: "1 Rue Test", line2: null, postcode: "16000", city: "Angouleme" },
     rental: { startDate: "2027-07-12", endDate: "2027-07-19" },

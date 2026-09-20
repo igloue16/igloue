@@ -29,6 +29,14 @@ function isValidServiceWindowId(slotId: string) {
   return IGLOUE_SERVER_SERVICE_WINDOWS.some((serviceWindow) => serviceWindow.id === slotId);
 }
 
+function normalizeFrenchPhone(value: unknown) {
+  if (typeof value !== "string") return null;
+  const compact = value.trim().replace(/[.\s()-]/g, "");
+  if (/^0[1-9]\d{8}$/.test(compact)) return compact;
+  if (/^\+33[1-9]\d{8}$/.test(compact)) return `0${compact.slice(3)}`;
+  return null;
+}
+
 export function validateProductId(productId: unknown) {
   if (typeof productId !== "string" || !(productId in IGLOUE_SERVER_PRICING.products)) {
     return invalid("INVALID_PRODUCT", "Invalid productId");
@@ -50,7 +58,8 @@ export function validateCustomer(customer: unknown) {
   if (typeof value.email !== "string" || !validLength(value.email, 254) || !/^\S+@\S+\.\S+$/.test(value.email.trim())) {
     return invalid("INVALID_CUSTOMER", "Invalid email");
   }
-  if (value.phone !== undefined && value.phone !== null && (typeof value.phone !== "string" || value.phone.trim().length > 32)) {
+  const phone = normalizeFrenchPhone(value.phone);
+  if (!phone) {
     return invalid("INVALID_CUSTOMER", "Invalid phone");
   }
   return {
@@ -59,7 +68,7 @@ export function validateCustomer(customer: unknown) {
       firstName: value.firstName.trim(),
       lastName: value.lastName.trim(),
       email: value.email.trim(),
-      phone: typeof value.phone === "string" ? value.phone.trim() : null,
+      phone,
     },
   };
 }

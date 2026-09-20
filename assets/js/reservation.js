@@ -141,6 +141,14 @@ function normalizeReservationOptionalText(value) {
   return normalized || null;
 }
 
+function normalizeReservationPhone(value) {
+  if (typeof value !== "string") return "";
+  const compact = value.trim().replace(/[.\s()-]/g, "");
+  if (/^0[1-9]\d{8}$/.test(compact)) return compact;
+  if (/^\+33[1-9]\d{8}$/.test(compact)) return `0${compact.slice(3)}`;
+  return "";
+}
+
 function isBasicReservationEmail(value) {
   return /^\S+@\S+\.\S+$/.test(value);
 }
@@ -174,6 +182,14 @@ function validateNormalizedReservationDraft(reservation, minimumNights = 3) {
       addIssue("customer-missing", "customer", message);
     }
   });
+
+  if (!normalizeReservationPhone(customer.phone)) {
+    addIssue(
+      "customer-phone-invalid",
+      "customer",
+      "Saisissez un numéro de téléphone français valide."
+    );
+  }
 
   if (
     normalizeReservationRequiredText(customer.email) &&
@@ -310,9 +326,9 @@ function buildNormalizedReservationDraft(state) {
       email: normalizeReservationRequiredText(
         state.customerDetails && state.customerDetails.email
       ),
-      phone: normalizeReservationOptionalText(
+      phone: normalizeReservationPhone(
         state.customerDetails && state.customerDetails.phone
-      )
+      ) || null
     },
 
     deliveryAddress: {

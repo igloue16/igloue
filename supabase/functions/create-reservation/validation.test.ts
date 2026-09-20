@@ -1,11 +1,21 @@
 import assert from "node:assert/strict";
 import {
+  validateCustomer,
   validateRentalDates,
   validateServiceChoices,
 } from "./validation.ts";
 import { buildServerOperationalPeriod } from "./operations.ts";
 
 const NOW = new Date("2027-01-01T12:00:00Z");
+
+Deno.test("customer phone is required and normalized to a French national number", () => {
+  const base = { firstName: "Ada", lastName: "Loue", email: "ada@example.com" };
+  assert.equal(validateCustomer({ ...base, phone: "   " }).ok, false);
+  assert.equal(validateCustomer({ ...base, phone: "06 12 34 56 78" }).ok, true);
+  const international = validateCustomer({ ...base, phone: "+33 6 12 34 56 78" });
+  assert.equal(international.ok, true);
+  if (international.ok) assert.equal(international.customer.phone, "0612345678");
+});
 
 function service(setupMode: string, expressSelected = false) {
   return {

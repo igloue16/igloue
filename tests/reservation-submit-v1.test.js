@@ -38,7 +38,7 @@ vm.runInContext(`
     }
   };
   const currentDraft = {
-    customer: { firstName: "Ada", lastName: "Loue", email: "ada@example.com", phone: null },
+    customer: { firstName: "Ada", lastName: "Loue", email: "ada@example.com", phone: "0612345678" },
     deliveryAddress: { line1: "1 Rue Test", line2: null, postcode: "16000", city: "Angouleme" },
     location: { postcode: "16000", zone: { id: "local", name: "Angoulême proche" } },
     product: { selectedProductId: "essential", recommendedProductId: "essential" },

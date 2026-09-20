@@ -210,6 +210,7 @@ const ASSISTANT_I18N = {
       lastName: "Nom",
       email: "E-mail",
       phone: "Téléphone",
+      phoneError: "Saisissez un numéro de téléphone français valide.",
       line1: "Adresse",
       line2: "Complément d’adresse",
       city: "Ville",
@@ -4062,8 +4063,8 @@ function showCustomerDetailsStage(addToHistory = true) {
             </div>
 
             <div class="assistant-customer-field">
-              <label class="assistant-label" for="assistant-phone">${copy.phone} <span class="assistant-optional">(${copy.optional})</span></label>
-              <input class="assistant-line-input" id="assistant-phone" name="phone" type="tel" autocomplete="tel" aria-describedby="assistant-phone-error" aria-invalid="false" value="${escapeAssistantHtml(customer.phone)}">
+              <label class="assistant-label" for="assistant-phone">${copy.phone}</label>
+              <input class="assistant-line-input" id="assistant-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required aria-describedby="assistant-phone-error" aria-invalid="false" value="${escapeAssistantHtml(customer.phone)}">
               <p class="assistant-error" id="assistant-phone-error" role="alert" hidden></p>
             </div>
 
@@ -4134,7 +4135,7 @@ function showCustomerDetailsStage(addToHistory = true) {
       event.preventDefault();
 
       const errors = [];
-      const requiredFields = ["firstName", "lastName", "email", "line1", "city"];
+      const requiredFields = ["firstName", "lastName", "email", "phone", "line1", "city"];
 
       requiredFields.forEach((name) => {
         const [inputSelector, errorSelector] = fields[name];
@@ -4146,6 +4147,8 @@ function showCustomerDetailsStage(addToHistory = true) {
           message = copy.requiredError;
         } else if (name === "email" && !/^\S+@\S+\.\S+$/.test(value)) {
           message = copy.emailError;
+        } else if (name === "phone" && !/^0[1-9](?:[.\s()-]?\d{2}){4}$/.test(value) && !/^\+33(?:[.\s()-]?\d){9}$/.test(value)) {
+          message = copy.phoneError;
         }
 
         setFieldError(assistant, inputSelector, errorSelector, message);

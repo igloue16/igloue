@@ -157,6 +157,9 @@ requestButton.click();
 
 const form = assistantRoot.querySelector("[data-customer-details-form]");
 assert.ok(form, "customer-details stage renders");
+assert.equal(assistantRoot.querySelector("#assistant-phone").attributes.autocomplete, "tel", "phone exposes tel autocomplete");
+assert.equal(assistantRoot.querySelector("#assistant-phone").attributes.required, "", "phone is required");
+assert.equal(assistantRoot.querySelector("#assistant-address-line1").attributes.autocomplete, "address-line1", "address exposes address-line1 autocomplete");
 assert.equal(assistantRoot.querySelector("#assistant-postcode"), null, "postcode is not editable in this stage");
 assert.match(assistantRoot.innerHTML, /16000/, "existing postcode is displayed");
 assert.ok(assistantRoot.querySelector("[data-change-postcode]"), "postcode change action is available");
@@ -200,6 +203,7 @@ for (const [missingSelector, errorSelector] of [
   ["#assistant-first-name", "#assistant-first-name-error"],
   ["#assistant-last-name", "#assistant-last-name-error"],
   ["#assistant-email", "#assistant-email-error"],
+  ["#assistant-phone", "#assistant-phone-error"],
   ["#assistant-address-line1", "#assistant-address-line1-error"],
   ["#assistant-city", "#assistant-city-error"]
 ]) {
@@ -218,7 +222,8 @@ assistantRoot.querySelector("#assistant-phone").dispatchEvent({ type: "input" })
 assistantRoot.querySelector("#assistant-address-line2").value = "";
 assistantRoot.querySelector("#assistant-address-line2").dispatchEvent({ type: "input" });
 assistantRoot.querySelector("[data-customer-details-form]").dispatchEvent({ type: "submit", preventDefault() {} });
-assert.equal(assistantRoot.querySelector("#assistant-phone").attributes["aria-invalid"], "false", "blank optional phone is accepted");
+assert.equal(assistantRoot.querySelector("#assistant-phone").attributes["aria-invalid"], "true", "blank phone is rejected");
+assert.equal(assistantRoot.querySelector("#assistant-phone-error").hidden, false, "blank phone shows an error");
 assert.equal(assistantRoot.querySelector("#assistant-address-line2").attributes["aria-invalid"], undefined, "blank optional line2 has no validation error");
 assert.equal(assistantRoot.querySelector("#assistant-first-name-error").hidden, true, "optional blanks do not add a first-name error");
 assert.equal(assistantRoot.querySelector("#assistant-email-error").hidden, true, "optional blanks do not add an email error");

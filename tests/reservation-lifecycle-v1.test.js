@@ -67,7 +67,7 @@ assert.deepEqual(draft.customer, {
   firstName: "Ada",
   lastName: "O'Connor",
   email: "ada@example.com",
-  phone: "+33 6 12 34 56 78"
+  phone: "0612345678"
 }, "A: normalized customer details");
 assert.deepEqual(draft.deliveryAddress, {
   line1: "1 rue des Lilas",
@@ -110,8 +110,8 @@ context.optionalCustomerDraft.customer.phone = null;
 context.optionalCustomerDraft.deliveryAddress.line2 = null;
 assert.equal(
   evaluate("validateNormalizedReservationDraft(optionalCustomerDraft, 3).valid"),
-  true,
-  "A: optional phone and address complement may be null"
+  false,
+  "A: missing phone blocks review readiness while address complement may be null"
 );
 
 context.blankOptionalState = JSON.parse(JSON.stringify(context.assistantLikeState));

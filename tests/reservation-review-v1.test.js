@@ -61,7 +61,7 @@ vm.runInContext(`
       firstName: "Ada",
       lastName: "O'Connor",
       email: "ada@example.com",
-      phone: null
+      phone: "0612345678"
     },
     deliveryAddress: {
       line1: "1 rue des Lilas",
@@ -257,16 +257,16 @@ assert.match(renderedReview, /ada@example\.com/, "I: customer email is displayed
 assert.match(renderedReview, /1 rue des Lilas/, "I: delivery address is displayed");
 assert.match(renderedReview, /16000 · Angoulême/, "I: postcode and city are displayed");
 assert.doesNotMatch(renderedReview, /customerId/, "I: internal customer ID is not displayed");
-assert.doesNotMatch(renderedReview, /Téléphone/, "I: blank phone is omitted");
+assert.match(renderedReview, /0612345678/, "I: normalized phone is displayed");
 assert.doesNotMatch(renderedReview, /Bâtiment/, "I: blank address complement is omitted");
 assert.match(renderedReview, /data-review-edit="customer"/, "I: customer edit action exists");
 reviewButtons[0].click();
 assert.equal(customerEditTriggered, true, "I: customer edit routes to the details stage");
 
-context.currentDraft.customer.phone = "+33 6 12 34 56 78";
+context.currentDraft.customer.phone = "0612345678";
 context.currentDraft.deliveryAddress.line2 = "<script>alert(1)</script>";
 evaluate("showReservationReview(false)");
-assert.match(renderedReview, /\+33 6 12 34 56 78/, "I: provided phone is displayed");
+assert.match(renderedReview, /0612345678/, "I: provided phone is displayed");
 assert.match(renderedReview, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/, "I: address HTML is escaped");
 
 vm.runInContext(`
