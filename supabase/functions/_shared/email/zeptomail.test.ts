@@ -39,7 +39,7 @@ Deno.test("sends an allowlisted request with the ZeptoMail payload", async () =>
 
 Deno.test("fails safely when the token is missing or blank", async () => {
   const fake = fakeFetch();
-  assert.deepEqual(await sendZeptoMail(validInput, { fetchImpl: fake.fetchImpl, getToken: () => "   " }), { ok: false, code: "MISSING_CONFIGURATION" });
+  assert.deepEqual(await sendZeptoMail(validInput, { fetchImpl: fake.fetchImpl, getToken: () => "   " }), { ok: false, code: "missing_configuration", retryable: true });
   assert.equal(fake.calls.length, 0);
 });
 
@@ -49,38 +49,38 @@ Deno.test("rejects disallowed senders before any network request", async () => {
     fetchImpl: fake.fetchImpl,
     getToken: () => "test-token-never-real",
   });
-  assert.deepEqual(result, { ok: false, code: "INVALID_SENDER" });
+  assert.deepEqual(result, { ok: false, code: "invalid_sender", retryable: false });
   assert.equal(fake.calls.length, 0);
 });
 
-Deno.test("normalizes provider and network failures without exposing details", async () => {
+Deno.test("classifies provider and network failures without exposing details", async () => {
   const provider = fakeFetch(new Response("provider secret body", { status: 503 }));
-  assert.deepEqual(await sendZeptoMail(validInput, { fetchImpl: provider.fetchImpl, getToken: () => "test-token-never-real" }), { ok: false, code: "DELIVERY_FAILED" });
+  assert.deepEqual(await sendZeptoMail(validInput, { fetchImpl: provider.fetchImpl, getToken: () => "test-token-never-real" }), { ok: false, code: "provider_unavailable", retryable: true });
 
   const network = fakeFetch(new Error("private network detail"));
   const result = await sendZeptoMail(validInput, { fetchImpl: network.fetchImpl, getToken: () => "test-token-never-real" });
-  assert.deepEqual(result, { ok: false, code: "DELIVERY_FAILED" });
+  assert.deepEqual(result, { ok: false, code: "provider_unavailable", retryable: true });
   assert.equal(JSON.stringify(result).includes("private"), false);
-  assert.equal(JSON.stringify(result).includes("provider"), false);
+  assert.equal(JSON.stringify(result).includes("provider secret body"), false);
 });
 
 Deno.test("aborts a request that exceeds the configured timeout", async () => {
   const fetchImpl = async (_url: string | URL | Request, init?: RequestInit) =>
     await new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
     });
   const result = await sendZeptoMail(validInput, {
     fetchImpl,
     getToken: () => "test-token-never-real",
     timeoutMs: 1,
   });
-  assert.deepEqual(result, { ok: false, code: "DELIVERY_FAILED" });
+  assert.deepEqual(result, { ok: false, code: "provider_timeout", retryable: true });
 });
 
 Deno.test("rejects invalid content without contacting ZeptoMail", async () => {
   const fake = fakeFetch();
-  assert.deepEqual(await sendZeptoMail({ ...validInput, recipient: "not-an-email" }, { fetchImpl: fake.fetchImpl, getToken: () => "test-token-never-real" }), { ok: false, code: "INVALID_REQUEST" });
-  assert.deepEqual(await sendZeptoMail({ ...validInput, subject: "   " }, { fetchImpl: fake.fetchImpl, getToken: () => "test-token-never-real" }), { ok: false, code: "INVALID_REQUEST" });
+  assert.deepEqual(await sendZeptoMail({ ...validInput, recipient: "not-an-email" }, { fetchImpl: fake.fetchImpl, getToken: () => "test-token-never-real" }), { ok: false, code: "invalid_message", retryable: false });
+  assert.deepEqual(await sendZeptoMail({ ...validInput, subject: "   " }, { fetchImpl: fake.fetchImpl, getToken: () => "test-token-never-real" }), { ok: false, code: "invalid_message", retryable: false });
   assert.equal(fake.calls.length, 0);
 });
 
@@ -94,9 +94,44 @@ Deno.test("rejects a request with no HTML or text body without exposing data", a
     fetchImpl: fake.fetchImpl,
     getToken: () => "test-token-never-real",
   });
-  assert.deepEqual(result, { ok: false, code: "INVALID_REQUEST" });
+  assert.deepEqual(result, { ok: false, code: "invalid_message", retryable: false });
   assert.equal(fake.calls.length, 0);
   assert.equal(JSON.stringify(result).includes("test-token-never-real"), false);
   assert.equal(JSON.stringify(result).includes("Confirmation"), false);
   assert.equal(JSON.stringify(result).includes("client@example.com"), false);
+});
+
+Deno.test("classifies HTTP statuses without reading provider response bodies", async () => {
+  const statuses = [
+    [408, "provider_timeout", true],
+    [429, "provider_rate_limited", true],
+    [400, "delivery_rejected", false],
+    [401, "delivery_rejected", false],
+    [403, "delivery_rejected", false],
+    [404, "delivery_rejected", false],
+    [409, "delivery_rejected", false],
+    [422, "delivery_rejected", false],
+    [500, "provider_unavailable", true],
+    [503, "provider_unavailable", true],
+  ] as const;
+  for (const [status, code, retryable] of statuses) {
+    const fake = fakeFetch(new Response("private provider response", { status }));
+    const result = await sendZeptoMail(validInput, {
+      fetchImpl: fake.fetchImpl,
+      getToken: () => "test-token-never-real",
+    });
+    assert.deepEqual(result, { ok: false, code, retryable });
+    assert.equal(JSON.stringify(result).includes("private"), false);
+  }
+});
+
+Deno.test("normalizes an unexpected token-provider exception safely", async () => {
+  const fake = fakeFetch();
+  const result = await sendZeptoMail(validInput, {
+    fetchImpl: fake.fetchImpl,
+    getToken: () => { throw new Error("private token-provider detail"); },
+  });
+  assert.deepEqual(result, { ok: false, code: "delivery_failed", retryable: true });
+  assert.equal(fake.calls.length, 0);
+  assert.equal(JSON.stringify(result).includes("private"), false);
 });

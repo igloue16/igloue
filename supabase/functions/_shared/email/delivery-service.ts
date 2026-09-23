@@ -9,12 +9,25 @@ type TransportInput = {
   textBody: string;
 };
 
-type TransportResult = { ok: true } | { ok: false };
+export type TransactionalEmailErrorCode =
+  | "provider_timeout"
+  | "provider_unavailable"
+  | "provider_rate_limited"
+  | "delivery_rejected"
+  | "missing_configuration"
+  | "invalid_message"
+  | "invalid_sender"
+  | "delivery_failed";
+
+type TransportResult =
+  | { ok: true }
+  | { ok: false; code: TransactionalEmailErrorCode; retryable: boolean };
 type EmailTransport = (input: TransportInput) => Promise<TransportResult>;
 
 export type EmailDeliveryResult =
   | { status: "delivered" }
-  | { status: "failed" };
+  | { status: "retryable_failure"; errorCode: TransactionalEmailErrorCode }
+  | { status: "terminal_failure"; errorCode: TransactionalEmailErrorCode };
 
 export type EmailDeliveryDependencies = {
   transport?: EmailTransport;
@@ -34,8 +47,11 @@ export async function deliverTransactionalEmail(
       htmlBody: message.htmlBody,
       textBody: message.textBody,
     });
-    return result.ok ? { status: "delivered" } : { status: "failed" };
+    if (result.ok) return { status: "delivered" };
+    return result.retryable
+      ? { status: "retryable_failure", errorCode: result.code }
+      : { status: "terminal_failure", errorCode: result.code };
   } catch {
-    return { status: "failed" };
+    return { status: "retryable_failure", errorCode: "delivery_failed" };
   }
 }

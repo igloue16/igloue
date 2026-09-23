@@ -12,7 +12,7 @@ const baseData = {
   totalAmount: "88,00 €",
 };
 
-function captureTransport(result: { ok: boolean } = { ok: true }) {
+function captureTransport(result: { ok: true } | { ok: false; code: "provider_timeout" | "provider_unavailable" | "provider_rate_limited" | "delivery_rejected" | "missing_configuration" | "invalid_message" | "invalid_sender" | "delivery_failed"; retryable: boolean } = { ok: true }) {
   const calls: Array<Record<string, string>> = [];
   const transport = async (input: Record<string, string>) => {
     calls.push(input);
@@ -50,11 +50,11 @@ Deno.test("maps an English message and preserves both body formats", async () =>
   assert.equal(fake.calls[0].textBody, message.textBody);
 });
 
-Deno.test("collapses every transport failure without leaking provider details", async () => {
+Deno.test("preserves safe retryable and terminal classifications without leaking provider details", async () => {
   const failures = [
-    { ok: false },
-    { ok: false, code: "DELIVERY_FAILED", status: 503, providerMessageId: "private-id" },
-    { ok: false, code: "MISSING_CONFIGURATION", authorization: "private-token" },
+    { ok: false as const, code: "provider_unavailable" as const, retryable: true },
+    { ok: false as const, code: "delivery_rejected" as const, retryable: false },
+    { ok: false as const, code: "missing_configuration" as const, retryable: true },
   ];
 
   for (const failure of failures) {
@@ -63,9 +63,9 @@ Deno.test("collapses every transport failure without leaking provider details", 
       buildReservationConfirmationEmail(baseData, "fr"),
       { transport: fake.transport },
     );
-    assert.deepEqual(result, { status: "failed" });
-    assert.equal(JSON.stringify(result).includes("DELIVERY_FAILED"), false);
-    assert.equal(JSON.stringify(result).includes("private"), false);
+    assert.deepEqual(result, failure.retryable
+      ? { status: "retryable_failure", errorCode: failure.code }
+      : { status: "terminal_failure", errorCode: failure.code });
     assert.equal(fake.calls.length, 1);
   }
 });
@@ -77,11 +77,11 @@ Deno.test("does not retry after a failed transport call", async () => {
     {
       transport: async () => {
         calls += 1;
-        return { ok: false };
+        return { ok: false, code: "provider_unavailable", retryable: true };
       },
     },
   );
-  assert.deepEqual(result, { status: "failed" });
+  assert.deepEqual(result, { status: "retryable_failure", errorCode: "provider_unavailable" });
   assert.equal(calls, 1);
 });
 
@@ -96,7 +96,7 @@ Deno.test("converts a thrown transport failure to a single safe failure", async 
       },
     },
   );
-  assert.deepEqual(result, { status: "failed" });
+  assert.deepEqual(result, { status: "retryable_failure", errorCode: "delivery_failed" });
   assert.equal(calls, 1);
   assert.equal(JSON.stringify(result).includes("private"), false);
 });
