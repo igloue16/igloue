@@ -30,6 +30,7 @@ const authenticatedHandler = withSupabase(
       supabaseAdmin: context.supabaseAdmin,
       lookupCustomerEmail,
       publicBaseUrl: Deno.env.get("IGLOUE_PUBLIC_BASE_URL") ?? "",
+      paymentCapabilitySecret: Deno.env.get("PAYMENT_CAPABILITY_SECRET"),
       verificationDelivery: noOpVerificationEmailDelivery,
       logError: console.error,
     });

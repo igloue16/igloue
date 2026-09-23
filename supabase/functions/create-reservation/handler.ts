@@ -13,6 +13,7 @@ import {
 } from "./validation.ts";
 import { noOpVerificationEmailDelivery, type VerificationEmailDelivery } from "../issue-email-verification/delivery.ts";
 import { orchestrateEmailVerification } from "../issue-email-verification/orchestrate.ts";
+import { derivePaymentCapability, paymentCapabilityHash } from "./payment-capability.ts";
 
 const MAX_BODY_BYTES = 16 * 1024;
 const CORS_HEADERS = Object.freeze({
@@ -36,6 +37,7 @@ type Dependencies = {
   lookupCustomerEmail?: (reservationId: string, customerId: string) => Promise<string | null>;
   publicBaseUrl?: string;
   verificationDelivery?: VerificationEmailDelivery;
+  paymentCapabilitySecret?: string;
 };
 
 function response(body: unknown, status: number) {
@@ -182,10 +184,23 @@ export async function handleReservationRequest(
     expressSelected: serviceValidation.service.expressSelected,
   });
 
+  const paymentCapabilitySecret = dependencies.paymentCapabilitySecret ?? Deno.env.get("PAYMENT_CAPABILITY_SECRET")?.trim();
+  if (!paymentCapabilitySecret) return errorResponse(500, "INTERNAL_ERROR");
+
+  let paymentCapability: string;
+  let paymentCapabilityHashValue: string;
+  try {
+    paymentCapability = await derivePaymentCapability(idempotencyKey, paymentCapabilitySecret);
+    paymentCapabilityHashValue = await paymentCapabilityHash(paymentCapability);
+  } catch {
+    return errorResponse(500, "INTERNAL_ERROR");
+  }
+
   let data: unknown;
   let error: { code?: string; message?: string } | null;
   try {
-    ({ data, error } = await dependencies.supabaseAdmin.rpc("create_reservation_transaction", {
+    ({ data, error } = await dependencies.supabaseAdmin.rpc("create_reservation_with_payment_capability", {
+    p_capability_hash: paymentCapabilityHashValue,
     p_first_name: customerValidation.customer.firstName,
     p_last_name: customerValidation.customer.lastName,
     p_email: customerValidation.customer.email,
@@ -237,6 +252,10 @@ export async function handleReservationRequest(
     return errorResponse(500, "INTERNAL_ERROR");
   }
 
+  if (created.reservation_status === "pending" && created.payment_capability_matched !== true) {
+    return errorResponse(409, "PAYMENT_CAPABILITY_UNAVAILABLE");
+  }
+
   if (created.created_new === true && dependencies.lookupCustomerEmail && dependencies.publicBaseUrl) {
     try {
       const destination = await dependencies.lookupCustomerEmail(
@@ -272,7 +291,7 @@ export async function handleReservationRequest(
     if (Date.parse(expires) <= now) return errorResponse(409, "RESERVATION_EXPIRED");
   }
 
-  return response({
+  const result = {
     ok: true,
     reservation: {
       reference: created.reservation_id,
@@ -291,5 +310,7 @@ export async function handleReservationRequest(
       totalAmount: pricing.totalAmount,
       depositAmount: pricing.depositAmount,
     },
-  }, 201);
+    ...(created.reservation_status === "pending" && expires ? { paymentCapability } : {}),
+  };
+  return response(result, 201);
 }

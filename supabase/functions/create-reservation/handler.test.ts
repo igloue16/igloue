@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { handleReservationRequest } from "./handler.ts";
 
+Deno.env.set("PAYMENT_CAPABILITY_SECRET", "test-payment-secret");
+
 const NOW = new Date("2027-01-01T12:00:00Z");
 
 function body(overrides: Record<string, unknown> = {}) {
@@ -54,10 +56,17 @@ async function errorCode(response: Response): Promise<string> {
 }
 
 Deno.test("returns an allowlisted success with authoritative state and pricing", async () => {
-  const mock = rpc([{ reservation_id: "res-1", reservation_status: "pending", hold_expires_at: "2027-07-12T10:30:00Z", created_new: true, customer_id: "customer-secret", allocation_id: "allocation-secret", machine_id: "machine-secret", delivery_job_id: "job-secret", collection_job_id: "job-secret-2" }]);
+  const mock = rpc([{ reservation_id: "res-1", reservation_status: "pending", hold_expires_at: "2027-07-12T10:30:00Z", payment_capability_matched: true, created_new: true, customer_id: "customer-secret", allocation_id: "allocation-secret", machine_id: "machine-secret", delivery_job_id: "job-secret", collection_job_id: "job-secret-2" }]);
   const response = await handleReservationRequest(request(body()), { supabaseAdmin: mock.client, now: NOW });
   const result = await json(response);
   assert.equal(response.status, 201);
+  const paymentCapability = result.paymentCapability;
+  delete result.paymentCapability;
+  assert.equal(typeof paymentCapability, "string");
+  assert.match(paymentCapability as string, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(mock.calls[0].name, "create_reservation_with_payment_capability");
+  assert.match(String(mock.calls[0].parameters.p_capability_hash), /^\\x[0-9a-f]{64}$/);
+  assert.equal(String(mock.calls[0].parameters.p_capability_hash).includes(paymentCapability as string), false);
   assert.deepEqual(result, {
     ok: true,
     reservation: { reference: "res-1", status: "pending", holdExpiresAt: "2027-07-12T10:30:00.000Z" },
@@ -112,7 +121,7 @@ Deno.test("maps stock conflicts and expired retries without false hold claims", 
 
 Deno.test("fails closed for missing or elapsed pending holds", async () => {
   for (const hold_expires_at of [null, "2026-12-31T00:00:00Z"]) {
-    const mock = rpc([{ reservation_id: "res-pending", reservation_status: "pending", hold_expires_at }]);
+    const mock = rpc([{ reservation_id: "res-pending", reservation_status: "pending", hold_expires_at, payment_capability_matched: true }]);
     const response = await handleReservationRequest(request(body()), { supabaseAdmin: mock.client, now: NOW });
     assert.equal(response.status, hold_expires_at === null ? 503 : 409);
     assert.equal(await errorCode(response), hold_expires_at === null ? "RESERVATION_UNAVAILABLE" : "RESERVATION_EXPIRED");
@@ -192,13 +201,14 @@ Deno.test("uses created_new as the sole verification orchestration gate", async 
   const client = {
     async rpc(name: string) {
       calls.push(name);
-      if (name === "create_reservation_transaction") {
+      if (name === "create_reservation_with_payment_capability") {
         return {
           data: [{
             reservation_id: "00000000-0000-4000-8000-000000000001",
             customer_id: "00000000-0000-4000-8000-000000000002",
             reservation_status: "pending",
             hold_expires_at: "2027-07-12T10:30:00Z",
+            payment_capability_matched: true,
             created_new: !replay,
           }],
           error: null,
@@ -247,4 +257,46 @@ Deno.test("uses created_new as the sole verification orchestration gate", async 
   assert.equal(lookups, 1);
   assert.equal(deliveries, 1);
   assert.equal(calls.filter((name) => name === "issue_email_verification_token").length, 1);
+});
+
+Deno.test("rotated-secret replay fails closed without returning the new capability", async () => {
+  let storedHash = "";
+  const client = {
+    async rpc(_name: string, parameters: Record<string, unknown>) {
+      const hash = String(parameters.p_capability_hash);
+      if (!storedHash) storedHash = hash;
+      return {
+        data: [{
+          reservation_id: "00000000-0000-4000-8000-000000000501",
+          reservation_status: "pending",
+          hold_expires_at: "2027-07-12T10:30:00Z",
+          payment_capability_matched: hash === storedHash,
+          created_new: false,
+        }],
+        error: null,
+      };
+    },
+  };
+
+  const first = await handleReservationRequest(request(body()), {
+    supabaseAdmin: client,
+    now: NOW,
+    paymentCapabilitySecret: "rotation-secret-a",
+  });
+  assert.equal(first.status, 201);
+  const firstBody = await json(first);
+  const firstCapability = firstBody.paymentCapability;
+  assert.equal(typeof firstCapability, "string");
+
+  const replay = await handleReservationRequest(request(body()), {
+    supabaseAdmin: client,
+    now: NOW,
+    paymentCapabilitySecret: "rotation-secret-b",
+  });
+  assert.equal(replay.status, 409);
+  const replayBody = await json(replay);
+  assert.deepEqual(replayBody, { ok: false, error: { code: "PAYMENT_CAPABILITY_UNAVAILABLE" } });
+  assert.equal(JSON.stringify(replayBody).includes(storedHash), false);
+  assert.equal(JSON.stringify(replayBody).includes("rotation-secret-b"), false);
+  assert.equal(JSON.stringify(replayBody).includes(String(firstCapability)), false);
 });
