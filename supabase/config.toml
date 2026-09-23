@@ -430,3 +430,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/check-availability/deno.json"
 entrypoint = "./functions/check-availability/index.ts"
+
+[functions.process-outbox]
+enabled = true
+verify_jwt = false
+import_map = "./functions/process-outbox/deno.json"
+entrypoint = "./functions/process-outbox/index.ts"
