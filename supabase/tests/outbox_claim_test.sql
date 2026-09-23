@@ -93,7 +93,7 @@ insert into public.outbox_events (
     (select id from public.organisations where slug = 'igloue'),
     'reservation.confirmed', 'reservation',
     '00000000-0000-4000-8000-000000002905',
-    '{"order":"processing"}'::jsonb, 'processing', 4, now() - interval '5 minutes'
+    '{"order":"processing"}'::jsonb, 'pending', 4, now() - interval '5 minutes'
 ),
 (
     '00000000-0000-4000-8000-000000002906',
@@ -102,6 +102,13 @@ insert into public.outbox_events (
     '00000000-0000-4000-8000-000000002906',
     '{"order":"failed"}'::jsonb, 'failed', 1, now() - interval '6 minutes'
 );
+
+update public.outbox_events
+set status = 'processing',
+    lease_expires_at = now() + interval '10 minutes',
+    claim_token = '00000000-0000-4000-8000-000000002905'::uuid,
+    last_attempt_at = now()
+where id = '00000000-0000-4000-8000-000000002905';
 
 insert into public.outbox_events (
     id, organisation_id, event_type, aggregate_type, aggregate_id,
