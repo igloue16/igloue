@@ -436,3 +436,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/process-outbox/deno.json"
 entrypoint = "./functions/process-outbox/index.ts"
+
+[functions.create-checkout-session]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-checkout-session/deno.json"
+entrypoint = "./functions/create-checkout-session/index.ts"

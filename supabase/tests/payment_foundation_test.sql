@@ -63,6 +63,10 @@ select throws_ok($$insert into public.payment_attempts (organisation_id, reserva
 select throws_ok($$insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', -1, 'EUR', 'created', 'payment-test-007')$$, '23514', null, 'negative amount is rejected');
 select throws_ok($$insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 1, 'EUR', 'created', ' ')$$, '23514', null, 'blank payment idempotency is rejected');
 
+update public.payment_attempts
+set status = 'failed'
+where id = '00000000-0000-4000-8000-00000000a001';
+
 insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key)
 values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 10, 'EUR', 'failed', 'payment-test-008');
 select ok(true, 'failed retry attempt is permitted');
@@ -71,9 +75,14 @@ insert into public.payment_attempts (organisation_id, reservation_id, provider, 
 values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 10, 'EUR', 'checkout_open', 'payment-test-009', 'cs_test_001', 'pi_test_001');
 select throws_ok($$insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key, provider_checkout_session_id) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 10, 'EUR', 'checkout_open', 'payment-test-010', 'cs_test_001')$$, '23505', null, 'duplicate Checkout Session ID is rejected');
 select throws_ok($$insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key, provider_payment_intent_id) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 10, 'EUR', 'checkout_open', 'payment-test-011', 'pi_test_001')$$, '23505', null, 'duplicate PaymentIntent ID is rejected');
+
+update public.payment_attempts
+set status = 'failed'
+where idempotency_key = 'payment-test-009';
+
 insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key)
 values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 10, 'EUR', 'created', 'payment-test-012');
-select ok(true, 'multiple attempts with null provider IDs are permitted');
+select ok(true, 'new active attempt is permitted after prior attempts are terminal');
 
 insert into public.payment_attempts (organisation_id, reservation_id, provider, purpose, amount, currency, status, idempotency_key, paid_at)
 values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000a101', 'stripe', 'rental', 10, 'EUR', 'paid', 'payment-test-013', now());
