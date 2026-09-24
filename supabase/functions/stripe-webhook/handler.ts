@@ -1,14 +1,61 @@
 import { verifyStripeSignature } from "./signature.ts";
+import { payloadSha256 } from "./digest.ts";
+import type { ReceiptRpcClient } from "./receipt.ts";
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
 type Dependencies = {
   secret?: string;
   now?: Date;
+  receiptClient?: ReceiptRpcClient;
 };
 
 function response(code: string, status: number) {
   return Response.json({ ok: false, error: { code } }, { status });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type StripeEventEnvelope = {
+  id: string;
+  type: string;
+  created: string;
+  livemode: boolean;
+};
+
+function parseEventEnvelope(value: unknown): StripeEventEnvelope | null {
+  if (!isRecord(value)) return null;
+
+  const id = value.id;
+  const type = value.type;
+  const created = value.created;
+  const livemode = value.livemode;
+  if (typeof id !== "string" || id.length < 1 || id.length > 255 || id !== id.trim()) return null;
+  if (typeof type !== "string" || type.length < 1 || type.length > 255 || type !== type.trim()) return null;
+  if (typeof created !== "number" || !Number.isSafeInteger(created) || created <= 0) return null;
+  if (typeof livemode !== "boolean") return null;
+
+  const createdMilliseconds = created * 1000;
+  if (!Number.isSafeInteger(createdMilliseconds)) return null;
+  const createdAt = new Date(createdMilliseconds);
+  if (!Number.isFinite(createdAt.getTime())) return null;
+
+  return {
+    id,
+    type,
+    created: createdAt.toISOString(),
+    livemode,
+  };
+}
+
+function receiptResult(value: unknown): "recorded" | "duplicate" | "conflict" | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!isRecord(row)) return null;
+  return row.outcome === "recorded" || row.outcome === "duplicate" || row.outcome === "conflict"
+    ? row.outcome
+    : null;
 }
 
 export async function handleStripeWebhookRequest(request: Request, dependencies: Dependencies) {
@@ -51,5 +98,33 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
     return response("INVALID_PAYLOAD", 400);
   }
 
-  return response("WEBHOOK_NOT_READY", 503);
+  const event = parseEventEnvelope(payload);
+  if (!event) return response("INVALID_PAYLOAD", 400);
+  if (!dependencies.receiptClient) return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+
+  let digest: string;
+  try {
+    digest = await payloadSha256(rawBody);
+  } catch {
+    return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+  }
+
+  let receipt;
+  try {
+    receipt = await dependencies.receiptClient.rpc("receive_payment_provider_event", {
+      p_provider: "stripe",
+      p_provider_event_id: event.id,
+      p_event_type: event.type,
+      p_provider_event_created_at: event.created,
+      p_livemode: event.livemode,
+      p_payload_sha256: digest,
+    });
+  } catch {
+    return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+  }
+  if (receipt.error || !receiptResult(receipt.data)) {
+    return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+  }
+
+  return Response.json({ received: true }, { status: 200 });
 }
