@@ -47,6 +47,7 @@ function formBody(input: CheckoutRequest): URLSearchParams {
   const cents = amountToCents(input.amount);
   const body = new URLSearchParams();
   body.set("mode", "payment");
+  body.set("payment_method_types[0]", "card");
   body.set("currency", "eur");
   body.set("line_items[0][price_data][currency]", "eur");
   body.set("line_items[0][price_data][unit_amount]", String(cents));

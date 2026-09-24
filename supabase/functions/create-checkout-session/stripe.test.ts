@@ -37,6 +37,8 @@ Deno.test("Stripe adapter sends authoritative hosted Checkout fields", async () 
   assert.equal(request!.headers.get("Idempotency-Key"), "igloue:checkout-session:attempt-1");
   const body = new URLSearchParams(await request!.text());
   assert.equal(body.get("mode"), "payment");
+  assert.equal(body.get("payment_method_types[0]"), "card");
+  assert.deepEqual(body.getAll("payment_method_types[0]"), ["card"]);
   assert.equal(body.get("currency"), "eur");
   assert.equal(body.get("line_items[0][price_data][unit_amount]"), "7500");
   assert.equal(body.get("metadata[payment_attempt_id]"), "attempt-1");
