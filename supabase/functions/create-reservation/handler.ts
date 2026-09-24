@@ -3,7 +3,15 @@ import {
   isServerProductAvailableInZone,
 } from "./delivery.ts";
 import { buildServerOperationalPeriod } from "./operations.ts";
-import { calculateServerBookingPrice, IGLOUE_SERVER_PRICING } from "./pricing.ts";
+import {
+  calculateBasketPricing,
+  normalizeBasketInput,
+  normalizeProductAuthority,
+  staticProductAuthority,
+  validateBasketProducts,
+  validateBasketSetup,
+} from "./basket.ts";
+import { normalizeBilling, normalizeRecipient } from "./context.ts";
 import {
   validateCustomer,
   validateDeliveryAddress,
@@ -38,6 +46,7 @@ type Dependencies = {
   publicBaseUrl?: string;
   verificationDelivery?: VerificationEmailDelivery;
   paymentCapabilitySecret?: string;
+  loadProducts?: (productIds: string[]) => Promise<unknown>;
 };
 
 function response(body: unknown, status: number) {
@@ -128,7 +137,8 @@ export async function handleReservationRequest(
   }
 
   if (!isObject(body) || !hasOnlyKeys(body, [
-    "idempotencyKey", "customer", "productId", "deliveryAddress", "rental", "service",
+    "idempotencyKey", "customer", "productId", "items", "deliveryAddress", "rental", "service",
+    "recipient", "billing",
   ])) {
     return errorResponse(400, "INVALID_REQUEST");
   }
@@ -149,18 +159,31 @@ export async function handleReservationRequest(
   if (isObject(body.service) && !hasOnlyKeys(body.service, ["deliverySlotId", "collectionSlotId", "setupMode", "expressSelected"])) {
     return errorResponse(400, "INVALID_REQUEST");
   }
+  if (isObject(body.recipient) && !hasOnlyKeys(body.recipient, ["mode", "firstName", "lastName", "phone"])) {
+    return errorResponse(400, "INVALID_RECIPIENT");
+  }
+  if (isObject(body.billing) && !hasOnlyKeys(body.billing, ["mode", "billingName", "companyName", "billingEmail", "billingAddress"])) {
+    return errorResponse(400, "INVALID_BILLING");
+  }
 
   const customerValidation = validateCustomer(body.customer);
   if (!customerValidation.ok) return errorResponse(400, validationError(customerValidation));
-  const productValidation = validateProductId(body.productId);
+  const basket = normalizeBasketInput({ productId: body.productId, items: body.items });
+  if (!basket.ok) return errorResponse(400, basket.code);
+  if (basket.units.length !== 1) return errorResponse(409, "MULTI_ITEM_NOT_YET_AVAILABLE");
+  const productId = basket.units[0].productId;
+  const productValidation = validateProductId(productId);
   if (!productValidation.ok) return errorResponse(400, validationError(productValidation));
-  const productId = productValidation.productId;
   const addressValidation = validateDeliveryAddress(body.deliveryAddress);
   if (!addressValidation.ok) return errorResponse(400, validationError(addressValidation));
   const rentalValidation = validateRentalDates(body.rental, dependencies.now ?? new Date());
   if (!rentalValidation.ok) return errorResponse(400, validationError(rentalValidation));
   const serviceValidation = validateServiceChoices(body.service, productId);
   if (!serviceValidation.ok) return errorResponse(400, validationError(serviceValidation));
+  const recipient = normalizeRecipient(body.recipient, customerValidation.customer);
+  if (!recipient.ok) return errorResponse(400, recipient.code);
+  const billing = normalizeBilling(body.billing, customerValidation.customer, addressValidation.address);
+  if (!billing.ok) return errorResponse(400, billing.code);
 
   const operationalPeriodResult = buildServerOperationalPeriod(
     rentalValidation.rental.startDate,
@@ -176,13 +199,28 @@ export async function handleReservationRequest(
     return errorResponse(400, "INVALID_PRODUCT");
   }
 
-  const pricing = calculateServerBookingPrice({
-    productId: productId as keyof typeof IGLOUE_SERVER_PRICING.products,
+  let products = staticProductAuthority();
+  if (dependencies.loadProducts) {
+    try {
+      products = normalizeProductAuthority(await dependencies.loadProducts([productId]));
+    } catch (exception) {
+      dependencies.logError?.("product authority lookup failed", exception);
+      return errorResponse(503, "PRODUCT_UNAVAILABLE");
+    }
+  }
+  const productAuthority = validateBasketProducts(basket.units, products);
+  if (!productAuthority.ok) return errorResponse(400, productAuthority.code);
+  const setupAuthority = validateBasketSetup(basket.units, serviceValidation.service.setupMode);
+  if (!setupAuthority.ok) return errorResponse(400, setupAuthority.code);
+  const pricing = calculateBasketPricing({
+    units: basket.units,
+    products,
     nights: rentalValidation.rental.nights,
     deliveryFee: deliveryZone.price,
-    setupMode: serviceValidation.service.setupMode as keyof typeof IGLOUE_SERVER_PRICING.setup,
+    setupMode: serviceValidation.service.setupMode,
     expressSelected: serviceValidation.service.expressSelected,
   });
+  if ("error" in pricing) return errorResponse(400, pricing.error);
 
   const paymentCapabilitySecret = dependencies.paymentCapabilitySecret ?? Deno.env.get("PAYMENT_CAPABILITY_SECRET")?.trim();
   if (!paymentCapabilitySecret) return errorResponse(500, "INTERNAL_ERROR");
@@ -225,6 +263,20 @@ export async function handleReservationRequest(
     p_idempotency_key: idempotencyKey,
     p_operational_start: operationalPeriodResult.operationalPeriod.operationalStart,
     p_operational_end: operationalPeriodResult.operationalPeriod.operationalEnd,
+    p_recipient_first_name: recipient.recipient.firstName,
+    p_recipient_last_name: recipient.recipient.lastName,
+    p_recipient_phone: recipient.recipient.phone,
+    p_billing_mode: billing.mode,
+    p_billing_name: billing.billingName,
+    p_billing_company_name: billing.companyName,
+    p_billing_email: billing.billingEmail,
+    p_billing_address_line_1: billing.billingAddressLine1,
+    p_billing_address_line_2: billing.billingAddressLine2,
+    p_billing_postcode: billing.billingPostcode,
+    p_billing_city: billing.billingCity,
+    p_billing_country: billing.billingCountry,
+    p_unit_rental_price: pricing.items[0].unitRentalPrice,
+    p_line_total: pricing.items[0].lineTotal,
     }));
   } catch (exception) {
     dependencies.logError?.("create_reservation_transaction threw", exception);
@@ -303,7 +355,7 @@ export async function handleReservationRequest(
     deliveryZone: { name: deliveryZone.name },
     pricing: {
       currency: pricing.currency,
-      rentalPrice: pricing.rentalPrice,
+      rentalPrice: pricing.rentalSubtotal,
       deliveryFee: pricing.deliveryFee,
       setupPrice: pricing.setupPrice,
       expressPrice: pricing.expressPrice,

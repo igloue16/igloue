@@ -28,6 +28,14 @@ const authenticatedHandler = withSupabase(
 
     return await handleReservationRequest(request, {
       supabaseAdmin: context.supabaseAdmin,
+      loadProducts: async (productIds: string[]) => {
+        const result = await context.supabaseAdmin
+          .from("products")
+          .select("id,weekly_price,deposit_amount,active")
+          .in("id", productIds);
+        if (result.error) throw result.error;
+        return result.data;
+      },
       lookupCustomerEmail,
       publicBaseUrl: Deno.env.get("IGLOUE_PUBLIC_BASE_URL") ?? "",
       paymentCapabilitySecret: Deno.env.get("PAYMENT_CAPABILITY_SECRET"),

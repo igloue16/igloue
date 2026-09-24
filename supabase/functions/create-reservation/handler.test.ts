@@ -83,6 +83,32 @@ Deno.test("returns an allowlisted success with authoritative state and pricing",
   assert.equal(JSON.stringify(result).includes("created_new"), false);
 });
 
+Deno.test("accepts a one-unit basket and persists normalized context parameters", async () => {
+  const mock = rpc([{ reservation_id: "res-1", reservation_status: "pending", hold_expires_at: "2027-07-12T10:30:00Z", payment_capability_matched: true, created_new: true }]);
+  const response = await handleReservationRequest(request(body({
+    productId: undefined,
+    items: [{ productId: "essential", quantity: 1 }],
+    recipient: { mode: "other", firstName: "Marie", lastName: "Test", phone: "0612345678" },
+    billing: { mode: "business", billingName: "Marie Test", companyName: "Acme", billingEmail: "billing@example.com", billingAddress: { line1: "2 Rue B", postcode: "75001", city: "Paris", country: "FR" } },
+  })), { supabaseAdmin: mock.client, now: NOW });
+  assert.equal(response.status, 201);
+  assert.equal(mock.calls[0].parameters.p_recipient_first_name, "Marie");
+  assert.equal(mock.calls[0].parameters.p_billing_mode, "business");
+  assert.equal(mock.calls[0].parameters.p_unit_rental_price, 59);
+  assert.equal(mock.calls[0].parameters.p_line_total, 59);
+});
+
+Deno.test("rejects multi-unit runtime creation until allocation support exists", async () => {
+  const mock = rpc(null);
+  const response = await handleReservationRequest(request(body({
+    productId: undefined,
+    items: [{ productId: "essential", quantity: 2 }],
+  })), { supabaseAdmin: mock.client, now: NOW });
+  assert.equal(response.status, 409);
+  assert.equal(await errorCode(response), "MULTI_ITEM_NOT_YET_AVAILABLE");
+  assert.equal(mock.calls.length, 0);
+});
+
 Deno.test("supports CORS OPTIONS and rejects unsupported methods", async () => {
   const mock = rpc(null);
   const options = await handleReservationRequest(request(undefined, "OPTIONS"), { supabaseAdmin: mock.client });

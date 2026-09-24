@@ -40,5 +40,10 @@ export async function derivePaymentCapability(idempotencyKey: string, secret: st
 export async function paymentCapabilityHash(rawCapability: string): Promise<string> {
   const bytes = decodeBase64Url(rawCapability);
   if (!bytes) throw new Error("invalid payment capability");
-  return tokenHashBytea(bytes);
+  if (encodeBase64Url(bytes) !== rawCapability) throw new Error("invalid payment capability");
+  const hash = await tokenHashBytea(bytes);
+  if (!/^\\x[0-9a-f]{64}$/.test(hash) || hash.length !== 66) {
+    throw new Error("invalid payment capability hash");
+  }
+  return hash;
 }

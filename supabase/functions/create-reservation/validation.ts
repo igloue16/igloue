@@ -29,7 +29,7 @@ function isValidServiceWindowId(slotId: string) {
   return IGLOUE_SERVER_SERVICE_WINDOWS.some((serviceWindow) => serviceWindow.id === slotId);
 }
 
-function normalizeFrenchPhone(value: unknown) {
+export function normalizeFrenchPhone(value: unknown) {
   if (typeof value !== "string") return null;
   const compact = value.trim().replace(/[.\s()-]/g, "");
   if (/^0[1-9]\d{8}$/.test(compact)) return compact;

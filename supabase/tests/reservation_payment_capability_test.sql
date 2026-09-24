@@ -63,15 +63,15 @@ insert into public.reservation_payment_capabilities (
 ) values (
     (select id from public.organisations where slug = 'igloue'),
     '00000000-0000-4000-8000-00000000b003',
-    '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    chr(92) || 'x' || repeat('a', 64),
     now() + interval '30 minutes'
 );
 select ok(true, 'valid hashed capability inserts');
-select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b003', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', now() + interval '30 minutes')$$, '23505', null, 'one capability per reservation is enforced');
+select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b003', chr(92) || 'x' || repeat('a', 64), now() + interval '30 minutes')$$, '23505', null, 'one capability per reservation is enforced');
 select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b003', '', now() + interval '30 minutes')$$, '23514', null, 'blank capability hash is rejected');
-select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b003', '\\xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', now() - interval '1 minute')$$, '23514', null, 'capability expiry must be future relative to creation');
-select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ('00000000-0000-4000-8000-00000000b001', '00000000-0000-4000-8000-00000000b004', '\\xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', now() + interval '30 minutes')$$, '23503', null, 'reservation organisation ownership is enforced');
-select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b999', '\\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', now() + interval '30 minutes')$$, '23503', null, 'reservation foreign key is enforced');
+select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b003', chr(92) || 'x' || repeat('b', 64), now() - interval '1 minute')$$, '23514', null, 'capability expiry must be future relative to creation');
+select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ('00000000-0000-4000-8000-00000000b001', '00000000-0000-4000-8000-00000000b004', chr(92) || 'x' || repeat('c', 64), now() + interval '30 minutes')$$, '23503', null, 'reservation organisation ownership is enforced');
+select throws_ok($$insert into public.reservation_payment_capabilities (organisation_id, reservation_id, capability_hash, expires_at) values ((select id from public.organisations where slug = 'igloue'), '00000000-0000-4000-8000-00000000b999', chr(92) || 'x' || repeat('d', 64), now() + interval '30 minutes')$$, '23503', null, 'reservation foreign key is enforced');
 
 update public.reservation_payment_capabilities
 set used_at = now()

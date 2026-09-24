@@ -51,14 +51,14 @@ insert into public.reservation_payment_capabilities (
     '00000000-0000-4000-8000-00000000c401',
     (select id from public.organisations where slug = 'igloue'),
     '00000000-0000-4000-8000-00000000c101',
-    '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    chr(92) || 'x' || repeat('a', 64),
     now() + interval '30 minutes'
 );
 
 create temporary table p2b_first as
 select * from public.initiate_reservation_payment(
     '00000000-0000-4000-8000-00000000c101',
-    '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    chr(92) || 'x' || repeat('a', 64),
     'p2b-key-a'
 );
 
@@ -74,43 +74,43 @@ select is((select count(*)::integer from public.reservation_payment_capabilities
 select ok((select hold_expires_at > now() + interval '9 minutes' from p2b_first), 'hold expiry is returned without extension');
 
 select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'p2b-invalid')$$, '22023', null, 'malformed capability input is rejected');
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', ' ')$$, '22023', null, 'blank idempotency key is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), ' ')$$, '22023', null, 'blank idempotency key is rejected');
 
 update public.reservation_payment_capabilities
 set created_at = now() - interval '2 minutes',
     expires_at = now() - interval '1 minute'
 where reservation_id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-expired')$$, 'P0001', null, 'expired capability is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-expired')$$, 'P0001', null, 'expired capability is rejected');
 update public.reservation_payment_capabilities
 set expires_at = now() + interval '30 minutes', revoked_at = now()
 where reservation_id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-revoked')$$, 'P0001', null, 'revoked capability is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-revoked')$$, 'P0001', null, 'revoked capability is rejected');
 update public.reservation_payment_capabilities
 set revoked_at = null, used_at = now()
 where reservation_id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-used')$$, 'P0001', null, 'used capability is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-used')$$, 'P0001', null, 'used capability is rejected');
 update public.reservation_payment_capabilities
 set used_at = null;
 
 update public.allocations
 set hold_expires_at = now() - interval '1 minute'
 where id = '00000000-0000-4000-8000-00000000c301';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-expired-hold')$$, 'P0001', null, 'expired hold is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-expired-hold')$$, 'P0001', null, 'expired hold is rejected');
 update public.allocations
 set hold_expires_at = now() + interval '10 minutes';
-select lives_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-boundary')$$, 'exactly ten minutes remaining is accepted');
+select lives_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-boundary')$$, 'exactly ten minutes remaining is accepted');
 update public.allocations set status = 'released' where id = '00000000-0000-4000-8000-00000000c301';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-nonheld')$$, 'P0001', null, 'non-held allocation is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-nonheld')$$, 'P0001', null, 'non-held allocation is rejected');
 update public.allocations set status = 'held', hold_expires_at = now() + interval '30 minutes' where id = '00000000-0000-4000-8000-00000000c301';
 
 update public.reservations set status = 'confirmed' where id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-confirmed')$$, 'P0001', null, 'non-pending reservation is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-confirmed')$$, 'P0001', null, 'non-pending reservation is rejected');
 update public.reservations set status = 'pending', payment_status = 'paid' where id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-paid')$$, 'P0001', null, 'paid reservation is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-paid')$$, 'P0001', null, 'paid reservation is rejected');
 update public.reservations set payment_status = 'requires_review' where id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-review')$$, 'P0001', null, 'requires-review reservation is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-review')$$, 'P0001', null, 'requires-review reservation is rejected');
 update public.reservations set payment_status = 'refunded' where id = '00000000-0000-4000-8000-00000000c101';
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-refunded')$$, 'P0001', null, 'refunded reservation is rejected');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-refunded')$$, 'P0001', null, 'refunded reservation is rejected');
 update public.reservations set payment_status = 'not_started' where id = '00000000-0000-4000-8000-00000000c101';
 
 select is((select count(*)::integer from public.payment_attempts where reservation_id = '00000000-0000-4000-8000-00000000c101'), 1, 'invalid initiation creates no attempt');
@@ -121,7 +121,7 @@ select is((select status from public.allocations where id = '00000000-0000-4000-
 create temporary table p2b_same_key as
 select * from public.initiate_reservation_payment(
     '00000000-0000-4000-8000-00000000c101',
-    '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    chr(92) || 'x' || repeat('a', 64),
     'p2b-key-a'
 );
 select is((select payment_attempt_id from p2b_same_key), (select payment_attempt_id from p2b_first), 'same key reuses the active attempt');
@@ -131,19 +131,19 @@ select is((select idempotency_key from public.payment_attempts where id = (selec
 create temporary table p2b_different_key as
 select * from public.initiate_reservation_payment(
     '00000000-0000-4000-8000-00000000c101',
-    '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    chr(92) || 'x' || repeat('a', 64),
     'p2b-key-b'
 );
 select is((select payment_attempt_id from p2b_different_key), (select payment_attempt_id from p2b_first), 'different key reuses the active attempt');
 select is((select count(*)::integer from public.payment_attempts where reservation_id = '00000000-0000-4000-8000-00000000c101'), 1, 'sequential different keys converge on one active attempt');
 
 update public.payment_attempts set status = 'failed' where id = (select payment_attempt_id from p2b_first);
-select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'p2b-key-a')$$, 'P0001', null, 'same failed key is not silently reset');
+select throws_ok($$select * from public.initiate_reservation_payment('00000000-0000-4000-8000-00000000c101', chr(92) || 'x' || repeat('a', 64), 'p2b-key-a')$$, 'P0001', null, 'same failed key is not silently reset');
 
 create temporary table p2b_retry as
 select * from public.initiate_reservation_payment(
     '00000000-0000-4000-8000-00000000c101',
-    '\\xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    chr(92) || 'x' || repeat('a', 64),
     'p2b-key-c'
 );
 select ok((select payment_attempt_id <> (select payment_attempt_id from p2b_first) from p2b_retry), 'new key after failure creates a new attempt');
