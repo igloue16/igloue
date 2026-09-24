@@ -7,6 +7,7 @@ export default {
     return handleStripeWebhookRequest(request, {
       secret: Deno.env.get("STRIPE_WEBHOOK_SECRET")?.trim(),
       receiptClient: createProductionReceiptClient() ?? undefined,
+      expectedLivemode: Deno.env.get("STRIPE_EXPECTED_LIVEMODE"),
     });
   },
 };

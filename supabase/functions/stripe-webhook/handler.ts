@@ -1,13 +1,23 @@
 import { verifyStripeSignature } from "./signature.ts";
 import { payloadSha256 } from "./digest.ts";
 import type { ReceiptRpcClient } from "./receipt.ts";
+import {
+  parseCheckoutSessionCompleted,
+  type CheckoutSessionParseResult,
+} from "./checkout-session.ts";
+import { parseExpectedLivemode } from "./config.ts";
 
 export const MAX_BODY_BYTES = 1024 * 1024;
+
+export type WebhookParser = (event: unknown) => CheckoutSessionParseResult;
 
 type Dependencies = {
   secret?: string;
   now?: Date;
   receiptClient?: ReceiptRpcClient;
+  matcherClient?: ReceiptRpcClient;
+  expectedLivemode?: string;
+  parser?: WebhookParser;
 };
 
 function response(code: string, status: number) {
@@ -50,10 +60,32 @@ function parseEventEnvelope(value: unknown): StripeEventEnvelope | null {
   };
 }
 
-function receiptResult(value: unknown): "recorded" | "duplicate" | "conflict" | null {
+type ReceiptResult = {
+  outcome: "recorded" | "duplicate" | "conflict";
+  eventId: string;
+};
+
+function receiptResult(value: unknown): ReceiptResult | null {
   const row = Array.isArray(value) ? value[0] : value;
   if (!isRecord(row)) return null;
-  return row.outcome === "recorded" || row.outcome === "duplicate" || row.outcome === "conflict"
+  if (row.outcome !== "recorded" && row.outcome !== "duplicate" && row.outcome !== "conflict") return null;
+  if (typeof row.event_id !== "string" || row.event_id.trim() === "") return null;
+  return { outcome: row.outcome, eventId: row.event_id };
+}
+
+function matcherResult(value: unknown):
+  | "matched"
+  | "already_matched"
+  | "unknown_provider_event"
+  | "unknown_checkout_session"
+  | "validation_failed"
+  | "conflict"
+  | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!isRecord(row)) return null;
+  return row.outcome === "matched" || row.outcome === "already_matched" ||
+      row.outcome === "unknown_provider_event" || row.outcome === "unknown_checkout_session" ||
+      row.outcome === "validation_failed" || row.outcome === "conflict"
     ? row.outcome
     : null;
 }
@@ -122,8 +154,52 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
   } catch {
     return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
   }
-  if (receipt.error || !receiptResult(receipt.data)) {
+  const received = receipt.error ? null : receiptResult(receipt.data);
+  if (!received) {
     return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+  }
+
+  if (received.outcome === "conflict") {
+    return Response.json({ received: true }, { status: 200 });
+  }
+
+  if (event.type !== "checkout.session.completed") {
+    return Response.json({ received: true }, { status: 200 });
+  }
+
+  const expectedLivemode = parseExpectedLivemode(dependencies.expectedLivemode);
+  if (expectedLivemode === null) return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+
+  const parsed = (dependencies.parser ?? parseCheckoutSessionCompleted)(payload);
+  if (!parsed.ok) return Response.json({ received: true }, { status: 200 });
+
+  const matcherClient = dependencies.matcherClient ?? dependencies.receiptClient;
+  if (!matcherClient) return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+
+  let matching;
+  try {
+    matching = await matcherClient.rpc("match_payment_provider_event", {
+      p_provider_event_id: received.eventId,
+      p_checkout_session_id: parsed.value.checkoutSessionId,
+      p_amount_total: parsed.value.amountTotal,
+      p_currency: parsed.value.currency,
+      p_mode: parsed.value.mode,
+      p_checkout_status: parsed.value.status,
+      p_payment_status: parsed.value.paymentStatus,
+      p_payment_intent_id: parsed.value.paymentIntentId,
+      p_client_reference_id: parsed.value.clientReferenceId,
+      p_metadata_payment_attempt_id: parsed.value.metadata.paymentAttemptId,
+      p_metadata_reservation_id: parsed.value.metadata.reservationId,
+      p_expected_livemode: expectedLivemode,
+    });
+  } catch {
+    return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+  }
+
+  const outcome = matching.error ? null : matcherResult(matching.data);
+  if (!outcome) return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+  if (outcome === "unknown_provider_event") {
+    return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
   }
 
   return Response.json({ received: true }, { status: 200 });
