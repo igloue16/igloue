@@ -237,8 +237,8 @@ select is((select count(*)::integer from public.outbox_events where aggregate_id
           'payment initiation emits no reservation outbox event');
 select is((select eligible from public.get_reservation_payment_checkout(
               (select payment_attempt_id from mm3e1_three_final),
-              (select id from public.organisations where slug = 'igloue'))), false,
-          'existing Checkout eligibility remains false for a normalized multi-item attempt');
+              (select id from public.organisations where slug = 'igloue'))), true,
+          'normalized multi-item Checkout eligibility is enabled by MM3E2');
 
 select * from finish();
 rollback;
