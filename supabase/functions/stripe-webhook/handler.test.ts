@@ -225,7 +225,7 @@ Deno.test("receipt succeeds before parser and matcher, with exact matcher argume
   assertEquals(await response.json(), { received: true });
   assertEquals(calls, ["receive_payment_provider_event", "parser", "match_payment_provider_event"]);
   assertEquals(base.calls[1].parameters, {
-    p_provider_event_id: "00000000-0000-4000-8000-000000000301",
+    p_provider_event_id: EVENT_ID,
     p_checkout_session_id: SESSION_ID,
     p_amount_total: 7500,
     p_currency: "eur",
@@ -238,6 +238,7 @@ Deno.test("receipt succeeds before parser and matcher, with exact matcher argume
     p_metadata_reservation_id: RESERVATION_ID,
     p_expected_livemode: false,
   });
+  assertNotEquals(base.calls[1].parameters.p_provider_event_id, "00000000-0000-4000-8000-000000000301");
 });
 
 Deno.test("recorded and duplicate receipts both continue to matching", async () => {

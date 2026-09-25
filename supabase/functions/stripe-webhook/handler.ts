@@ -179,7 +179,7 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
   let matching;
   try {
     matching = await matcherClient.rpc("match_payment_provider_event", {
-      p_provider_event_id: received.eventId,
+      p_provider_event_id: event.id,
       p_checkout_session_id: parsed.value.checkoutSessionId,
       p_amount_total: parsed.value.amountTotal,
       p_currency: parsed.value.currency,

@@ -1,6 +1,6 @@
 begin;
 
-select plan(41);
+select plan(44);
 
 select ok(to_regprocedure('public.match_payment_provider_event(text,text,bigint,text,text,text,text,text,uuid,uuid,uuid,boolean)') is not null,
           'matching RPC exists with the intended signature');
@@ -56,11 +56,18 @@ values (
     75.00, 'EUR', 'checkout_open', 'matching-attempt', 'cs_p3d3_e001'
 );
 
+create temporary table matching_receipt as
 select * from public.receive_payment_provider_event(
     'stripe', 'evt_p3d3_match', 'checkout.session.completed',
     to_timestamp(1800000000), false,
     '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 );
+
+select is((select event_id from matching_receipt),
+          (select id from public.payment_provider_events where provider_event_id = 'evt_p3d3_match'),
+          'receipt returns its internal row UUID for receipt identity');
+select ok((select event_id::text <> 'evt_p3d3_match' from matching_receipt),
+          'internal receipt UUID is distinct from the Stripe provider event ID');
 
 create temporary table matching_first as
 select * from public.match_payment_provider_event(
@@ -76,6 +83,8 @@ select is((select payment_attempt_id from matching_first), '00000000-0000-4000-8
 select is((select reservation_id from matching_first), '00000000-0000-4000-8000-00000000e101'::uuid, 'reservation is derived locally');
 select is((select organisation_id from matching_first), (select id from public.organisations where slug = 'igloue'), 'organisation is derived locally');
 select ok((select payment_attempt_id is not null and organisation_id is not null from public.payment_provider_events where provider_event_id = 'evt_p3d3_match'), 'provider event is linked as a relationship pair');
+select ok((select matched_at is not null from public.payment_provider_events where provider_event_id = 'evt_p3d3_match'),
+          'receipt located by Stripe event ID is marked matched after validation');
 select is((select status from public.payment_provider_events where provider_event_id = 'evt_p3d3_match'), 'received', 'matched event remains received');
 select is((select provider_event_id from public.payment_provider_events where provider_event_id = 'evt_p3d3_match'), 'evt_p3d3_match', 'event identity is unchanged');
 select is((select payload_sha256 from public.payment_provider_events where provider_event_id = 'evt_p3d3_match'), '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'event digest is unchanged');
