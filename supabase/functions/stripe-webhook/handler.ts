@@ -90,6 +90,24 @@ function matcherResult(value: unknown):
     : null;
 }
 
+type AuthorityOutcome =
+  | "paid_confirmed"
+  | "paid_already_confirmed"
+  | "requires_review"
+  | "already_paid"
+  | "already_requires_review"
+  | "not_authoritative";
+
+function authorityResult(value: unknown): AuthorityOutcome | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!isRecord(row)) return null;
+  return row.outcome === "paid_confirmed" || row.outcome === "paid_already_confirmed" ||
+      row.outcome === "requires_review" || row.outcome === "already_paid" ||
+      row.outcome === "already_requires_review" || row.outcome === "not_authoritative"
+    ? row.outcome
+    : null;
+}
+
 export async function handleStripeWebhookRequest(request: Request, dependencies: Dependencies) {
   if (request.method !== "POST") return response("METHOD_NOT_ALLOWED", 405);
   if (!dependencies.secret) return response("WEBHOOK_CONFIGURATION_ERROR", 500);
@@ -199,6 +217,26 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
   const outcome = matching.error ? null : matcherResult(matching.data);
   if (!outcome) return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
   if (outcome === "unknown_provider_event") {
+    return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+  }
+
+  if (outcome !== "matched" && outcome !== "already_matched") {
+    return Response.json({ received: true }, { status: 200 });
+  }
+
+  // Matching uses Stripe's evt_... identifier. Paid authority consumes the
+  // distinct internal UUID returned by the durable receipt RPC.
+  let authority;
+  try {
+    authority = await matcherClient.rpc("apply_provider_payment_outcome", {
+      p_event_id: received.eventId,
+    });
+  } catch {
+    return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+  }
+
+  const paymentOutcome = authority.error ? null : authorityResult(authority.data);
+  if (!paymentOutcome || paymentOutcome === "not_authoritative") {
     return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
   }
 
