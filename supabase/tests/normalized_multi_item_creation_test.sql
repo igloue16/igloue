@@ -1,6 +1,6 @@
 begin;
 
-select plan(38);
+select plan(39);
 
 select ok(
     exists (
@@ -111,13 +111,15 @@ select is((select count(*)::integer from public.allocations a join public.reserv
 select is((select deposit_amount from public.reservations where id = (select reservation_id from mm3c_mixed)), null::numeric, 'mixed basket deposit is NULL without aggregation');
 select is((select count(*)::integer from public.outbox_events where aggregate_id = (select reservation_id from mm3c_mixed)), 0, 'creation emits no confirmation outbox event');
 
-select throws_ok($$
+select lives_ok($$
     select * from public.initiate_reservation_payment(
         (select reservation_id from mm3c_mixed),
         chr(92) || 'x' || repeat('c', 64),
         'mm3c-mixed-payment'
     )
-$$, 'P0001', null, 'multi-item reservation remains ineligible for payment');
+$$, 'multi-item reservation is eligible for payment initiation');
+select is((select count(*)::integer from public.payment_attempts where reservation_id = (select reservation_id from mm3c_mixed)), 1,
+          'multi-item payment initiation creates one reservation attempt');
 
 select throws_ok($$
     select * from public.create_reservation_with_payment_capability(
