@@ -454,3 +454,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/execute-stripe-refund/deno.json"
 entrypoint = "./functions/execute-stripe-refund/index.ts"
+
+[functions.payment-operator]
+enabled = true
+verify_jwt = false
+import_map = "./functions/payment-operator/deno.json"
+entrypoint = "./functions/payment-operator/index.ts"
