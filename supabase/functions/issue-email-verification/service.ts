@@ -4,7 +4,7 @@ const TOKEN_BYTE_LENGTH = 32;
 const TOKEN_LIFETIME_MS = 30 * 60 * 1000;
 
 export type EmailVerificationRpc = {
-  rpc(name: string, parameters: Record<string, unknown>): Promise<{
+  rpc(name: string, parameters: Record<string, unknown>): PromiseLike<{
     data: unknown;
     error: { code?: string; message?: string } | null;
   }>;

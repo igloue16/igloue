@@ -1,9 +1,52 @@
 import assert from "node:assert/strict";
-import { handleCheckoutRequest } from "./handler.ts";
+import {
+  createProductionDependencies,
+  handleCheckoutRequest,
+} from "./handler.ts";
 import { type CheckoutAdapter, StripeAdapterError } from "./stripe.ts";
 
 const capability = "A".repeat(43);
 const reservationId = "00000000-0000-4000-8000-000000000101";
+
+Deno.test("checkout configuration fails closed for missing or mismatched mode and malformed URLs", () => {
+  const names = [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_EXPECTED_LIVEMODE",
+    "IGLOUE_CHECKOUT_SUCCESS_URL",
+    "IGLOUE_CHECKOUT_CANCEL_URL",
+  ];
+  const previous = new Map(names.map((name) => [name, Deno.env.get(name)]));
+  try {
+    Deno.env.set("STRIPE_SECRET_KEY", "sk_test_local_only");
+    Deno.env.set("STRIPE_EXPECTED_LIVEMODE", "false");
+    Deno.env.set("IGLOUE_CHECKOUT_SUCCESS_URL", "https://example.test/success");
+    Deno.env.set("IGLOUE_CHECKOUT_CANCEL_URL", "https://example.test/cancel");
+    assert.doesNotThrow(() =>
+      createProductionDependencies({
+        rpc: async () => ({ data: null, error: null }),
+      })
+    );
+
+    Deno.env.set("STRIPE_EXPECTED_LIVEMODE", "true");
+    assert.throws(() =>
+      createProductionDependencies({
+        rpc: async () => ({ data: null, error: null }),
+      })
+    );
+    Deno.env.set("STRIPE_EXPECTED_LIVEMODE", "false");
+    Deno.env.set("IGLOUE_CHECKOUT_SUCCESS_URL", "https://");
+    assert.throws(() =>
+      createProductionDependencies({
+        rpc: async () => ({ data: null, error: null }),
+      })
+    );
+  } finally {
+    for (const [name, value] of previous) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+  }
+});
 
 function request(body: unknown) {
   return new Request(

@@ -1,5 +1,9 @@
 import { paymentCapabilityHash } from "../create-reservation/payment-capability.ts";
 import {
+  parseExpectedLivemode,
+  stripeSecretMatchesExpectedLivemode,
+} from "../stripe-webhook/config.ts";
+import {
   type CheckoutAdapter,
   createStripeCheckoutAdapter,
   StripeAdapterError,
@@ -57,7 +61,14 @@ function row(value: unknown): Record<string, unknown> | null {
 }
 
 function isValidUrl(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith("https://");
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !!url.hostname && !url.username &&
+      !url.password;
+  } catch {
+    return false;
+  }
 }
 
 function mapRpcError(error: RpcError) {
@@ -298,9 +309,15 @@ export function createProductionDependencies(
   supabaseAdmin: CheckoutRpcClient,
 ): Dependencies {
   const secret = Deno.env.get("STRIPE_SECRET_KEY")?.trim();
+  const expectedLivemode = parseExpectedLivemode(
+    Deno.env.get("STRIPE_EXPECTED_LIVEMODE"),
+  );
   const successUrl = Deno.env.get("IGLOUE_CHECKOUT_SUCCESS_URL")?.trim();
   const cancelUrl = Deno.env.get("IGLOUE_CHECKOUT_CANCEL_URL")?.trim();
-  if (!secret || !isValidUrl(successUrl) || !isValidUrl(cancelUrl)) {
+  if (
+    !secret || !stripeSecretMatchesExpectedLivemode(secret, expectedLivemode) ||
+    !isValidUrl(successUrl) || !isValidUrl(cancelUrl)
+  ) {
     throw new Error("checkout configuration unavailable");
   }
   return {

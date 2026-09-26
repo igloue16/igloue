@@ -460,3 +460,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/payment-operator/deno.json"
 entrypoint = "./functions/payment-operator/index.ts"
+
+[functions.recover-stripe-events]
+enabled = true
+verify_jwt = false
+import_map = "./functions/recover-stripe-events/deno.json"
+entrypoint = "./functions/recover-stripe-events/index.ts"

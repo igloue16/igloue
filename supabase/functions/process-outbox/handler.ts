@@ -6,7 +6,10 @@ import { processOutboxBatch, type ClaimedOutboxEvent, type ReservationEmailData,
 
 type QueryResult<T> = { data: T | null; error: unknown | null };
 type SupabaseClient = {
-  rpc(name: string, parameters: Record<string, unknown>): Promise<QueryResult<unknown>>;
+  rpc(
+    name: string,
+    parameters: Record<string, unknown>,
+  ): Promise<QueryResult<unknown>>;
   from(table: string): {
     select(columns: string): {
       eq(column: string, value: string): {

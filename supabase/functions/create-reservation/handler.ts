@@ -32,7 +32,7 @@ const CORS_HEADERS = Object.freeze({
 });
 
 export type ReservationRpcClient = {
-  rpc(name: string, parameters: Record<string, unknown>): Promise<{
+  rpc(name: string, parameters: Record<string, unknown>): PromiseLike<{
     data: unknown;
     error: { code?: string; message?: string } | null;
   }>;

@@ -9,7 +9,10 @@ import {
 
 type RpcResult = { data: unknown; error: unknown | null };
 type SupabaseAdmin = {
-  rpc(name: string, parameters: Record<string, unknown>): Promise<RpcResult>;
+  rpc(
+    name: string,
+    parameters: Record<string, unknown>,
+  ): PromiseLike<RpcResult>;
 };
 
 function object(value: unknown): value is Record<string, unknown> {

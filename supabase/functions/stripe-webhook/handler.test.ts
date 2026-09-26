@@ -475,6 +475,21 @@ Deno.test("expected livemode accepts only true and false", async () => {
   }
 });
 
+Deno.test("missing webhook signing secret fails before reading or persisting an event", async () => {
+  const body = JSON.stringify(checkoutEvent());
+  const { dependencies, calls } = makeDependencies();
+  const response = await handleStripeWebhookRequest(request(body), {
+    ...dependencies,
+    secret: undefined,
+  });
+  assertEquals(response.status, 500);
+  assertEquals(
+    (await response.json()).error.code,
+    "WEBHOOK_CONFIGURATION_ERROR",
+  );
+  assertEquals(calls.length, 0);
+});
+
 Deno.test("all deterministic matcher outcomes return the same sanitized 200", async () => {
   for (
     const matchOutcome of [

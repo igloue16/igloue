@@ -33,7 +33,7 @@ export type AvailabilityRpcClient = {
   rpc: (
     name: string,
     parameters: Record<string, unknown>,
-  ) => Promise<RpcResult>;
+  ) => PromiseLike<RpcResult>;
 };
 
 type AvailabilityDependencies = {

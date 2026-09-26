@@ -5,13 +5,23 @@ import {
   handleExecuteRefundRequest,
 } from "./handler.ts";
 import { createStripeRefundAdapter } from "./stripe.ts";
+import {
+  parseExpectedLivemode,
+  stripeSecretMatchesExpectedLivemode,
+} from "../stripe-webhook/config.ts";
 
 const refundHandler = withSupabase(
   { auth: ["secret"] },
   async (request, context) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY")?.trim();
-    if (!serviceRoleKey || !stripeSecret) {
+    const expectedLivemode = parseExpectedLivemode(
+      Deno.env.get("STRIPE_EXPECTED_LIVEMODE"),
+    );
+    if (
+      !serviceRoleKey || !stripeSecret ||
+      !stripeSecretMatchesExpectedLivemode(stripeSecret, expectedLivemode)
+    ) {
       return Response.json({
         ok: false,
         error: { code: "REFUND_EXECUTION_UNAVAILABLE" },
