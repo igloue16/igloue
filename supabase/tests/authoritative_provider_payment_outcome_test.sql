@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(57);
 
 select ok(to_regprocedure('public.apply_provider_payment_outcome(uuid)') is not null,
           'authoritative payment outcome function exists');
@@ -110,6 +110,100 @@ select is((select count(*)::integer from public.outbox_events where aggregate_id
 select is((select status from public.payment_provider_events where provider_event_id = 'evt_p3e3a_review'), 'processed', 'review outcome processes its proven provider event');
 select is((select outcome from public.apply_provider_payment_outcome((select id from public.payment_provider_events where provider_event_id = 'evt_p3e3a_review'))),
           'already_requires_review', 'review replay does not upgrade or downgrade state');
+select is((select count(*)::integer from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'), 1,
+          'review transition creates exactly one exception');
+select is((select reason_code from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'), 'hold_expired',
+          'exception records why the payment needs review');
+select is((select status from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'), 'unresolved',
+          'new payment exception is unresolved');
+select is((select source_provider_event_id from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'),
+          (select id from public.payment_provider_events where provider_event_id = 'evt_p3e3a_review'),
+          'exception points to its matched provider evidence');
+select ok(exists (
+    select 1
+    from public.payment_exceptions as e
+    join public.reservations as r
+      on r.id = e.reservation_id and r.organisation_id = e.organisation_id
+    join public.payment_attempts as pa
+      on pa.id = e.payment_attempt_id
+     and pa.reservation_id = e.reservation_id
+     and pa.organisation_id = e.organisation_id
+    join public.payment_provider_events as pe
+      on pe.id = e.source_provider_event_id
+     and pe.payment_attempt_id = e.payment_attempt_id
+     and pe.organisation_id = e.organisation_id
+    where e.payment_attempt_id = '00000000-0000-4000-8000-00000000f502'
+), 'exception organisation, reservation, attempt, and event relationships are coherent');
+select is((select count(*)::integer from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f501'), 0,
+          'normal paid confirmation creates no exception');
+
+select * from public.receive_payment_provider_event(
+ 'stripe', 'evt_p3e3a_review_second', 'checkout.session.completed', to_timestamp(1800000003), false,
+ '4444444444444444444444444444444444444444444444444444444444444444'
+);
+select * from public.match_payment_provider_event(
+ 'evt_p3e3a_review_second', 'cs_p3e3a_review', 7500, 'eur', 'payment', 'complete', 'paid', 'pi_p3e3a_review',
+ '00000000-0000-4000-8000-00000000f502', '00000000-0000-4000-8000-00000000f502', '00000000-0000-4000-8000-00000000f202', false
+);
+select is((select outcome from public.apply_provider_payment_outcome((select id from public.payment_provider_events where provider_event_id = 'evt_p3e3a_review_second'))),
+          'already_requires_review', 'another valid event for the reviewed attempt remains idempotent');
+select is((select count(*)::integer from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'), 1,
+          'a later valid event does not create duplicate exception authority');
+
+select is((select outcome from public.resolve_payment_exception(
+    (select id from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'),
+    (select id from public.organisations where slug = 'igloue'), 'refund_required', 'operator_tool', 'operator-42',
+    '00000000-0000-4000-8000-00000000f901')),
+    'resolved', 'trusted resolution records a disposition');
+select is((select outcome from public.resolve_payment_exception(
+    (select id from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'),
+    (select id from public.organisations where slug = 'igloue'), 'refund_required', 'operator_tool', 'operator-42',
+    '00000000-0000-4000-8000-00000000f901')),
+    'already_resolved', 'exact resolution replay is idempotent');
+select throws_ok($$select * from public.resolve_payment_exception(
+    (select id from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'),
+    (select id from public.organisations where slug = 'igloue'), 'no_refund_required', 'operator_tool', 'operator-42',
+    '00000000-0000-4000-8000-00000000f902')$$, 'P0001', null::text,
+    'conflicting second resolution is rejected');
+select throws_ok($$select * from public.resolve_payment_exception(
+    (select id from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'),
+    '00000000-0000-4000-8000-00000000ffff', 'refund_required', 'operator_tool', 'operator-42',
+    '00000000-0000-4000-8000-00000000f903')$$, 'P0002', null::text,
+    'cross-organisation resolution is rejected without disclosing the exception');
+select ok((select resolved_at is not null and resolved_at <= clock_timestamp()
+                  and resolver_source = 'operator_tool' and resolver_actor = 'operator-42'
+                  and resolution = 'refund_required'
+           from public.payment_exceptions where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'),
+          'resolution stores database time, resolver source, actor, and disposition');
+select is((select count(*)::integer from public.payment_exception_history
+           where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'), 1,
+          'resolution appends exactly one history event');
+select throws_ok($$update public.payment_exception_history set actor_id = 'rewritten' where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'$$,
+    '42501', 'payment exception history is append-only', 'history rows cannot be rewritten');
+select throws_ok($$delete from public.payment_exception_history where payment_attempt_id = '00000000-0000-4000-8000-00000000f502'$$,
+    '42501', 'payment exception history is append-only', 'history rows cannot be deleted');
+select ok(not has_table_privilege('public', 'public.payment_exception_history', 'UPDATE')
+          and not has_table_privilege('public', 'public.payment_exception_history', 'DELETE')
+          and not has_table_privilege('anon', 'public.payment_exception_history', 'SELECT')
+          and not has_table_privilege('authenticated', 'public.payment_exception_history', 'SELECT')
+          and not has_table_privilege('service_role', 'public.payment_exception_history', 'INSERT'),
+          'normal roles cannot read or mutate payment exception history');
+select ok(not has_table_privilege('service_role', 'public.payment_exceptions', 'UPDATE')
+          and not has_table_privilege('service_role', 'public.payment_exceptions', 'INSERT'),
+          'exception rows can only be created by the authority trigger and resolved by the RPC');
+select ok(has_function_privilege('service_role', 'public.resolve_payment_exception(uuid,uuid,text,text,text,uuid)', 'EXECUTE')
+          and not has_function_privilege('public', 'public.resolve_payment_exception(uuid,uuid,text,text,text,uuid)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.resolve_payment_exception(uuid,uuid,text,text,text,uuid)', 'EXECUTE')
+          and not has_function_privilege('authenticated', 'public.resolve_payment_exception(uuid,uuid,text,text,text,uuid)', 'EXECUTE'),
+          'only service_role can invoke payment exception resolution');
+select is((select status from public.payment_attempts where id = '00000000-0000-4000-8000-00000000f502'), 'requires_review',
+          'refund-required disposition does not claim the payment was refunded');
+select is((select payment_status from public.reservations where id = '00000000-0000-4000-8000-00000000f202'), 'requires_review',
+          'resolution does not fabricate a payment state');
+select is((select status from public.allocations where id = '00000000-0000-4000-8000-00000000f302'), 'held',
+          'resolution does not alter or resurrect inventory');
+select is((select count(*)::integer from public.outbox_events where aggregate_id = '00000000-0000-4000-8000-00000000f202' and event_type = 'reservation.confirmed'), 0,
+          'resolution does not enqueue reservation confirmation');
 
 select * from public.receive_payment_provider_event(
  'stripe', 'evt_p3e3a_unmatched', 'checkout.session.completed', to_timestamp(1800000002), false,
@@ -119,6 +213,8 @@ select is((select outcome from public.apply_provider_payment_outcome((select id 
           'not_authoritative', 'unmatched event cannot change payment authority');
 select is((select status from public.payment_provider_events where provider_event_id = 'evt_p3e3a_unmatched'), 'received', 'unmatched event remains unprocessed');
 select is((select status from public.payment_attempts where id = '00000000-0000-4000-8000-00000000f501'), 'paid', 'unmatched event cannot alter an attempt');
+select is((select count(*)::integer from public.payment_exceptions), 1,
+          'unmatched and non-authoritative evidence creates no payment exception');
 
 select * from finish();
 rollback;
