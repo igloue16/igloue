@@ -1,6 +1,14 @@
 begin;
 
-select plan(40);
+select plan(55);
+
+select ok(to_regprocedure('public.prepare_reservation_payment_checkout(uuid,uuid)') is not null,
+          'Checkout window preparation RPC exists');
+select ok(has_function_privilege('service_role', 'public.prepare_reservation_payment_checkout(uuid,uuid)', 'EXECUTE'),
+          'service_role can prepare a Checkout window');
+select ok(not has_function_privilege('anon', 'public.prepare_reservation_payment_checkout(uuid,uuid)', 'EXECUTE')
+          and not has_function_privilege('authenticated', 'public.prepare_reservation_payment_checkout(uuid,uuid)', 'EXECUTE'),
+          'browser roles cannot prepare a Checkout window');
 
 select ok(to_regprocedure('public.validate_normalized_basket(uuid,uuid,timestamptz,interval)') is not null,
           'normalized Checkout basket validator exists');
@@ -61,6 +69,39 @@ select ok((select eligible from mm3e2_two_state), 'normalized two-item Checkout 
 select is((select amount from mm3e2_two_state), 167.00::numeric, 'Checkout amount is reservations.total_amount');
 select is((select currency from mm3e2_two_state), 'EUR', 'Checkout currency is EUR');
 select ok((select hold_expires_at >= now() + interval '11 minutes' from mm3e2_two_state), 'pre-Stripe hold window is at least eleven minutes');
+
+create temporary table mm3e2_two_window as
+select * from public.prepare_reservation_payment_checkout(
+    (select payment_attempt_id from mm3e2_two_attempt),
+    (select id from public.organisations where slug = 'igloue')
+);
+select ok((select eligible from mm3e2_two_window), 'active normalized holds receive a Checkout window');
+select ok((select checkout_expires_at >= clock_timestamp() + interval '30 minutes'
+            and checkout_expires_at <= clock_timestamp() + interval '32 minutes' from mm3e2_two_window),
+          'Checkout uses a 31-minute database-time window with a transport buffer');
+select is((select hold_expires_at - checkout_expires_at from mm3e2_two_window), interval '5 minutes',
+          'inventory hold remains five minutes beyond Stripe expiry');
+select is((select count(distinct hold_expires_at)::integer from public.allocations
+           where reservation_id = (select reservation_id from mm3e2_two)), 1,
+          'all normalized allocations receive one atomic hold expiry');
+select is((select checkout_expires_at from public.payment_attempts
+           where id = (select payment_attempt_id from mm3e2_two_attempt)),
+          (select checkout_expires_at from mm3e2_two_window),
+          'window expiry is durably stored on the payment attempt');
+select is((select expires_at from public.reservation_payment_capabilities
+           where reservation_id = (select reservation_id from mm3e2_two)),
+          (select hold_expires_at from mm3e2_two_window),
+          'payment capability remains valid for the aligned hold window');
+select is((select checkout_expires_at from public.prepare_reservation_payment_checkout(
+           (select payment_attempt_id from mm3e2_two_attempt),
+           (select id from public.organisations where slug = 'igloue'))),
+          (select checkout_expires_at from mm3e2_two_window),
+          'exact preparation retry keeps the same Checkout expiry');
+select throws_ok(format(
+    'select * from public.prepare_reservation_payment_checkout(%L::uuid, %L::uuid)',
+    (select payment_attempt_id from mm3e2_two_attempt),
+    '00000000-0000-0000-0000-000000000002'
+), 'P0002', null, 'a different organisation cannot manipulate the checkout window');
 
 insert into public.allocations (
     id, reservation_id, machine_id, status, operational_start, operational_end, hold_expires_at
@@ -279,6 +320,8 @@ where reservation_id = (select reservation_id from mm3e2_three)
   and id = (select id from public.allocations where reservation_id = (select reservation_id from mm3e2_three) order by id limit 1);
 select throws_ok($$select * from public.persist_reservation_payment_checkout((select payment_attempt_id from mm3e2_three_attempt), (select id from public.organisations where slug = 'igloue'), 'cs_mm3e2_missing-post', 'https://checkout.stripe.test/mm3e2-missing-post', null)$$,
                  'P0001', null, 'missing allocation rejects post-Stripe persistence');
+select throws_ok($$select * from public.prepare_reservation_payment_checkout((select payment_attempt_id from mm3e2_three_attempt), (select id from public.organisations where slug = 'igloue'))$$,
+                 'P0001', null, 'incomplete normalized allocation set cannot receive a Checkout window');
 update public.allocations
 set status = 'held'
 where reservation_id = (select reservation_id from mm3e2_three)
@@ -300,6 +343,8 @@ set hold_expires_at = now() - interval '1 minute'
 where reservation_id = (select reservation_id from mm3e2_three);
 select throws_ok($$select * from public.persist_reservation_payment_checkout((select payment_attempt_id from mm3e2_three_attempt), (select id from public.organisations where slug = 'igloue'), 'cs_mm3e2_expired-post', 'https://checkout.stripe.test/mm3e2-expired-post', null)$$,
                  'P0001', null, 'expired hold rejects post-Stripe persistence');
+select throws_ok($$select * from public.prepare_reservation_payment_checkout((select payment_attempt_id from mm3e2_three_attempt), (select id from public.organisations where slug = 'igloue'))$$,
+                 'P0001', null, 'expired inventory cannot be resurrected for Checkout');
 select is((select provider_checkout_session_id from public.payment_attempts where id = (select payment_attempt_id from mm3e2_three_attempt)), null,
           'failed post-Stripe validation does not persist a provider session');
 update public.allocations
@@ -311,6 +356,17 @@ set status = 'cancelled'
 where id = (select reservation_id from mm3e2_three);
 select throws_ok($$select * from public.persist_reservation_payment_checkout((select payment_attempt_id from mm3e2_three_attempt), (select id from public.organisations where slug = 'igloue'), 'cs_mm3e2_cancelled', 'https://checkout.stripe.test/mm3e2-cancelled', null)$$,
                  'P0001', null, 'cancellation during Stripe boundary rejects persistence');
+select ok(not (select eligible from public.prepare_reservation_payment_checkout(
+                  (select payment_attempt_id from mm3e2_three_attempt),
+                  (select id from public.organisations where slug = 'igloue'))),
+          'cancelled reservation cannot receive a Checkout window');
+update public.reservations
+set status = 'confirmed'
+where id = (select reservation_id from mm3e2_three);
+select ok(not (select eligible from public.prepare_reservation_payment_checkout(
+                  (select payment_attempt_id from mm3e2_three_attempt),
+                  (select id from public.organisations where slug = 'igloue'))),
+          'confirmed reservation cannot receive a Checkout window');
 select is((select provider_checkout_session_id from public.payment_attempts where id = (select payment_attempt_id from mm3e2_three_attempt)), null,
           'failed cancellation persistence does not store a provider session');
 select is((select payment_status from public.reservations where id = (select reservation_id from mm3e2_three)), 'not_started',
