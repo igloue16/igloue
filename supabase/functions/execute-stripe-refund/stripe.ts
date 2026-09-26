@@ -36,8 +36,8 @@ export interface StripeRefundAdapter {
   ): Promise<StripeRefund>;
 }
 
-export function stripeRefundIdempotencyKey(refundId: string): string {
-  return `igloue:refund:${refundId}`;
+export function stripeRefundIdempotencyKey(providerAttemptId: string): string {
+  return `igloue:refund:${providerAttemptId}`;
 }
 
 function amountToCents(amount: number): number {

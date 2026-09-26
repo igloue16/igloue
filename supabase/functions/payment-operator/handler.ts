@@ -258,6 +258,50 @@ export async function handlePaymentOperatorRequest(
       },
     });
   }
+
+  if (body.action === "prepare_refund") {
+    if (
+      Object.keys(body).some((key) =>
+        !["action", "exceptionId", "idempotencyKey"].includes(key)
+      ) || !uuid(body.exceptionId) || !uuid(body.idempotencyKey)
+    ) return failure(400, "INVALID_REQUEST");
+    const loaded = await loadCase(dependencies, body.exceptionId);
+    if (loaded.response) return loaded.response;
+    if (
+      loaded.row.status !== "resolved" ||
+      loaded.row.resolution !== "refund_required"
+    ) {
+      return failure(409, "REFUND_NOT_ELIGIBLE");
+    }
+    let result: RpcResult;
+    try {
+      result = await dependencies.supabaseAdmin.rpc("prepare_payment_refund", {
+        p_exception_id: loaded.row.exceptionId,
+        p_organisation_id: loaded.row.organisationId,
+        p_actor_source: OPERATOR_SOURCE,
+        p_actor_id: OPERATOR_ACTOR,
+        p_idempotency_key: body.idempotencyKey,
+      });
+    } catch {
+      return failure(503, "REFUND_PREPARATION_UNAVAILABLE", true);
+    }
+    if (result.error) return rpcFailure(result.error);
+    const prepared = scalarRow(result.data);
+    if (
+      !prepared || !uuid(prepared.refund_id) ||
+      !uuid(prepared.provider_attempt_id) ||
+      !["prepared", "already_prepared", "already_failed", "already_satisfied"]
+        .includes(String(prepared.outcome))
+    ) return failure(503, "REFUND_PREPARATION_UNAVAILABLE", true);
+    return response({
+      ok: true,
+      refund: {
+        refundId: prepared.refund_id,
+        providerAttemptId: prepared.provider_attempt_id,
+        outcome: prepared.outcome,
+      },
+    });
+  }
   return failure(400, "INVALID_REQUEST");
 }
 

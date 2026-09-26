@@ -40,6 +40,8 @@ type ExecutionRecord = {
   reservationPaymentStatus: "requires_review";
   sourceProviderEventId: string;
   sourceEventMatchedAt: string;
+  providerAttemptId: string;
+  providerAttemptNumber: number;
 };
 
 function response(body: Record<string, unknown>, status: number) {
@@ -101,7 +103,12 @@ function executionRecord(value: unknown): ExecutionRecord | null {
     row.reservation_payment_status !== "requires_review" ||
     typeof row.source_provider_event_id !== "string" ||
     !UUID.test(row.source_provider_event_id) ||
-    typeof row.source_event_matched_at !== "string"
+    typeof row.source_event_matched_at !== "string" ||
+    typeof row.provider_attempt_id !== "string" ||
+    !UUID.test(row.provider_attempt_id) ||
+    typeof row.provider_attempt_number !== "number" ||
+    !Number.isInteger(row.provider_attempt_number) ||
+    row.provider_attempt_number < 1
   ) return null;
 
   return {
@@ -121,6 +128,8 @@ function executionRecord(value: unknown): ExecutionRecord | null {
     reservationPaymentStatus: "requires_review",
     sourceProviderEventId: row.source_provider_event_id,
     sourceEventMatchedAt: row.source_event_matched_at,
+    providerAttemptId: row.provider_attempt_id,
+    providerAttemptNumber: Number(row.provider_attempt_number),
   };
 }
 
@@ -189,7 +198,7 @@ export async function handleExecuteRefundRequest(
       paymentIntentId: execution.paymentIntentId,
       expectedAmount: execution.refundAmount,
       currency: execution.refundCurrency,
-    }, stripeRefundIdempotencyKey(execution.refundId));
+    }, stripeRefundIdempotencyKey(execution.providerAttemptId));
   } catch (error) {
     if (error instanceof StripeRefundError) {
       if (error.kind === "timeout") {
@@ -212,16 +221,16 @@ export async function handleExecuteRefundRequest(
   let evidenceResult: RpcResult;
   try {
     evidenceResult = await dependencies.supabaseAdmin.rpc(
-      "record_payment_refund_evidence",
+      "record_payment_refund_attempt_evidence",
       {
-        p_refund_id: execution.refundId,
+        p_provider_attempt_id: execution.providerAttemptId,
         p_organisation_id: execution.organisationId,
         p_provider_refund_id: providerRefund.id,
         p_evidence_outcome: providerRefund.status,
         p_evidence_source: "stripe_api",
         p_actor_source: "operator_tool",
         p_actor_id: "stripe_refund_executor",
-        p_idempotency_key: execution.refundId,
+        p_idempotency_key: execution.providerAttemptId,
       },
     );
   } catch {
@@ -232,6 +241,7 @@ export async function handleExecuteRefundRequest(
   const evidence = scalarRow(evidenceResult.data);
   if (
     !evidence || evidence.refund_id !== execution.refundId ||
+    evidence.provider_attempt_id !== execution.providerAttemptId ||
     ![providerRefund.status, "already_recorded"].includes(
       String(evidence.outcome),
     )

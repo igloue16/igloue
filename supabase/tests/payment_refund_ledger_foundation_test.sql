@@ -1,6 +1,6 @@
 begin;
 
-select plan(45);
+select plan(47);
 
 select ok(to_regprocedure('public.prepare_payment_refund(uuid,uuid,text,text,uuid)') is not null,
           'refund preparation authority exists');
@@ -165,6 +165,11 @@ select is((select count(*)::integer from public.payment_refund_history where pay
 select is((select string_agg(action, ',' order by occurred_at, id) from public.payment_refund_history
            where payment_attempt_id = '00000000-0000-4000-8000-00000000c501'),
     'prepared,succeeded', 'history records prepared and succeeded transitions in order');
+select throws_ok($$update public.payment_refund_attempts set provider_refund_id='re_rewritten'
+ where refund_id=(select id from public.payment_refunds where payment_attempt_id='00000000-0000-4000-8000-00000000c501')$$,
+    '42501','payment refund attempt history is immutable','terminal provider attempt evidence cannot be rewritten');
+select throws_ok($$delete from public.payment_refund_attempts where refund_id=(select id from public.payment_refunds where payment_attempt_id='00000000-0000-4000-8000-00000000c501')$$,
+    '42501','payment refund attempts are append-only','terminal provider attempt history cannot be deleted');
 select throws_ok($$update public.payment_refund_history set actor_id = 'rewritten' where payment_attempt_id = '00000000-0000-4000-8000-00000000c501'$$,
     '42501', 'payment refund history is append-only', 'refund audit history cannot be rewritten');
 select throws_ok($$delete from public.payment_refund_history where payment_attempt_id = '00000000-0000-4000-8000-00000000c501'$$,

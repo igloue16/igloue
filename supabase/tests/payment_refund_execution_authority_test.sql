@@ -76,11 +76,11 @@ select ok((select source_event_matched_at is not null and attempt_paid_at is not
 select throws_ok($$select * from public.get_payment_refund_execution('00000000-0000-4000-8000-00000000efff')$$,
     'P0002', null::text, 'unknown refund UUID is unavailable');
 
-update public.payment_refunds set status = 'failed', provider_refund_id = 're_execution_failed',
-    evidence_outcome = 'failed', evidence_source = 'stripe_api', evidence_actor_source = 'operator_tool',
+update public.payment_refund_attempts set status = 'failed', provider_refund_id = 're_execution_failed',
+    evidence_source = 'stripe_api', evidence_actor_source = 'operator_tool',
     evidence_actor = 'execution-fixture', evidence_idempotency_key = '00000000-0000-4000-8000-00000000e802',
-    evidence_recorded_at = clock_timestamp(), finalized_at = clock_timestamp()
-where id = '00000000-0000-4000-8000-00000000e701';
+    finalized_at = clock_timestamp()
+where refund_id = '00000000-0000-4000-8000-00000000e701';
 select throws_ok($$select * from public.get_payment_refund_execution('00000000-0000-4000-8000-00000000e701')$$,
     'P0001', null::text, 'non-prepared refund is not executable');
 

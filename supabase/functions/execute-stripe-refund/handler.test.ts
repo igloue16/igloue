@@ -8,6 +8,7 @@ import { type StripeRefundAdapter, StripeRefundError } from "./stripe.ts";
 const serviceKey = "internal-service-test-key";
 const refundId = "00000000-0000-4000-8000-00000000d101";
 const orgId = "00000000-0000-4000-8000-00000000d201";
+const providerAttemptId = "00000000-0000-4000-8000-00000000d111";
 const row = {
   refund_id: refundId,
   organisation_id: orgId,
@@ -28,6 +29,8 @@ const row = {
   exception_resolution: "refund_required",
   source_provider_event_id: "00000000-0000-4000-8000-00000000d401",
   source_event_matched_at: "2026-09-26T10:00:00Z",
+  provider_attempt_id: providerAttemptId,
+  provider_attempt_number: 1,
 };
 
 function request(
@@ -62,10 +65,11 @@ function fixture(options: {
           error: options.executionError ?? null,
         };
       }
-      if (name === "record_payment_refund_evidence") {
+      if (name === "record_payment_refund_attempt_evidence") {
         return {
           data: [{
-            refund_id: parameters.p_refund_id,
+            refund_id: refundId,
+            provider_attempt_id: parameters.p_provider_attempt_id,
             outcome: parameters.p_evidence_outcome,
           }],
           error: options.evidenceError ?? null,
@@ -80,7 +84,7 @@ function fixture(options: {
       assert.equal(input.paymentIntentId, row.payment_intent_id);
       assert.equal(input.expectedAmount, 75);
       assert.equal(input.currency, "EUR");
-      assert.equal(key, `igloue:refund:${refundId}`);
+      assert.equal(key, `igloue:refund:${providerAttemptId}`);
       return {
         id: "re_valid123",
         status: "succeeded",
@@ -108,18 +112,18 @@ Deno.test("prepared refund loads server authority, calls Stripe once, then reuse
   assert.equal(f.stripeCalls(), 1);
   assert.deepEqual(f.calls.map((call) => call.name), [
     "get_payment_refund_execution",
-    "record_payment_refund_evidence",
+    "record_payment_refund_attempt_evidence",
   ]);
   assert.deepEqual(f.calls[0].parameters, { p_refund_id: refundId });
   assert.deepEqual(f.calls[1].parameters, {
-    p_refund_id: refundId,
+    p_provider_attempt_id: providerAttemptId,
     p_organisation_id: orgId,
     p_provider_refund_id: "re_valid123",
     p_evidence_outcome: "succeeded",
     p_evidence_source: "stripe_api",
     p_actor_source: "operator_tool",
     p_actor_id: "stripe_refund_executor",
-    p_idempotency_key: refundId,
+    p_idempotency_key: providerAttemptId,
   });
   assert.equal(
     f.calls.some((call) => /update|status|refunded_at/i.test(call.name)),
@@ -216,7 +220,7 @@ Deno.test("successful Stripe response is finalized by C1, preserving separate re
   const result = await response.json();
   assert.deepEqual(result, { ok: true, refund: { status: "succeeded" } });
   assert.equal(row.reservation_status, "cancelled");
-  assert.equal(f.calls[1].name, "record_payment_refund_evidence");
+  assert.equal(f.calls[1].name, "record_payment_refund_attempt_evidence");
   assert.equal(
     f.calls.some((call) =>
       ["cancel_reservation", "release_allocation", "confirm_reservation"]
@@ -251,14 +255,16 @@ Deno.test("ambiguous network result remains retryable and every retry uses the s
     error: { code: "REFUND_PROVIDER_TIMEOUT", retryable: true },
   });
   assert.equal(
-    f.calls.some((call) => call.name === "record_payment_refund_evidence"),
+    f.calls.some((call) =>
+      call.name === "record_payment_refund_attempt_evidence"
+    ),
     false,
   );
   const second = await handleExecuteRefundRequest(request(), f.dependencies);
   assert.equal(second.status, 200);
   assert.deepEqual(keys, [
-    `igloue:refund:${refundId}`,
-    `igloue:refund:${refundId}`,
+    `igloue:refund:${providerAttemptId}`,
+    `igloue:refund:${providerAttemptId}`,
   ]);
 });
 
@@ -276,7 +282,7 @@ Deno.test("invalid Stripe response is not finalized and provider failures are sa
   assert.equal(invalidResponse.status, 502);
   assert.equal(
     invalid.calls.some((call) =>
-      call.name === "record_payment_refund_evidence"
+      call.name === "record_payment_refund_attempt_evidence"
     ),
     false,
   );
@@ -307,7 +313,9 @@ Deno.test("invalid Stripe response is not finalized and provider failures are sa
       error: { code, retryable },
     });
     assert.equal(
-      f.calls.some((call) => call.name === "record_payment_refund_evidence"),
+      f.calls.some((call) =>
+        call.name === "record_payment_refund_attempt_evidence"
+      ),
       false,
     );
   }
@@ -333,7 +341,9 @@ Deno.test("pending Stripe outcome remains prepared and is not falsely finalized"
     refund: { status: "pending" },
   });
   assert.equal(
-    f.calls.some((call) => call.name === "record_payment_refund_evidence"),
+    f.calls.some((call) =>
+      call.name === "record_payment_refund_attempt_evidence"
+    ),
     false,
   );
 });
@@ -380,7 +390,11 @@ Deno.test("C1 persistence ambiguity can be retried without exposing provider det
           error: { code: "XX000", message: "private database detail" },
         }
         : {
-          data: [{ refund_id: refundId, outcome: "succeeded" }],
+          data: [{
+            refund_id: refundId,
+            provider_attempt_id: providerAttemptId,
+            outcome: "succeeded",
+          }],
           error: null,
         };
     },
@@ -406,7 +420,7 @@ Deno.test("C1 persistence ambiguity can be retried without exposing provider det
   const second = await handleExecuteRefundRequest(request(), dependencies);
   assert.equal(second.status, 200);
   assert.deepEqual(keys, [
-    `igloue:refund:${refundId}`,
-    `igloue:refund:${refundId}`,
+    `igloue:refund:${providerAttemptId}`,
+    `igloue:refund:${providerAttemptId}`,
   ]);
 });

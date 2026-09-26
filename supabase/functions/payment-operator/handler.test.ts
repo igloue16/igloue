@@ -10,6 +10,8 @@ const organisationId = "00000000-0000-4000-8000-00000000a201";
 const reservationId = "00000000-0000-4000-8000-00000000a301";
 const attemptId = "00000000-0000-4000-8000-00000000a401";
 const idemKey = "00000000-0000-4000-8000-00000000a501";
+const refundId = "00000000-0000-4000-8000-00000000a801";
+const refundAttemptId = "00000000-0000-4000-8000-00000000a802";
 const queue = {
   exception_id: exceptionId,
   organisation_id: organisationId,
@@ -62,6 +64,7 @@ function fixture(options: {
   queueData?: unknown;
   caseData?: unknown;
   resolveData?: unknown;
+  prepareData?: unknown;
   rpcError?: { code?: string; message?: string } | null;
   throwOn?: string;
 } = {}) {
@@ -84,6 +87,19 @@ function fixture(options: {
             exception_id: parameters.p_exception_id,
             outcome: "resolved",
             resolved_at: "2026-09-26T10:05:00Z",
+          }],
+          error: null,
+        };
+      }
+      if (name === "prepare_payment_refund") {
+        return {
+          data: options.prepareData ?? [{
+            refund_id: refundId,
+            provider_attempt_id: refundAttemptId,
+            outcome: "prepared",
+            amount: "75.00",
+            currency: "EUR",
+            prepared_at: "2026-09-26T10:05:00Z",
           }],
           error: null,
         };
@@ -346,6 +362,60 @@ Deno.test("resolve derives organisation and fixes source/actor from trusted serv
     p_resolver_actor: "payment_operator_api",
     p_idempotency_key: idemKey,
   });
+});
+
+Deno.test("prepare_refund derives tenant and actor server-side and returns immutable attempt identity", async () => {
+  const f = fixture({
+    caseData: [{
+      ...caseDetail,
+      exception_status: "resolved",
+      resolution: "refund_required",
+      resolved_at: "2026-09-26T10:04:00Z",
+    }],
+  });
+  const response = await handlePaymentOperatorRequest(
+    request({
+      action: "prepare_refund",
+      exceptionId,
+      idempotencyKey: idemKey,
+    }),
+    f.dependencies,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(f.calls.map((call) => call.name), [
+    "get_payment_exception_operator_case",
+    "prepare_payment_refund",
+  ]);
+  assert.deepEqual(f.calls[1].parameters, {
+    p_exception_id: exceptionId,
+    p_organisation_id: organisationId,
+    p_actor_source: "operator_tool",
+    p_actor_id: "payment_operator_api",
+    p_idempotency_key: idemKey,
+  });
+  assert.deepEqual((await response.json()).refund, {
+    refundId,
+    providerAttemptId: refundAttemptId,
+    outcome: "prepared",
+  });
+});
+
+Deno.test("prepare_refund rejects client-supplied payment or tenant authority", async () => {
+  const f = fixture();
+  const response = await handlePaymentOperatorRequest(
+    request({
+      action: "prepare_refund",
+      exceptionId,
+      idempotencyKey: idemKey,
+      amount: 1,
+      currency: "EUR",
+      paymentIntentId: "pi_client",
+      organisationId,
+    }),
+    f.dependencies,
+  );
+  assert.equal(response.status, 400);
+  assert.equal(f.calls.length, 0);
 });
 Deno.test("refund_required disposition is forwarded unchanged", async () => {
   const f = fixture();

@@ -64,7 +64,7 @@ Deno.test("Stripe refund request uses the authoritative PaymentIntent and omits 
   });
 });
 
-Deno.test("refund idempotency key derives only from immutable refund ID", () => {
+Deno.test("refund idempotency key derives from the immutable provider attempt ID", () => {
   assert.equal(
     stripeRefundIdempotencyKey(input.refundId),
     `igloue:refund:${input.refundId}`,
