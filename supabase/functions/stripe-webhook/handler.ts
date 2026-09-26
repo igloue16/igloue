@@ -2,10 +2,14 @@ import { verifyStripeSignature } from "./signature.ts";
 import { payloadSha256 } from "./digest.ts";
 import type { ReceiptRpcClient } from "./receipt.ts";
 import {
-  parseCheckoutSessionCompleted,
   type CheckoutSessionParseResult,
+  parseCheckoutSessionCompleted,
 } from "./checkout-session.ts";
 import { parseExpectedLivemode } from "./config.ts";
+import {
+  isSupportedStripeRefundEventType,
+  parseStripeRefundEvent,
+} from "./refund-event.ts";
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -42,9 +46,18 @@ function parseEventEnvelope(value: unknown): StripeEventEnvelope | null {
   const type = value.type;
   const created = value.created;
   const livemode = value.livemode;
-  if (typeof id !== "string" || id.length < 1 || id.length > 255 || id !== id.trim()) return null;
-  if (typeof type !== "string" || type.length < 1 || type.length > 255 || type !== type.trim()) return null;
-  if (typeof created !== "number" || !Number.isSafeInteger(created) || created <= 0) return null;
+  if (
+    typeof id !== "string" || id.length < 1 || id.length > 255 ||
+    id !== id.trim()
+  ) return null;
+  if (
+    typeof type !== "string" || type.length < 1 || type.length > 255 ||
+    type !== type.trim()
+  ) return null;
+  if (
+    typeof created !== "number" || !Number.isSafeInteger(created) ||
+    created <= 0
+  ) return null;
   if (typeof livemode !== "boolean") return null;
 
   const createdMilliseconds = created * 1000;
@@ -61,15 +74,20 @@ function parseEventEnvelope(value: unknown): StripeEventEnvelope | null {
 }
 
 type ReceiptResult = {
-  outcome: "recorded" | "duplicate" | "conflict";
+  outcome: "recorded" | "duplicate" | "conflict" | "ignored";
   eventId: string;
 };
 
 function receiptResult(value: unknown): ReceiptResult | null {
   const row = Array.isArray(value) ? value[0] : value;
   if (!isRecord(row)) return null;
-  if (row.outcome !== "recorded" && row.outcome !== "duplicate" && row.outcome !== "conflict") return null;
-  if (typeof row.event_id !== "string" || row.event_id.trim() === "") return null;
+  if (
+    row.outcome !== "recorded" && row.outcome !== "duplicate" &&
+    row.outcome !== "conflict" && row.outcome !== "ignored"
+  ) return null;
+  if (typeof row.event_id !== "string" || row.event_id.trim() === "") {
+    return null;
+  }
   return { outcome: row.outcome, eventId: row.event_id };
 }
 
@@ -84,7 +102,8 @@ function matcherResult(value: unknown):
   const row = Array.isArray(value) ? value[0] : value;
   if (!isRecord(row)) return null;
   return row.outcome === "matched" || row.outcome === "already_matched" ||
-      row.outcome === "unknown_provider_event" || row.outcome === "unknown_checkout_session" ||
+      row.outcome === "unknown_provider_event" ||
+      row.outcome === "unknown_checkout_session" ||
       row.outcome === "validation_failed" || row.outcome === "conflict"
     ? row.outcome
     : null;
@@ -101,19 +120,57 @@ type AuthorityOutcome =
 function authorityResult(value: unknown): AuthorityOutcome | null {
   const row = Array.isArray(value) ? value[0] : value;
   if (!isRecord(row)) return null;
-  return row.outcome === "paid_confirmed" || row.outcome === "paid_already_confirmed" ||
+  return row.outcome === "paid_confirmed" ||
+      row.outcome === "paid_already_confirmed" ||
       row.outcome === "requires_review" || row.outcome === "already_paid" ||
-      row.outcome === "already_requires_review" || row.outcome === "not_authoritative"
+      row.outcome === "already_requires_review" ||
+      row.outcome === "not_authoritative"
     ? row.outcome
     : null;
 }
 
-export async function handleStripeWebhookRequest(request: Request, dependencies: Dependencies) {
+function refundOutcome(
+  value: unknown,
+):
+  | "succeeded"
+  | "failed"
+  | "already_processed"
+  | "pending"
+  | "ignored"
+  | "conflict"
+  | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!isRecord(row)) return null;
+  return [
+      "succeeded",
+      "failed",
+      "already_processed",
+      "pending",
+      "ignored",
+      "conflict",
+    ].includes(String(row.outcome))
+    ? row.outcome as
+      | "succeeded"
+      | "failed"
+      | "already_processed"
+      | "pending"
+      | "ignored"
+      | "conflict"
+    : null;
+}
+
+export async function handleStripeWebhookRequest(
+  request: Request,
+  dependencies: Dependencies,
+) {
   if (request.method !== "POST") return response("METHOD_NOT_ALLOWED", 405);
   if (!dependencies.secret) return response("WEBHOOK_CONFIGURATION_ERROR", 500);
 
   const contentLength = request.headers.get("content-length");
-  if (contentLength !== null && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_BODY_BYTES) {
+  if (
+    contentLength !== null && /^\d+$/.test(contentLength) &&
+    Number(contentLength) > MAX_BODY_BYTES
+  ) {
     return response("REQUEST_TOO_LARGE", 413);
   }
 
@@ -123,7 +180,9 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
   } catch {
     return response("INVALID_REQUEST", 400);
   }
-  if (rawBody.byteLength > MAX_BODY_BYTES) return response("REQUEST_TOO_LARGE", 413);
+  if (rawBody.byteLength > MAX_BODY_BYTES) {
+    return response("REQUEST_TOO_LARGE", 413);
+  }
 
   let verification;
   try {
@@ -144,13 +203,17 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
   } catch {
     return response("INVALID_JSON", 400);
   }
-  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+  if (
+    typeof payload !== "object" || payload === null || Array.isArray(payload)
+  ) {
     return response("INVALID_PAYLOAD", 400);
   }
 
   const event = parseEventEnvelope(payload);
   if (!event) return response("INVALID_PAYLOAD", 400);
-  if (!dependencies.receiptClient) return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+  if (!dependencies.receiptClient) {
+    return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
+  }
 
   let digest: string;
   try {
@@ -161,14 +224,43 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
 
   let receipt;
   try {
-    receipt = await dependencies.receiptClient.rpc("receive_payment_provider_event", {
-      p_provider: "stripe",
-      p_provider_event_id: event.id,
-      p_event_type: event.type,
-      p_provider_event_created_at: event.created,
-      p_livemode: event.livemode,
-      p_payload_sha256: digest,
-    });
+    if (isSupportedStripeRefundEventType(event.type)) {
+      const expectedLivemode = parseExpectedLivemode(
+        dependencies.expectedLivemode,
+      );
+      if (expectedLivemode === null) {
+        return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+      }
+      const parsed = parseStripeRefundEvent(payload);
+      const normalized = parsed.ok ? parsed.value : null;
+      receipt = await dependencies.receiptClient.rpc(
+        "receive_payment_refund_provider_event",
+        {
+          p_provider_event_id: event.id,
+          p_event_type: event.type,
+          p_provider_event_created_at: event.created,
+          p_livemode: event.livemode,
+          p_payload_sha256: digest,
+          p_expected_livemode: expectedLivemode,
+          p_provider_refund_id: normalized?.refundId ?? null,
+          p_payment_intent_id: normalized?.paymentIntentId ?? null,
+          p_amount_cents: normalized?.amountCents ?? null,
+          p_currency: normalized?.currency ?? null,
+          p_refund_status: normalized?.status ?? null,
+          p_validation_error: parsed.ok ? null : "malformed_refund_event",
+        },
+      );
+    } else {receipt = await dependencies.receiptClient.rpc(
+        "receive_payment_provider_event",
+        {
+          p_provider: "stripe",
+          p_provider_event_id: event.id,
+          p_event_type: event.type,
+          p_provider_event_created_at: event.created,
+          p_livemode: event.livemode,
+          p_payload_sha256: digest,
+        },
+      );}
   } catch {
     return response("WEBHOOK_RECEIPT_UNAVAILABLE", 503);
   }
@@ -181,17 +273,43 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
     return Response.json({ received: true }, { status: 200 });
   }
 
+  if (isSupportedStripeRefundEventType(event.type)) {
+    if (received.outcome === "ignored") {
+      return Response.json({ received: true }, { status: 200 });
+    }
+    let applied;
+    try {
+      applied = await dependencies.receiptClient.rpc(
+        "apply_payment_refund_provider_event",
+        {
+          p_event_id: received.eventId,
+        },
+      );
+    } catch {
+      return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+    }
+    if (applied.error || refundOutcome(applied.data) === null) {
+      return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+    }
+    return Response.json({ received: true }, { status: 200 });
+  }
+
   if (event.type !== "checkout.session.completed") {
     return Response.json({ received: true }, { status: 200 });
   }
 
   const expectedLivemode = parseExpectedLivemode(dependencies.expectedLivemode);
-  if (expectedLivemode === null) return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+  if (expectedLivemode === null) {
+    return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
+  }
 
-  const parsed = (dependencies.parser ?? parseCheckoutSessionCompleted)(payload);
+  const parsed = (dependencies.parser ?? parseCheckoutSessionCompleted)(
+    payload,
+  );
   if (!parsed.ok) return Response.json({ received: true }, { status: 200 });
 
-  const matcherClient = dependencies.matcherClient ?? dependencies.receiptClient;
+  const matcherClient = dependencies.matcherClient ??
+    dependencies.receiptClient;
   if (!matcherClient) return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
 
   let matching;
@@ -235,7 +353,9 @@ export async function handleStripeWebhookRequest(request: Request, dependencies:
     return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
   }
 
-  const paymentOutcome = authority.error ? null : authorityResult(authority.data);
+  const paymentOutcome = authority.error
+    ? null
+    : authorityResult(authority.data);
   if (!paymentOutcome || paymentOutcome === "not_authoritative") {
     return response("WEBHOOK_PROCESSING_UNAVAILABLE", 503);
   }

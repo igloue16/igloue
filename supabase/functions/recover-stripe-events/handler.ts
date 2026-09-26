@@ -2,7 +2,9 @@ import {
   type AuthorityOutcome,
   type ClaimedPaymentEvent,
   recoverStripeEventsBatch,
+  recoverStripeRefundEventsBatch,
   type RecoveryDependencies,
+  type RefundRecoveryDependencies,
 } from "./worker.ts";
 
 type RpcResult = { data: unknown; error: unknown | null };
@@ -108,9 +110,62 @@ export function createRecoveryDependencies(
   };
 }
 
+export function createRefundRecoveryDependencies(
+  supabaseAdmin: SupabaseAdmin,
+  expectedLivemode: boolean | null,
+): RefundRecoveryDependencies {
+  const call = async (name: string, parameters: Record<string, unknown>) => {
+    const result = await supabaseAdmin.rpc(name, parameters);
+    if (result.error) throw new Error(`${name} unavailable`);
+    return result.data;
+  };
+  return {
+    async claim(limit): Promise<ClaimedPaymentEvent[]> {
+      if (expectedLivemode === null) {
+        throw new Error("livemode configuration unavailable");
+      }
+      return claimRows(
+        await call("claim_payment_refund_event_recovery", {
+          p_limit: limit,
+          p_expected_livemode: expectedLivemode,
+        }),
+      );
+    },
+    async applyAuthority(eventId) {
+      const value = await call("apply_payment_refund_provider_event", {
+        p_event_id: eventId,
+      });
+      const row = Array.isArray(value) ? value[0] : value;
+      const outcome = object(row) ? row.outcome : null;
+      return outcome === "succeeded" || outcome === "failed" ||
+          outcome === "already_processed" || outcome === "pending" ||
+          outcome === "ignored" || outcome === "conflict"
+        ? outcome
+        : null;
+    },
+    async recordResult(eventId, claimToken, result, errorClass) {
+      const outcome = scalar(
+        await call("record_payment_provider_event_recovery", {
+          p_event_id: eventId,
+          p_claim_token: claimToken,
+          p_result: result,
+          p_error_class: errorClass ?? null,
+        }),
+      );
+      if (
+        outcome !== "completed" && outcome !== "terminal" &&
+        outcome !== "retry_scheduled" && outcome !== "retry_exhausted" &&
+        outcome !== "lost_claim"
+      ) throw new Error("invalid recovery result response");
+      return outcome;
+    },
+  };
+}
+
 export async function handleRecoveryRequest(
   request: Request,
   dependencies: RecoveryDependencies,
+  refundDependencies?: RefundRecoveryDependencies,
 ) {
   if (request.method !== "POST") {
     return Response.json({ ok: false, error: { code: "METHOD_NOT_ALLOWED" } }, {
@@ -119,7 +174,14 @@ export async function handleRecoveryRequest(
   }
   try {
     const result = await recoverStripeEventsBatch(dependencies);
-    return Response.json({ ok: true, ...result });
+    const refunds = refundDependencies
+      ? await recoverStripeRefundEventsBatch(refundDependencies)
+      : null;
+    return Response.json({
+      ok: true,
+      ...result,
+      ...(refunds ? { refunds } : {}),
+    });
   } catch {
     return Response.json(
       { ok: false, error: { code: "RECOVERY_UNAVAILABLE" } },

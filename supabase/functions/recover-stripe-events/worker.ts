@@ -25,6 +25,22 @@ export type RecoveryDependencies = {
   ): Promise<string>;
 };
 
+export type RefundRecoveryDependencies = {
+  claim(limit: number): Promise<ClaimedPaymentEvent[]>;
+  applyAuthority(
+    eventId: string,
+  ): Promise<
+    | "succeeded"
+    | "failed"
+    | "already_processed"
+    | "pending"
+    | "ignored"
+    | "conflict"
+    | null
+  >;
+  recordResult: RecoveryDependencies["recordResult"];
+};
+
 export type RecoveryBatchResult = {
   claimed: number;
   processed: number;
@@ -125,5 +141,51 @@ export async function recoverStripeEventsBatch(
     }
   }
 
+  return result;
+}
+
+export async function recoverStripeRefundEventsBatch(
+  dependencies: RefundRecoveryDependencies,
+): Promise<RecoveryBatchResult> {
+  const events = await dependencies.claim(RECOVERY_BATCH_LIMIT);
+  const result: RecoveryBatchResult = {
+    claimed: events.length,
+    processed: 0,
+    terminal: 0,
+    retried: 0,
+    retryExhausted: 0,
+    lostClaims: 0,
+  };
+  for (const event of events) {
+    let authority: Awaited<
+      ReturnType<RefundRecoveryDependencies["applyAuthority"]>
+    >;
+    try {
+      authority = await dependencies.applyAuthority(event.event_id);
+    } catch {
+      authority = null;
+    }
+    const success = authority === "succeeded" || authority === "failed" ||
+      authority === "already_processed";
+    const terminal = authority === "pending" || authority === "ignored" ||
+      authority === "conflict";
+    try {
+      recordOutcome(
+        result,
+        await dependencies.recordResult(
+          event.event_id,
+          event.claim_token,
+          success
+            ? "processed"
+            : terminal
+            ? "not_authoritative"
+            : "transient_error",
+          authority === null ? "authority_rpc_unavailable" : undefined,
+        ),
+      );
+    } catch {
+      result.lostClaims += 1;
+    }
+  }
   return result;
 }

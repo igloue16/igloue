@@ -26,13 +26,18 @@ async function signature(body: string, secret = SECRET, timestamp = TIMESTAMP) {
     key,
     new TextEncoder().encode(`${timestamp}.${body}`),
   );
-  const hex = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0")
+  const hex = Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0"),
   ).join("");
   return `t=${timestamp},v1=${hex}`;
 }
 
-function request(body: string, method = "POST", headers: Record<string, string> = {}) {
+function request(
+  body: string,
+  method = "POST",
+  headers: Record<string, string> = {},
+) {
   return new Request("https://example.test/stripe-webhook", {
     method,
     headers,
@@ -55,7 +60,7 @@ function checkoutEvent(overrides: Record<string, unknown> = {}) {
         payment_status: "paid",
         amount_total: 7500,
         currency: "eur",
-        payment_intent: "pi_test_123",
+        payment_intent: "pi_test123",
         client_reference_id: PAYMENT_ATTEMPT_ID,
         metadata: {
           payment_attempt_id: PAYMENT_ATTEMPT_ID,
@@ -83,14 +88,24 @@ function body(value: unknown) {
 function makeDependencies(options: {
   expectedLivemode?: string;
   receiptOutcome?: "recorded" | "duplicate" | "conflict";
-  matchOutcome?: "matched" | "already_matched" | "unknown_provider_event" |
-    "unknown_checkout_session" | "validation_failed" | "conflict";
+  matchOutcome?:
+    | "matched"
+    | "already_matched"
+    | "unknown_provider_event"
+    | "unknown_checkout_session"
+    | "validation_failed"
+    | "conflict";
   receiptData?: unknown;
   matcherData?: unknown;
   receiptError?: unknown | null;
   matcherError?: unknown | null;
-  authorityOutcome?: "paid_confirmed" | "paid_already_confirmed" | "requires_review" |
-    "already_paid" | "already_requires_review" | "not_authoritative";
+  authorityOutcome?:
+    | "paid_confirmed"
+    | "paid_already_confirmed"
+    | "requires_review"
+    | "already_paid"
+    | "already_requires_review"
+    | "not_authoritative";
   authorityData?: unknown;
   authorityError?: unknown | null;
   throwReceipt?: boolean;
@@ -98,7 +113,8 @@ function makeDependencies(options: {
   throwAuthority?: boolean;
   parser?: (event: unknown) => CheckoutSessionParseResult;
 } = {}) {
-  const calls: Array<{ name: string; parameters: Record<string, unknown> }> = [];
+  const calls: Array<{ name: string; parameters: Record<string, unknown> }> =
+    [];
   const receiptClient: ReceiptRpcClient = {
     async rpc(name, parameters) {
       calls.push({ name, parameters });
@@ -112,17 +128,37 @@ function makeDependencies(options: {
           error: options.receiptError ?? null,
         };
       }
+      if (name === "receive_payment_refund_provider_event") {
+        return {
+          data: [{
+            outcome: parameters.p_validation_error ? "ignored" : "recorded",
+            event_id: INTERNAL_EVENT_ID,
+          }],
+          error: null,
+        };
+      }
+      if (name === "apply_payment_refund_provider_event") {
+        return {
+          data: [{
+            outcome: "succeeded",
+            refund_id: "00000000-0000-4000-8000-000000000401",
+          }],
+          error: null,
+        };
+      }
       if (name === "match_payment_provider_event") {
         if (options.throwMatcher) throw new Error("matcher unavailable");
         return {
-          data: options.matcherData ?? [{ outcome: options.matchOutcome ?? "matched" }],
+          data: options.matcherData ??
+            [{ outcome: options.matchOutcome ?? "matched" }],
           error: options.matcherError ?? null,
         };
       }
       if (name === "apply_provider_payment_outcome") {
         if (options.throwAuthority) throw new Error("authority unavailable");
         return {
-          data: options.authorityData ?? [{ outcome: options.authorityOutcome ?? "paid_confirmed" }],
+          data: options.authorityData ??
+            [{ outcome: options.authorityOutcome ?? "paid_confirmed" }],
           error: options.authorityError ?? null,
         };
       }
@@ -136,7 +172,9 @@ function makeDependencies(options: {
       secret: SECRET,
       now: NOW,
       receiptClient,
-      expectedLivemode: "expectedLivemode" in options ? options.expectedLivemode : "false",
+      expectedLivemode: "expectedLivemode" in options
+        ? options.expectedLivemode
+        : "false",
       parser: options.parser,
     },
   };
@@ -146,7 +184,10 @@ function errorCode(response: Response) {
   return response.json().then((value) => value.error.code);
 }
 
-async function signedRequest(value: unknown, headers: Record<string, string> = {}) {
+async function signedRequest(
+  value: unknown,
+  headers: Record<string, string> = {},
+) {
   const raw = typeof value === "string" ? value : body(value);
   return request(raw, "POST", {
     "content-type": "application/json",
@@ -171,6 +212,58 @@ Deno.test("invalid signatures never record, parse, or match", async () => {
   assertEquals(response.status, 400);
   assertEquals(calls.length, 0);
   assertEquals(parsed, 0);
+});
+
+Deno.test("signed refund event uses normalized durable receipt and C1 evidence RPC", async () => {
+  const { dependencies, calls } = makeDependencies({});
+  const response = await handleStripeWebhookRequest(
+    await signedRequest({
+      id: "evt_refund123",
+      type: "refund.updated",
+      created: TIMESTAMP,
+      livemode: false,
+      data: {
+        object: {
+          object: "refund",
+          id: "re_test123",
+          payment_intent: "pi_test123",
+          amount: 7500,
+          currency: "eur",
+          status: "succeeded",
+        },
+      },
+    }),
+    dependencies,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(calls.map((call) => call.name), [
+    "receive_payment_refund_provider_event",
+    "apply_payment_refund_provider_event",
+  ]);
+  assertEquals(calls[1].parameters, { p_event_id: INTERNAL_EVENT_ID });
+});
+
+Deno.test("malformed signed refund is durably terminal and never invokes evidence authority", async () => {
+  const { dependencies, calls } = makeDependencies({});
+  const response = await handleStripeWebhookRequest(
+    await signedRequest({
+      id: "evt_refundbad123",
+      type: "refund.updated",
+      created: TIMESTAMP,
+      livemode: false,
+      data: { object: { object: "refund", id: "re_bad123" } },
+    }),
+    dependencies,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(calls.map((call) => call.name), [
+    "receive_payment_refund_provider_event",
+  ]);
+  assertEquals(
+    calls[0].parameters.p_validation_error,
+    "malformed_refund_event",
+  );
+  assertEquals(calls[0].parameters.p_provider_refund_id, null);
 });
 
 Deno.test("oversized bodies never reach business processing", async () => {
@@ -213,9 +306,12 @@ Deno.test("verified receipt, parser, matcher, and payment authority use distinct
       paymentStatus: "paid",
       amountTotal: 7500,
       currency: "eur",
-      paymentIntentId: "pi_test_123",
+      paymentIntentId: "pi_test123",
       clientReferenceId: PAYMENT_ATTEMPT_ID,
-      metadata: { paymentAttemptId: PAYMENT_ATTEMPT_ID, reservationId: RESERVATION_ID },
+      metadata: {
+        paymentAttemptId: PAYMENT_ATTEMPT_ID,
+        reservationId: RESERVATION_ID,
+      },
     },
   };
   const base = makeDependencies({});
@@ -226,7 +322,9 @@ Deno.test("verified receipt, parser, matcher, and payment authority use distinct
       return normalized;
     },
   };
-  const originalRpc = base.dependencies.receiptClient!.rpc.bind(base.dependencies.receiptClient);
+  const originalRpc = base.dependencies.receiptClient!.rpc.bind(
+    base.dependencies.receiptClient,
+  );
   base.dependencies.receiptClient!.rpc = async (name, parameters) => {
     calls.push(name);
     return originalRpc(name, parameters);
@@ -240,7 +338,9 @@ Deno.test("verified receipt, parser, matcher, and payment authority use distinct
   assertEquals(response.status, 200);
   assertEquals(await response.json(), { received: true });
   assertEquals(calls, [
-    "receive_payment_provider_event", "parser", "match_payment_provider_event",
+    "receive_payment_provider_event",
+    "parser",
+    "match_payment_provider_event",
     "apply_provider_payment_outcome",
   ]);
   assertEquals(base.calls[1].parameters, {
@@ -251,13 +351,16 @@ Deno.test("verified receipt, parser, matcher, and payment authority use distinct
     p_mode: "payment",
     p_checkout_status: "complete",
     p_payment_status: "paid",
-    p_payment_intent_id: "pi_test_123",
+    p_payment_intent_id: "pi_test123",
     p_client_reference_id: PAYMENT_ATTEMPT_ID,
     p_metadata_payment_attempt_id: PAYMENT_ATTEMPT_ID,
     p_metadata_reservation_id: RESERVATION_ID,
     p_expected_livemode: false,
   });
-  assertNotEquals(base.calls[1].parameters.p_provider_event_id, INTERNAL_EVENT_ID);
+  assertNotEquals(
+    base.calls[1].parameters.p_provider_event_id,
+    INTERNAL_EVENT_ID,
+  );
   assertEquals(base.calls[2].parameters, { p_event_id: INTERNAL_EVENT_ID });
   assertNotEquals(base.calls[2].parameters.p_event_id, EVENT_ID);
 });
@@ -299,11 +402,13 @@ Deno.test("receipt conflict is acknowledged without parser or matcher", async ()
 });
 
 Deno.test("receipt failures return sanitized 503 and never match", async () => {
-  for (const options of [
-    { throwReceipt: true },
-    { receiptError: { message: "database failure" } },
-    { receiptData: [] },
-  ]) {
+  for (
+    const options of [
+      { throwReceipt: true },
+      { receiptError: { message: "database failure" } },
+      { receiptData: [] },
+    ]
+  ) {
     const { dependencies, calls } = makeDependencies(options);
     const response = await handleStripeWebhookRequest(
       await signedRequest(checkoutEvent()),
@@ -316,7 +421,9 @@ Deno.test("receipt failures return sanitized 503 and never match", async () => {
 });
 
 Deno.test("unsupported authentic events are durably acknowledged, not matched", async () => {
-  const { dependencies, calls } = makeDependencies({ expectedLivemode: undefined });
+  const { dependencies, calls } = makeDependencies({
+    expectedLivemode: undefined,
+  });
   const response = await handleStripeWebhookRequest(
     await signedRequest(genericEvent("checkout.session.expired")),
     dependencies,
@@ -324,7 +431,9 @@ Deno.test("unsupported authentic events are durably acknowledged, not matched", 
 
   assertEquals(response.status, 200);
   assertEquals(await response.json(), { received: true });
-  assertEquals(calls.map((call) => call.name), ["receive_payment_provider_event"]);
+  assertEquals(calls.map((call) => call.name), [
+    "receive_payment_provider_event",
+  ]);
 });
 
 Deno.test("parser failures are sanitized durable acknowledgements", async () => {
@@ -343,7 +452,9 @@ Deno.test("parser failures are sanitized durable acknowledgements", async () => 
 
 Deno.test("expected livemode accepts only true and false", async () => {
   for (const expected of ["true", "false"] as const) {
-    const { dependencies, calls } = makeDependencies({ expectedLivemode: expected });
+    const { dependencies, calls } = makeDependencies({
+      expectedLivemode: expected,
+    });
     const response = await handleStripeWebhookRequest(
       await signedRequest(checkoutEvent()),
       dependencies,
@@ -365,13 +476,15 @@ Deno.test("expected livemode accepts only true and false", async () => {
 });
 
 Deno.test("all deterministic matcher outcomes return the same sanitized 200", async () => {
-  for (const matchOutcome of [
-    "matched",
-    "already_matched",
-    "unknown_checkout_session",
-    "validation_failed",
-    "conflict",
-  ] as const) {
+  for (
+    const matchOutcome of [
+      "matched",
+      "already_matched",
+      "unknown_checkout_session",
+      "validation_failed",
+      "conflict",
+    ] as const
+  ) {
     const { dependencies, calls } = makeDependencies({ matchOutcome });
     const response = await handleStripeWebhookRequest(
       await signedRequest(checkoutEvent()),
@@ -387,12 +500,18 @@ Deno.test("all deterministic matcher outcomes return the same sanitized 200", as
 });
 
 Deno.test("review and finalized replay outcomes acknowledge without leaking payment state", async () => {
-  for (const authorityOutcome of [
-    "requires_review", "paid_already_confirmed", "already_paid", "already_requires_review",
-  ] as const) {
+  for (
+    const authorityOutcome of [
+      "requires_review",
+      "paid_already_confirmed",
+      "already_paid",
+      "already_requires_review",
+    ] as const
+  ) {
     const { dependencies, calls } = makeDependencies({ authorityOutcome });
     const result = await handleStripeWebhookRequest(
-      await signedRequest(checkoutEvent()), dependencies,
+      await signedRequest(checkoutEvent()),
+      dependencies,
     );
     assertEquals(result.status, 200);
     assertEquals(await result.text(), '{"received":true}');
@@ -405,20 +524,24 @@ Deno.test("review and finalized replay outcomes acknowledge without leaking paym
 });
 
 Deno.test("authority failure and non-authoritative result remain retryable and sanitized", async () => {
-  for (const options of [
-    { throwAuthority: true },
-    { authorityError: { message: "database failure" } },
-    { authorityData: [] },
-    { authorityData: [{ outcome: "unexpected" }] },
-    { authorityOutcome: "not_authoritative" as const },
-  ]) {
+  for (
+    const options of [
+      { throwAuthority: true },
+      { authorityError: { message: "database failure" } },
+      { authorityData: [] },
+      { authorityData: [{ outcome: "unexpected" }] },
+      { authorityOutcome: "not_authoritative" as const },
+    ]
+  ) {
     const { dependencies, calls } = makeDependencies(options);
     const result = await handleStripeWebhookRequest(
-      await signedRequest(checkoutEvent()), dependencies,
+      await signedRequest(checkoutEvent()),
+      dependencies,
     );
     assertEquals(result.status, 503);
     assertEquals(await result.json(), {
-      ok: false, error: { code: "WEBHOOK_PROCESSING_UNAVAILABLE" },
+      ok: false,
+      error: { code: "WEBHOOK_PROCESSING_UNAVAILABLE" },
     });
     assertEquals(calls.map((call) => call.name), [
       "receive_payment_provider_event",
@@ -429,7 +552,8 @@ Deno.test("authority failure and non-authoritative result remain retryable and s
 });
 
 Deno.test("same-digest duplicate retries authority after an interrupted first delivery", async () => {
-  const calls: Array<{ name: string; parameters: Record<string, unknown> }> = [];
+  const calls: Array<{ name: string; parameters: Record<string, unknown> }> =
+    [];
   let receipts = 0;
   let authorityCalls = 0;
   const client: ReceiptRpcClient = {
@@ -438,12 +562,18 @@ Deno.test("same-digest duplicate retries authority after an interrupted first de
       if (name === "receive_payment_provider_event") {
         receipts += 1;
         return {
-          data: [{ outcome: receipts === 1 ? "recorded" : "duplicate", event_id: INTERNAL_EVENT_ID }],
+          data: [{
+            outcome: receipts === 1 ? "recorded" : "duplicate",
+            event_id: INTERNAL_EVENT_ID,
+          }],
           error: null,
         };
       }
       if (name === "match_payment_provider_event") {
-        return { data: [{ outcome: receipts === 1 ? "matched" : "already_matched" }], error: null };
+        return {
+          data: [{ outcome: receipts === 1 ? "matched" : "already_matched" }],
+          error: null,
+        };
       }
       if (name === "apply_provider_payment_outcome") {
         authorityCalls += 1;
@@ -454,18 +584,31 @@ Deno.test("same-digest duplicate retries authority after an interrupted first de
     },
   };
   const dependencies = {
-    secret: SECRET, now: NOW, receiptClient: client, expectedLivemode: "false",
+    secret: SECRET,
+    now: NOW,
+    receiptClient: client,
+    expectedLivemode: "false",
   };
 
-  const first = await handleStripeWebhookRequest(await signedRequest(checkoutEvent()), dependencies);
+  const first = await handleStripeWebhookRequest(
+    await signedRequest(checkoutEvent()),
+    dependencies,
+  );
   assertEquals(first.status, 503);
   assertEquals(await errorCode(first), "WEBHOOK_PROCESSING_UNAVAILABLE");
-  const second = await handleStripeWebhookRequest(await signedRequest(checkoutEvent()), dependencies);
+  const second = await handleStripeWebhookRequest(
+    await signedRequest(checkoutEvent()),
+    dependencies,
+  );
   assertEquals(second.status, 200);
   assertEquals(await second.json(), { received: true });
   assertEquals(calls.map((call) => call.name), [
-    "receive_payment_provider_event", "match_payment_provider_event", "apply_provider_payment_outcome",
-    "receive_payment_provider_event", "match_payment_provider_event", "apply_provider_payment_outcome",
+    "receive_payment_provider_event",
+    "match_payment_provider_event",
+    "apply_provider_payment_outcome",
+    "receive_payment_provider_event",
+    "match_payment_provider_event",
+    "apply_provider_payment_outcome",
   ]);
   assertEquals(authorityCalls, 2);
   assertEquals(calls[1].parameters.p_provider_event_id, EVENT_ID);
@@ -475,33 +618,41 @@ Deno.test("same-digest duplicate retries authority after an interrupted first de
 Deno.test("invalid Checkout payment fields never invoke authority", async () => {
   const checkout = checkoutEvent();
   const session = checkout.data.object;
-  for (const change of [
-    { mode: "setup" },
-    { status: "open" },
-    { payment_status: "unpaid" },
-    { currency: "usd" },
-    { amount_total: null },
-    { payment_intent: null },
-    { client_reference_id: "invalid" },
-  ]) {
+  for (
+    const change of [
+      { mode: "setup" },
+      { status: "open" },
+      { payment_status: "unpaid" },
+      { currency: "usd" },
+      { amount_total: null },
+      { payment_intent: null },
+      { client_reference_id: "invalid" },
+    ]
+  ) {
     const { dependencies, calls } = makeDependencies();
     const result = await handleStripeWebhookRequest(
-      await signedRequest(checkoutEvent({ data: { object: { ...session, ...change } } })),
+      await signedRequest(
+        checkoutEvent({ data: { object: { ...session, ...change } } }),
+      ),
       dependencies,
     );
     assertEquals(result.status, 200);
     assertEquals(await result.json(), { received: true });
-    assertEquals(calls.map((call) => call.name), ["receive_payment_provider_event"]);
+    assertEquals(calls.map((call) => call.name), [
+      "receive_payment_provider_event",
+    ]);
   }
 });
 
 Deno.test("unknown provider event and transient matcher failures return sanitized 503", async () => {
-  for (const options of [
-    { matchOutcome: "unknown_provider_event" as const },
-    { throwMatcher: true },
-    { matcherError: { message: "database failure" } },
-    { matcherData: [] },
-  ]) {
+  for (
+    const options of [
+      { matchOutcome: "unknown_provider_event" as const },
+      { throwMatcher: true },
+      { matcherError: { message: "database failure" } },
+      { matcherData: [] },
+    ]
+  ) {
     const { dependencies } = makeDependencies(options);
     const response = await handleStripeWebhookRequest(
       await signedRequest(checkoutEvent()),
@@ -513,7 +664,9 @@ Deno.test("unknown provider event and transient matcher failures return sanitize
 });
 
 Deno.test("responses never expose internal payment data", async () => {
-  const { dependencies } = makeDependencies({ matchOutcome: "validation_failed" });
+  const { dependencies } = makeDependencies({
+    matchOutcome: "validation_failed",
+  });
   const response = await handleStripeWebhookRequest(
     await signedRequest(checkoutEvent()),
     dependencies,
@@ -522,5 +675,5 @@ Deno.test("responses never expose internal payment data", async () => {
   assertEquals(successText, '{"received":true}');
   assertNotEquals(successText.includes(PAYMENT_ATTEMPT_ID), true);
   assertNotEquals(successText.includes(RESERVATION_ID), true);
-  assertNotEquals(successText.includes("pi_test_123"), true);
+  assertNotEquals(successText.includes("pi_test123"), true);
 });
