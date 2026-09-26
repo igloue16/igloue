@@ -39,6 +39,12 @@ function rows(data: unknown): ClaimedOutboxEvent[] {
 export function createWorkerDependencies(supabaseAdmin: SupabaseClient): WorkerDependencies {
   return {
     async claim(limit) {
+      const recovered = await supabaseAdmin.rpc(
+        "recover_stale_outbox_events",
+        { p_limit: 100 },
+      );
+      if (recovered.error) throw new Error("stale outbox recovery failed");
+
       const result = await supabaseAdmin.rpc("claim_outbox_events", { p_limit: limit });
       if (result.error) throw new Error("claim failed");
       return rows(result.data);

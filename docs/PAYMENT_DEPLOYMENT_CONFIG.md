@@ -39,3 +39,113 @@ Never put service-role keys, Stripe secret keys, webhook signing secrets, paymen
 Configure the webhook endpoint for `checkout.session.completed`, `refund.created`, `refund.updated`, and `refund.failed`. The webhook checks the HMAC before parsing the event, then checks event `livemode` against the exact configured expected mode before authoritative database reconciliation. Recovery uses that same expected mode. Checkout creation and refund execution reject a Stripe key whose test/live prefix disagrees with the expected mode. Do not use a test key with `true`, a live key with `false`, or omit the mode setting.
 
 For local development and automated tests, use test-mode Stripe keys and `STRIPE_EXPECTED_LIVEMODE=false`; use local Supabase credentials and non-production callback URLs. Production configuration must independently provide the live key, live webhook signing secret, `STRIPE_EXPECTED_LIVEMODE=true`, production Supabase credentials, and production callback URLs. This document contains no secret values. No production values are checked into the repository.
+
+## Background payment jobs
+
+The migration `20261030000000_schedule_background_recovery_and_outbox.sql`
+installs `pg_net` when needed and configures two `pg_cron` jobs. It does not
+install or alter `pg_cron` or `supabase_vault`; those extensions must be
+available in the Supabase database. The existing hold-cleanup job remains
+unchanged.
+
+| Job name | Cadence | Work |
+| --- | --- | --- |
+| `igloue-provider-event-recovery` | Every minute | POSTs to the internal `recover-stripe-events` Edge Function. The worker claims at most 10 events per batch and retains its database lease, retry backoff, and terminal-event rules. |
+| `igloue-confirmation-outbox` | Every minute | POSTs to the internal `process-outbox` Edge Function. Before each claim, it recovers at most 100 expired outbox leases; then it claims at most 10 events. |
+
+The schedule invokes a private, postgres-only helper. At run time, the helper
+reads these two named entries from `vault.decrypted_secrets` and builds the
+`Authorization: Bearer …` and `apikey` headers for `pg_net`:
+
+- `igloue_internal_functions_base_url`: environment-specific Supabase
+  Functions base URL ending in `/functions/v1`.
+- `igloue_internal_edge_secret_key`: Supabase secret API key (`sb_secret_…`)
+  for the same project. This matches the functions' configured `secret` auth
+  mode. The Edge runtime continues to use its own service-role credential for
+  database work; that credential is not copied into Vault for these calls.
+
+Neither value is stored in the migration or cron command. If either Vault entry
+is absent or blank, the helper does not enqueue a request. The jobs remain
+scheduled and begin invoking the functions after both entries are provisioned.
+The Edge Functions still enforce their internal secret-auth boundary. Keep
+Vault access restricted to trusted operators and database service roles.
+
+### Provision and rotate Vault values
+
+Connect to the target project database with `psql` as a trusted database
+operator. Enter the URL and secret API key at the prompts; the key prompt is
+hidden. Retrieve a local key from the local Supabase environment and use the
+matching project's `sb_secret_…` key for another environment. These commands
+use psql variables so the values are not literal SQL text or migration history:
+
+```psql
+\prompt 'Functions base URL (ending /functions/v1): ' igloue_functions_base_url
+\prompt -s 'Secret API key for this same project: ' igloue_edge_secret_key
+select vault.create_secret(:'igloue_functions_base_url', 'igloue_internal_functions_base_url', 'Background Edge invocation URL');
+select vault.create_secret(:'igloue_edge_secret_key', 'igloue_internal_edge_secret_key', 'Background Edge invocation credential');
+\unset igloue_functions_base_url
+\unset igloue_edge_secret_key
+```
+
+Run the creation commands once per project. To rotate either value, use the
+hidden prompt again and update the existing Vault entry by its name:
+
+```psql
+\prompt -s 'Replacement secret API key: ' igloue_edge_secret_key
+select vault.update_secret(
+  secret_id => (select id from vault.secrets where name = 'igloue_internal_edge_secret_key'),
+  new_secret => :'igloue_edge_secret_key'
+);
+\unset igloue_edge_secret_key
+```
+
+For URL changes, use the same `vault.update_secret` call with
+`igloue_internal_functions_base_url` and the prompted URL variable. Never put
+either value in source control, a migration, a cron command, a ticket, or a
+report. Use a local project URL and local secret API key for local testing;
+use only the matching environment's credential when provisioning another
+project.
+
+### Verify, disable, and re-enable
+
+Inspect the jobs without reading any Vault values:
+
+```sql
+select jobname, schedule, command
+from cron.job
+where jobname in ('igloue-provider-event-recovery', 'igloue-confirmation-outbox');
+```
+
+Each name should appear exactly once with schedule `* * * * *`. The command
+contains only a call to the private enqueue helper. To inspect recent HTTP
+outcomes, query `net._http_response` by the request ID returned by the cron job;
+the function response is sanitized batch counts. Do not query or print
+`vault.decrypted_secrets` in routine diagnostics.
+
+Disable one or both jobs by name:
+
+```sql
+select cron.unschedule(jobid)
+from cron.job
+where jobname in ('igloue-provider-event-recovery', 'igloue-confirmation-outbox');
+```
+
+As the database owner, re-enable them idempotently with:
+
+```sql
+select private.configure_background_jobs();
+```
+
+If Vault values are missing, no HTTP request is queued and the cron entry
+remains available for retry after provisioning. If a function call fails, pg_net
+records its HTTP outcome; the next scheduled run retries eligible work. The
+database claim tokens and leases remain authoritative, so overlapping calls do
+not steal active work. Provider events retain their bounded backoff and
+terminalization behavior. Outbox delivery keeps retryable and terminal outcomes
+in the existing worker; expired processing leases are requeued immediately
+before each outbox claim, while active leases are left alone.
+
+The migration owns extension installation for `pg_net` and idempotent job
+creation. Operators own environment-specific Vault provisioning and credential
+rotation. No URL or credential needs to be embedded in deployment SQL or job
+definitions.
