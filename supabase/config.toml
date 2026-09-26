@@ -448,3 +448,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/stripe-webhook/deno.json"
 entrypoint = "./functions/stripe-webhook/index.ts"
+
+[functions.execute-stripe-refund]
+enabled = true
+verify_jwt = false
+import_map = "./functions/execute-stripe-refund/deno.json"
+entrypoint = "./functions/execute-stripe-refund/index.ts"
