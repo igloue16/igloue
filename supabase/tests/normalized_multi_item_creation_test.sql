@@ -1,6 +1,6 @@
 begin;
 
-select plan(39);
+select plan(42);
 
 select ok(
     exists (
@@ -59,6 +59,7 @@ select * from public.create_reservation_with_payment_capability(
 
 select is((select count(*)::integer from public.reservation_items where reservation_id = (select reservation_id from mm3c_single)), 1, 'single item creates one reservation item');
 select is((select count(*)::integer from public.allocations where reservation_id = (select reservation_id from mm3c_single) and status = 'held'), 1, 'single item creates one held allocation');
+select is((select count(*)::integer from public.allocations a join public.reservation_items ri on ri.id = a.reservation_item_id and ri.reservation_id = a.reservation_id join public.reservations r on r.id = ri.reservation_id join public.physical_machines pm on pm.id = a.machine_id where a.reservation_id = (select reservation_id from mm3c_single) and a.status = 'held' and ri.organisation_id = r.organisation_id and ri.product_id = pm.product_id and a.operational_start < a.operational_end), 1, 'single-item held allocation links its exact tenant and product coherent item');
 select is((select product_id from public.reservation_items where reservation_id = (select reservation_id from mm3c_single)), 'mm3c-product-a', 'single item product is authoritative');
 select is((select deposit_amount from public.reservations where id = (select reservation_id from mm3c_single)), 250.00::numeric, 'single item deposit remains numeric');
 select is((select count(*)::integer from public.service_jobs where reservation_id = (select reservation_id from mm3c_single)), 2, 'single item creates one delivery and collection job');
@@ -83,6 +84,7 @@ select * from public.create_reservation_with_payment_capability(
 select is((select count(*)::integer from public.reservation_items where reservation_id = (select reservation_id from mm3c_same_product)), 2, 'same-product quantity two creates two item rows');
 select is((select count(distinct machine_id)::integer from public.allocations where reservation_id = (select reservation_id from mm3c_same_product) and status = 'held'), 2, 'same-product quantity two uses distinct machines');
 select is((select count(*)::integer from public.allocations a join public.reservation_items ri on ri.id = a.reservation_item_id where a.reservation_id = (select reservation_id from mm3c_same_product) and a.status = 'held'), 2, 'each same-product item has one linked allocation');
+select is((select count(*)::integer from public.reservation_items ri where ri.reservation_id = (select reservation_id from mm3c_same_product) and (select count(*) from public.allocations a where a.reservation_id = ri.reservation_id and a.reservation_item_id = ri.id and a.status = 'held') = 1), 2, 'quantity two maps one distinct held allocation to each exact item');
 select is((select count(distinct hold_expires_at)::integer from public.allocations where reservation_id = (select reservation_id from mm3c_same_product) and status = 'held'), 1, 'same-product hold expiry is shared');
 select is((select count(*)::integer from public.service_jobs where reservation_id = (select reservation_id from mm3c_same_product)), 2, 'same-product quantity two still creates one job pair');
 select is((select deposit_amount from public.reservations where id = (select reservation_id from mm3c_same_product)), null::numeric, 'same-product multi-item deposit is NULL');
@@ -108,6 +110,7 @@ select is((select weekly_price_at_booking from public.reservations where id = (s
 select is((select count(*)::integer from public.reservation_items where reservation_id = (select reservation_id from mm3c_mixed)), 2, 'mixed basket creates two item rows');
 select is((select count(*)::integer from public.allocations where reservation_id = (select reservation_id from mm3c_mixed) and status = 'held'), 2, 'mixed basket creates two held allocations');
 select is((select count(*)::integer from public.allocations a join public.reservation_items ri on ri.id = a.reservation_item_id join public.physical_machines pm on pm.id = a.machine_id where a.reservation_id = (select reservation_id from mm3c_mixed) and a.status = 'held' and pm.product_id = ri.product_id), 2, 'mixed allocations match exact item products');
+select is((select count(*)::integer from public.allocations a where a.status = 'held' and a.reservation_id in ((select reservation_id from mm3c_single), (select reservation_id from mm3c_same_product), (select reservation_id from mm3c_mixed)) and a.reservation_item_id is null), 0, 'normalized creation leaves no held allocation unlinked');
 select is((select deposit_amount from public.reservations where id = (select reservation_id from mm3c_mixed)), null::numeric, 'mixed basket deposit is NULL without aggregation');
 select is((select count(*)::integer from public.outbox_events where aggregate_id = (select reservation_id from mm3c_mixed)), 0, 'creation emits no confirmation outbox event');
 

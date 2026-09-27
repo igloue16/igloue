@@ -96,6 +96,7 @@ Deno.test("accepts a one-unit basket and persists normalized context parameters"
   assert.equal(mock.calls[0].parameters.p_billing_mode, "business");
   assert.equal(mock.calls[0].parameters.p_unit_rental_price, 59);
   assert.equal(mock.calls[0].parameters.p_line_total, 59);
+  assert.deepEqual(mock.calls[0].parameters.p_items, [{ product_id: "essential", quantity: 1 }]);
 });
 
 Deno.test("rejects multi-unit runtime creation until allocation support exists", async () => {

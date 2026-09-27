@@ -277,6 +277,7 @@ export async function handleReservationRequest(
     p_billing_country: billing.billingCountry,
     p_unit_rental_price: pricing.items[0].unitRentalPrice,
     p_line_total: pricing.items[0].lineTotal,
+    p_items: [{ product_id: productId, quantity: basket.units.length }],
     }));
   } catch (exception) {
     dependencies.logError?.("create_reservation_transaction threw", exception);
