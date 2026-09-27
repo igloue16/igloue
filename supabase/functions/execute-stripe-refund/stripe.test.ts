@@ -11,6 +11,7 @@ const input = {
   expectedAmount: 75,
   currency: "EUR",
 };
+const providerAttemptIdForDefault = "00000000-0000-4000-8000-00000000d199";
 
 function stripeResponse(overrides: Record<string, unknown> = {}) {
   return Response.json({
@@ -62,6 +63,41 @@ Deno.test("Stripe refund request uses the authoritative PaymentIntent and omits 
     currency: "EUR",
     paymentIntentId: input.paymentIntentId,
   });
+});
+
+Deno.test("default refund transport uses global fetch and the fixed Stripe endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let capturedRequest: Request | undefined;
+  globalThis.fetch = async (input, init) => {
+    capturedRequest = new Request(input, init);
+    return stripeResponse();
+  };
+
+  try {
+    const adapter = createStripeRefundAdapter("sk_test_default");
+    await adapter.createFullRefund(
+      input,
+      stripeRefundIdempotencyKey(providerAttemptIdForDefault),
+    );
+
+    assert(capturedRequest);
+    assert.equal(capturedRequest.url, "https://api.stripe.com/v1/refunds");
+    assert.equal(capturedRequest.method, "POST");
+    assert.equal(
+      capturedRequest.headers.get("Authorization"),
+      "Bearer sk_test_default",
+    );
+    assert.equal(
+      capturedRequest.headers.get("Idempotency-Key"),
+      `igloue:refund:${providerAttemptIdForDefault}`,
+    );
+    const body = new URLSearchParams(await capturedRequest.text());
+    assert.equal(body.get("payment_intent"), input.paymentIntentId);
+    assert.equal(body.get("metadata[igloue_refund_id]"), input.refundId);
+    assert.equal(body.has("amount"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 Deno.test("refund idempotency key derives from the immutable provider attempt ID", () => {
