@@ -51,6 +51,9 @@ assert.match(refundSource, /stripeSecretMatchesExpectedLivemode/, "refund execut
 assert.match(refundSource, /!serviceRoleKey\s*\|\|\s*!stripeSecret/, "refund execution fails closed for missing authority or Stripe key");
 const reservationSource = fs.readFileSync(path.join(functionsRoot, "create-reservation", "handler.ts"), "utf8");
 assert.match(reservationSource, /if\s*\(!paymentCapabilitySecret\)\s*return errorResponse\(500, "INTERNAL_ERROR"\)/, "reservation fails closed without payment capability secret");
+const reservationEntry = fs.readFileSync(path.join(functionsRoot, "create-reservation", "index.ts"), "utf8");
+assert.match(reservationEntry, /createZeptoMailVerificationEmailDelivery\(\)/, "reservation production entrypoint injects real ZeptoMail verification delivery");
+assert.doesNotMatch(reservationEntry, /noOpVerificationEmailDelivery/, "reservation production entrypoint does not use no-op verification delivery");
 for (const name of ["execute-stripe-refund", "payment-operator"]) {
   const source = fs.readFileSync(path.join(functionsRoot, name, "handler.ts"), "utf8");
   assert.match(source, /authorization[\s\S]{0,180}serviceRoleKey|serviceRoleKey[\s\S]{0,180}authorization/i, `${name} checks internal service authority`);

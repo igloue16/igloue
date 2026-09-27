@@ -1,7 +1,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { handleReservationRequest } from "./handler.ts";
-import { noOpVerificationEmailDelivery } from "../issue-email-verification/delivery.ts";
+import { createZeptoMailVerificationEmailDelivery } from "../issue-email-verification/zeptomail-delivery.ts";
 
 const authenticatedHandler = withSupabase(
   { auth: ["publishable", "secret"] },
@@ -39,7 +39,7 @@ const authenticatedHandler = withSupabase(
       lookupCustomerEmail,
       publicBaseUrl: Deno.env.get("IGLOUE_PUBLIC_BASE_URL") ?? "",
       paymentCapabilitySecret: Deno.env.get("PAYMENT_CAPABILITY_SECRET"),
-      verificationDelivery: noOpVerificationEmailDelivery,
+      verificationDelivery: createZeptoMailVerificationEmailDelivery(),
       logError: console.error,
     });
   },

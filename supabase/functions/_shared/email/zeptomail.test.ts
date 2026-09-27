@@ -8,7 +8,11 @@ const validInput = {
   htmlBody: "<p>Confirmez votre adresse.</p>",
 };
 
-function fakeFetch(response: Response | Error = new Response(null, { status: 200 })) {
+function fakeFetch(response: Response | Error = Response.json({
+  data: [{ code: "EM_104", message: "OK" }],
+  message: "OK",
+  request_id: "req-test",
+})) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), init: init ?? {} });
@@ -41,6 +45,22 @@ Deno.test("fails safely when the token is missing or blank", async () => {
   const fake = fakeFetch();
   assert.deepEqual(await sendZeptoMail(validInput, { fetchImpl: fake.fetchImpl, getToken: () => "   " }), { ok: false, code: "missing_configuration", retryable: true });
   assert.equal(fake.calls.length, 0);
+});
+
+Deno.test("reads the API token from the runtime environment when sending", async () => {
+  const original = Deno.env.get("ZEPTOMAIL_API_TOKEN");
+  Deno.env.set("ZEPTOMAIL_API_TOKEN", "runtime-test-token");
+  const fake = fakeFetch();
+  try {
+    assert.deepEqual(await sendZeptoMail(validInput, { fetchImpl: fake.fetchImpl }), { ok: true });
+    assert.equal(
+      (fake.calls[0].init.headers as Record<string, string>).Authorization,
+      "Zoho-enczapikey runtime-test-token",
+    );
+  } finally {
+    if (original === undefined) Deno.env.delete("ZEPTOMAIL_API_TOKEN");
+    else Deno.env.set("ZEPTOMAIL_API_TOKEN", original);
+  }
 });
 
 Deno.test("rejects disallowed senders before any network request", async () => {
@@ -134,4 +154,26 @@ Deno.test("normalizes an unexpected token-provider exception safely", async () =
   assert.deepEqual(result, { ok: false, code: "delivery_failed", retryable: true });
   assert.equal(fake.calls.length, 0);
   assert.equal(JSON.stringify(result).includes("private"), false);
+});
+
+Deno.test("maps a malformed transport response to a safe failure", async () => {
+  const malformedTransport = await sendZeptoMail(validInput, {
+    fetchImpl: async () => ({} as Response),
+    getToken: () => "test-token-never-real",
+  });
+  assert.deepEqual(malformedTransport, { ok: false, code: "delivery_failed", retryable: true });
+
+  const malformedBody = fakeFetch(new Response("not-json", { status: 200 }));
+  const malformedJson = await sendZeptoMail(validInput, {
+    fetchImpl: malformedBody.fetchImpl,
+    getToken: () => "test-token-never-real",
+  });
+  assert.deepEqual(malformedJson, { ok: false, code: "delivery_failed", retryable: true });
+
+  const malformedEnvelope = fakeFetch(Response.json({ data: [{ code: "unexpected" }], request_id: "" }));
+  const malformed = await sendZeptoMail(validInput, {
+    fetchImpl: malformedEnvelope.fetchImpl,
+    getToken: () => "test-token-never-real",
+  });
+  assert.deepEqual(malformed, { ok: false, code: "delivery_failed", retryable: true });
 });

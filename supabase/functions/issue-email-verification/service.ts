@@ -46,7 +46,7 @@ export async function issueEmailVerificationToken(
     return { status: "error" as const, code: "INTERNAL_ERROR" };
   }
 
-  // This raw value exists only as the return value to a future trusted email
+  // This raw value exists only as the return value to the trusted email
   // adapter. It is never logged, persisted, or returned by a browser handler.
   return {
     status: "issued" as const,

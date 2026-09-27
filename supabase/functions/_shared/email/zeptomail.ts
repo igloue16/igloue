@@ -101,7 +101,30 @@ export async function sendZeptoMail(
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    if (response.ok) return { ok: true };
+    if (typeof response?.ok !== "boolean" || typeof response?.status !== "number") {
+      return { ok: false, code: "delivery_failed", retryable: true };
+    }
+    if (response.ok) {
+      let result: unknown;
+      try {
+        result = await response.json();
+      } catch {
+        return { ok: false, code: "delivery_failed", retryable: true };
+      }
+      if (typeof result !== "object" || result === null || Array.isArray(result)) {
+        return { ok: false, code: "delivery_failed", retryable: true };
+      }
+      const body = result as Record<string, unknown>;
+      const accepted = Array.isArray(body.data) ? body.data[0] : null;
+      if (
+        !accepted || typeof accepted !== "object" || Array.isArray(accepted) ||
+        (accepted as Record<string, unknown>).code !== "EM_104" ||
+        typeof body.request_id !== "string" || body.request_id.trim().length === 0
+      ) {
+        return { ok: false, code: "delivery_failed", retryable: true };
+      }
+      return { ok: true };
+    }
     if (response.status === 408) return { ok: false, code: "provider_timeout", retryable: true };
     if (response.status === 429) return { ok: false, code: "provider_rate_limited", retryable: true };
     if (response.status >= 500 && response.status <= 599) {
