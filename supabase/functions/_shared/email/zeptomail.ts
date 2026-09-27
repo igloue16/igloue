@@ -1,4 +1,4 @@
-const ZEPTOMAIL_ENDPOINT = "https://api.zeptomail.eu/v1.1/email";
+const ZEPTOMAIL_ENDPOINT = "https://cpaas.zoho.eu/v1.1/email";
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 const ALLOWED_SENDERS = new Set([

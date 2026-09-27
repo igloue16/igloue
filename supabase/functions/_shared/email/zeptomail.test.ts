@@ -30,7 +30,7 @@ Deno.test("sends an allowlisted request with the ZeptoMail payload", async () =>
   });
   assert.deepEqual(result, { ok: true });
   assert.equal(fake.calls.length, 1);
-  assert.equal(fake.calls[0].url, "https://api.zeptomail.eu/v1.1/email");
+  assert.equal(fake.calls[0].url, "https://cpaas.zoho.eu/v1.1/email");
   assert.equal(fake.calls[0].init.method, "POST");
   assert.equal(fake.calls[0].init.headers && (fake.calls[0].init.headers as Record<string, string>).Authorization, "Zoho-enczapikey test-token-never-real");
   assert.deepEqual(JSON.parse(String(fake.calls[0].init.body)), {
