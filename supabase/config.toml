@@ -463,3 +463,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/recover-stripe-events/deno.json"
 entrypoint = "./functions/recover-stripe-events/index.ts"
+
+[functions.verify-email]
+enabled = true
+verify_jwt = false
+import_map = "./functions/verify-email/deno.json"
+entrypoint = "./functions/verify-email/index.ts"

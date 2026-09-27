@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Confirmer votre adresse e-mail | IGLOUE</title>
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/layout.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <style>
+    body { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .verification-card { width: min(100%, 560px); padding: clamp(28px, 6vw, 56px); border: 1px solid rgb(217 229 236 / 16%); border-radius: 20px; background: var(--page-alt); text-align: center; }
+    .verification-card h1 { font-size: clamp(1.8rem, 5vw, 2.7rem); }
+    .verification-card p { color: var(--text-on-dark-soft); }
+    .verification-card button { margin: 12px 0 20px; padding: 14px 22px; border: 0; border-radius: 8px; background: var(--tan); color: #14222c; font-weight: 700; cursor: pointer; }
+    .verification-card button:disabled { opacity: .65; cursor: wait; }
+    .verification-home { display: inline-block; color: var(--text-on-dark); }
+  </style>
+  <script src="../assets/js/supabase-config.js" defer></script>
+  <script src="../assets/js/email-verification.js" defer></script>
+  <script src="../assets/js/email-verification-page.js" defer></script>
+</head>
+<body>
+  <main class="verification-card">
+    <p class="eyebrow">IGLOUE</p>
+    <div id="verification-message" aria-live="polite">
+      <h1>Confirmez votre adresse e-mail</h1>
+      <p>Sélectionnez le bouton pour confirmer votre adresse e-mail.</p>
+    </div>
+    <form id="verification-form">
+      <button id="verification-submit" type="submit">Confirmer mon adresse e-mail</button>
+    </form>
+    <a class="verification-home" href="../index.html">Retour à l’accueil</a>
+  </main>
+</body>
+</html>

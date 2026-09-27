@@ -118,11 +118,10 @@ The email link must lead to a landing/exchange page, not a side-effecting GET.
 
 ```text
 email link containing token
-  -> GET landing page
-  -> check token without consuming or verifying
+  -> GET landing page (no token consumption)
   -> render a generic confirmation page
   -> customer explicitly selects “Confirmer mon adresse e-mail”
-  -> POST/controlled consume operation
+  -> explicit user action -> POST/controlled consume operation
   -> atomically verify token and reservation contact
 ```
 
