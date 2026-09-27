@@ -1,6 +1,6 @@
 begin;
 
-select plan(67);
+select plan(78);
 
 select ok(to_regprocedure('public.receive_payment_refund_provider_event(text,text,timestamptz,boolean,text,boolean,text,text,bigint,text,text,text)') is not null,
           'normalized refund receipt authority exists');
@@ -68,6 +68,43 @@ select * from public.prepare_payment_refund('00000000-0000-4000-8000-00000000d70
  (select id from public.organisations where slug = 'igloue'), 'operator_tool', 'refund-preparer',
  '00000000-0000-4000-8000-00000000d902');
 
+select is((select outcome from public.record_payment_refund_attempt_evidence(
+ (select ra.id from public.payment_refund_attempts ra join public.payment_refunds pr on pr.id=ra.refund_id where pr.payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
+ (select id from public.organisations where slug='igloue'),'re_p3e4c3001','succeeded','stripe_api','operator_tool','refund-executor',
+ '00000000-0000-4000-8000-00000000d920')),'succeeded','executor success finalizes the authoritative provider attempt first');
+create temporary table p3e9d2_refund_finalized_snapshot as
+ select pa.refunded_at,pr.finalized_at,r.payment_status,pr.obligation_status
+ from public.payment_attempts pa join public.payment_refunds pr on pr.payment_attempt_id=pa.id
+ join public.reservations r on r.id=pa.reservation_id where pa.id='00000000-0000-4000-8000-00000000d501';
+select is((select outcome from public.record_payment_refund_attempt_evidence(
+ (select ra.id from public.payment_refund_attempts ra join public.payment_refunds pr on pr.id=ra.refund_id where pr.payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
+ (select id from public.organisations where slug='igloue'),'re_p3e4c3001','succeeded','stripe_dashboard_reconciliation','admin_tool','refund-webhook-observer',
+ '00000000-0000-4000-8000-00000000d921')),'already_recorded','equivalent provider facts replay idempotently across actor and evidence source');
+select throws_ok($$select * from public.record_payment_refund_attempt_evidence(
+ (select ra.id from public.payment_refund_attempts ra join public.payment_refunds pr on pr.id=ra.refund_id where pr.payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
+ (select id from public.organisations where slug='igloue'),'re_p3e4c3different','succeeded','stripe_api','operator_tool','refund-webhook-observer','00000000-0000-4000-8000-00000000d922')$$,
+ 'P0001',null::text,'a different provider refund ID still conflicts');
+select throws_ok($$select * from public.record_payment_refund_attempt_evidence(
+ (select ra.id from public.payment_refund_attempts ra join public.payment_refunds pr on pr.id=ra.refund_id where pr.payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
+ (select id from public.organisations where slug='igloue'),'re_p3e4c3001','failed','stripe_api','operator_tool','refund-webhook-observer','00000000-0000-4000-8000-00000000d923')$$,
+ 'P0001',null::text,'an incompatible terminal outcome still conflicts');
+select is((select evidence_actor from public.payment_refund_attempts where refund_id=(select id from public.payment_refunds where payment_attempt_id='00000000-0000-4000-8000-00000000d501') and status='succeeded'),
+ 'refund-executor','equivalent evidence does not overwrite the original attempt audit actor');
+select ok((select evidence_source='stripe_api' and evidence_actor_source='operator_tool'
+           and evidence_idempotency_key='00000000-0000-4000-8000-00000000d920'
+           from public.payment_refund_attempts where refund_id=(select id from public.payment_refunds where payment_attempt_id='00000000-0000-4000-8000-00000000d501') and status='succeeded'),
+          'equivalent evidence preserves original source and idempotency provenance');
+select throws_ok($$select * from public.record_payment_refund_attempt_evidence(
+ (select ra.id from public.payment_refund_attempts ra join public.payment_refunds pr on pr.id=ra.refund_id where pr.payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
+ '00000000-0000-4000-8000-00000000deee','re_p3e4c3001','succeeded','stripe_api','operator_tool','refund-executor','00000000-0000-4000-8000-00000000d925')$$,
+ 'P0002',null::text,'cross-organisation evidence cannot reconcile the attempt');
+select throws_ok($$select * from public.receive_payment_refund_provider_event('evt_p3e4c3_bad_currency','refund.updated',to_timestamp(1800000999),false,repeat('0',64),false,'re_p3e4c3001','pi_p3e4c3refund',7500,'usd','succeeded',null)$$,
+ '22023',null::text,'non-EUR provider evidence is rejected before reconciliation');
+select is((select outcome from public.record_payment_refund_attempt_evidence(
+ (select ra.id from public.payment_refund_attempts ra join public.payment_refunds pr on pr.id=ra.refund_id where pr.payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
+ (select id from public.organisations where slug='igloue'),'re_p3e4c3001','succeeded','stripe_api','operator_tool','refund-executor','00000000-0000-4000-8000-00000000d924')),
+ 'already_recorded','equivalent evidence remains idempotent when the retry key differs');
+
 insert into public.reservations (
  id, organisation_id, customer_id, product_id, quantity, rental_start, rental_end, status,
  delivery_address_line_1, delivery_postcode, delivery_city, weekly_price_at_booking,
@@ -101,7 +138,16 @@ select * from public.prepare_payment_refund('00000000-0000-4000-8000-00000000d70
 select is((select outcome from public.receive_payment_refund_provider_event('evt_p3e4c3_success', 'refund.updated', to_timestamp(1800001000), false, repeat('b',64), false, 're_p3e4c3001', 'pi_p3e4c3refund', 7500, 'eur', 'succeeded', null)),
           'recorded', 'valid success is durably normalized');
 select is((select outcome from public.apply_payment_refund_provider_event((select id from public.payment_provider_events where provider_event_id='evt_p3e4c3_success'))),
-          'succeeded', 'known refund reconciles through C1 evidence authority');
+          'already_processed', 'known refund webhook reconciles as equivalent to executor evidence');
+select is((select status from public.payment_provider_events where provider_event_id='evt_p3e4c3_success'),
+          'processed', 'matching webhook receipt is durably finalized');
+select ok((select pa.refunded_at=s.refunded_at and pr.finalized_at=s.finalized_at and r.payment_status=s.payment_status
+           and pr.obligation_status=s.obligation_status and (select count(*) from public.payment_refund_attempts ra where ra.refund_id=pr.id and ra.status='succeeded')=1
+           and (select count(*) from public.payment_refunds rf where rf.payment_exception_id=pr.payment_exception_id and rf.obligation_status='satisfied')=1
+           from public.payment_attempts pa join public.payment_refunds pr on pr.payment_attempt_id=pa.id
+           join public.reservations r on r.id=pa.reservation_id cross join p3e9d2_refund_finalized_snapshot s
+           where pa.id='00000000-0000-4000-8000-00000000d501'),
+          'webhook reconciliation preserves timestamps and creates no duplicate financial transition');
 select is((select status from public.payment_refunds where payment_attempt_id='00000000-0000-4000-8000-00000000d501'),
           'succeeded', 'success updates the refund ledger');
 select is((select status from public.payment_attempts where id='00000000-0000-4000-8000-00000000d501'),
