@@ -1,11 +1,9 @@
 import { verifyStripeSignature } from "../functions/stripe-webhook/signature.ts";
 
-// Local opt-in only. Prepare the ignored supabase/functions/.env.local with
-// STRIPE_WEBHOOK_SECRET=<dedicated whsec_local_e2e_ fake value>
-// STRIPE_EXPECTED_LIVEMODE=false, then serve with:
-// npx.cmd supabase functions serve stripe-webhook --env-file supabase/functions/.env.local
-// In another shell set P3E3D_LOCAL_E2E=1 and STRIPE_WEBHOOK_SECRET to that
-// same fake value, then run:
+// Local opt-in only. From the repository root, use the isolated runner:
+// powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-p3e3d-local-e2e.ps1
+// It generates a per-run fake whsec_local_e2e_ secret, supplies it to both
+// the local Edge runtime and this test, and removes the temporary env file.
 // deno.exe test --allow-env=P3E3D_LOCAL_E2E,STRIPE_WEBHOOK_SECRET,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,http_proxy,https_proxy,all_proxy --allow-read=supabase/integration --allow-net=127.0.0.1:54321 --allow-run=docker.exe supabase/integration/p3e3d-local-webhook.test.ts
 
 const API_ENDPOINT = "http://127.0.0.1:54321/functions/v1/stripe-webhook";
