@@ -27,9 +27,14 @@ export type ReservationEmailData = {
   status: string;
   customer_id: string;
   product_id: string;
+  quantity: number;
   rental_start: string;
   rental_end: string;
   total_amount: string | number;
+  delivery_address_line_1: string;
+  delivery_address_line_2: string | null;
+  delivery_postcode: string;
+  delivery_city: string;
   customer: {
     organisation_id: string;
     first_name: string;
@@ -37,6 +42,7 @@ export type ReservationEmailData = {
     email: string;
   } | null;
   product: { name: string } | null;
+  items?: Array<{ product: { name: string } | null }> | null;
 };
 
 export type ReservationLoadResult =
@@ -63,6 +69,33 @@ export type OutboxBatchResult = {
 
 function emptyResult(): OutboxBatchResult {
   return { claimed: 0, completed: 0, retried: 0, failed: 0, lostClaims: 0 };
+}
+
+function productSummary(reservation: ReservationEmailData) {
+  const counts = new Map<string, number>();
+  if (Array.isArray(reservation.items) && reservation.items.length > 0) {
+    for (const item of reservation.items) {
+      const name = item?.product?.name;
+      if (typeof name === "string" && name.trim()) {
+        const productName = name.trim();
+        counts.set(productName, (counts.get(productName) ?? 0) + 1);
+      }
+    }
+  }
+  if (counts.size === 0 && reservation.product?.name) {
+    counts.set(reservation.product.name, Math.max(1, Number(reservation.quantity) || 1));
+  }
+  return [...counts].map(([name, quantity]) => `${quantity} × ${name}`).join(", ");
+}
+
+function deliveryAddress(reservation: ReservationEmailData) {
+  return [
+    reservation.delivery_address_line_1,
+    reservation.delivery_address_line_2,
+    [reservation.delivery_postcode, reservation.delivery_city].filter(Boolean).join(" "),
+  ].filter((value): value is string => typeof value === "string" && value.trim() !== "")
+    .map((value) => value.trim())
+    .join(", ");
 }
 
 async function recordRetry(
@@ -132,25 +165,28 @@ async function processEvent(
       await recordFailure(event, dependencies, result, "invalid_reservation_state");
       return;
     }
-    if (!reservation.product) {
-      await recordFailure(event, dependencies, result, "product_not_found");
-      return;
-    }
     if (typeof reservation.customer.email !== "string" || reservation.customer.email.trim() === "") {
       await recordFailure(event, dependencies, result, "recipient_missing");
       return;
     }
 
+    const summary = productSummary(reservation);
+    if (!summary) {
+      await recordFailure(event, dependencies, result, "product_not_found");
+      return;
+    }
+
     const message = buildReservationConfirmationEmail({
       recipientEmail: reservation.customer.email,
-      customerName: [reservation.customer.first_name, reservation.customer.last_name]
-        .filter((value) => typeof value === "string" && value.trim() !== "")
-        .join(" "),
+      customerFirstName: typeof reservation.customer.first_name === "string"
+        ? reservation.customer.first_name
+        : "",
       reservationReference: reservation.id,
-      productName: reservation.product.name,
+      productSummary: summary,
       startDate: reservation.rental_start,
       endDate: reservation.rental_end,
       totalAmount: String(reservation.total_amount),
+      deliveryAddress: deliveryAddress(reservation),
     }, "fr");
 
     const delivery = await dependencies.deliver(message);

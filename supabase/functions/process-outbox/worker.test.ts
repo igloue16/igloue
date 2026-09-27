@@ -30,11 +30,17 @@ function reservation(overrides: Partial<ReservationEmailData> = {}): Reservation
     status: "confirmed",
     customer_id: "00000000-0000-4000-8000-000000005102",
     product_id: "essential",
+    quantity: 1,
     rental_start: "2027-07-12T12:00:00Z",
     rental_end: "2027-07-19T12:00:00Z",
     total_amount: "88.00",
-    customer: { organisation_id: org, first_name: "Camille", last_name: "Test", email: "client@example.com" },
+    delivery_address_line_1: "12 rue du Test",
+    delivery_address_line_2: null,
+    delivery_postcode: "75001",
+    delivery_city: "Paris",
+    customer: { organisation_id: org, first_name: "Camille", last_name: "PrivateSurname", email: "client@example.com" },
     product: { name: "IGLOUE Essential" },
+    items: [{ product: { name: "IGLOUE Essential" } }],
     ...overrides,
   };
 }
@@ -63,8 +69,50 @@ Deno.test("authoritative confirmed reservation is delivered and completed", asyn
   const result = await processOutboxBatch(deps);
   assert.deepEqual(result, { claimed: 1, completed: 1, retried: 0, failed: 0, lostClaims: 0 });
   assert.deepEqual(deps.calls, ["deliver", "complete"]);
-  assert.equal((deps.deliveredMessage as { locale: string }).locale, "fr");
-  assert.equal(JSON.stringify(deps.deliveredMessage).includes("attacker@example.com"), false);
+  const message = deps.deliveredMessage as {
+    locale: string;
+    from: { address: string };
+    to: { address: string };
+    subject: string;
+    htmlBody: string;
+    textBody: string;
+  };
+  assert.equal(message.locale, "fr");
+  assert.equal(message.from.address, "commandes@igloue.fr");
+  assert.equal(message.to.address, "client@example.com");
+  assert.equal(message.subject, "Réservation confirmée — IGLOUE");
+  assert.match(message.htmlBody, /Camille/);
+  assert.match(message.htmlBody, /IGLOUE Essential/);
+  assert.match(message.htmlBody, /12 juillet 2027/);
+  assert.match(message.htmlBody, /19 juillet 2027/);
+  assert.match(message.htmlBody, /12 rue du Test/);
+  assert.match(message.htmlBody, /88,00/);
+  assert.match(message.textBody, /paiement, s’il est requis/i);
+  assert.match(message.textBody, /commandes@igloue\.fr/);
+  assert.equal(message.htmlBody.length > 0 && message.textBody.length > 0, true);
+  const content = `${message.subject}\n${message.htmlBody}\n${message.textBody}`;
+  for (const privateValue of [
+    "attacker@example.com", // event payload is not authoritative
+    "00000000-0000-4000-8000-000000005102", // customer id
+    "00000000-0000-4000-8000-000000005001", // organisation id
+    "00000000-0000-4000-8000-000000005011", // claim token
+    "essential", // product id
+    "PrivateSurname", // customer last name is deliberately omitted from the greeting
+  ]) assert.equal(content.includes(privateValue), false);
+});
+
+Deno.test("normalized reservation items produce product-level summaries without machine IDs", async () => {
+  const deps = dependencies([event()], reservation({
+    items: [
+      { product: { name: "Essential <Plus>" } },
+      { product: { name: "Essential <Plus>" } },
+    ],
+  }));
+  await processOutboxBatch(deps);
+  const message = deps.deliveredMessage as { htmlBody: string; textBody: string };
+  assert.match(message.textBody, /2 × Essential <Plus>/);
+  assert.match(message.htmlBody, /2 × Essential &lt;Plus&gt;/);
+  assert.equal(`${message.htmlBody}${message.textBody}`.includes("machine-id"), false);
 });
 
 Deno.test("unsupported, malformed and invalid events fail safely", async () => {
@@ -86,7 +134,7 @@ Deno.test("ownership, missing data and recipient validation are terminal", async
   const scenarios: Array<[Partial<ClaimedOutboxEvent>, Partial<ReservationEmailData>, string]> = [
     [{ organisation_id: "00000000-0000-4000-8000-000000005099" }, {}, "tenant_mismatch"],
     [{}, { customer: null }, "aggregate_not_found"],
-    [{}, { product: null }, "product_not_found"],
+    [{}, { product: null, items: null }, "product_not_found"],
     [{}, { customer: { organisation_id: org, first_name: "", last_name: "", email: "" } }, "recipient_missing"],
   ];
   for (const [eventChanges, reservationChanges, expected] of scenarios) {
@@ -147,6 +195,16 @@ Deno.test("one event exception retries and does not prevent the next event", asy
   const result = await processOutboxBatch(deps);
   assert.equal(result.retried, 1);
   assert.equal(result.completed, 1);
+});
+
+Deno.test("a completed event is not delivered again when the next claim is empty", async () => {
+  const deps = dependencies([event()]);
+  await processOutboxBatch(deps);
+  deps.claim = async () => [];
+  const second = await processOutboxBatch(deps);
+  assert.deepEqual(second, { claimed: 0, completed: 0, retried: 0, failed: 0, lostClaims: 0 });
+  assert.equal(deps.calls.filter((call) => call === "deliver").length, 1);
+  assert.equal(deps.calls.filter((call) => call === "complete").length, 1);
 });
 
 Deno.test("HTTP boundary accepts POST, rejects other methods, and returns counts only", async () => {

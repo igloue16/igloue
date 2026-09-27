@@ -2,6 +2,7 @@ import {
   deliverTransactionalEmail,
   type EmailDeliveryResult,
 } from "../_shared/email/delivery-service.ts";
+import type { EmailDeliveryDependencies } from "../_shared/email/delivery-service.ts";
 import { processOutboxBatch, type ClaimedOutboxEvent, type ReservationEmailData, type ReservationLoadResult, type WorkerDependencies } from "./worker.ts";
 
 type QueryResult<T> = { data: T | null; error: unknown | null };
@@ -36,7 +37,10 @@ function rows(data: unknown): ClaimedOutboxEvent[] {
   return Array.isArray(data) ? data as ClaimedOutboxEvent[] : [];
 }
 
-export function createWorkerDependencies(supabaseAdmin: SupabaseClient): WorkerDependencies {
+export function createWorkerDependencies(
+  supabaseAdmin: SupabaseClient,
+  emailDependencies: EmailDeliveryDependencies = {},
+): WorkerDependencies {
   return {
     async claim(limit) {
       const recovered = await supabaseAdmin.rpc(
@@ -52,7 +56,7 @@ export function createWorkerDependencies(supabaseAdmin: SupabaseClient): WorkerD
     async loadReservation(event): Promise<ReservationLoadResult> {
       const result = await supabaseAdmin
         .from("reservations")
-        .select("id, organisation_id, status, customer_id, product_id, rental_start, rental_end, total_amount, customer:customers(organisation_id, first_name, last_name, email), product:products(name)")
+        .select("id, organisation_id, status, customer_id, product_id, quantity, rental_start, rental_end, total_amount, delivery_address_line_1, delivery_address_line_2, delivery_postcode, delivery_city, customer:customers(organisation_id, first_name, last_name, email), product:products(name), items:reservation_items(product:products(name))")
         .eq("id", event.aggregate_id)
         .maybeSingle();
       if (result.error) return { status: "error" };
@@ -60,7 +64,7 @@ export function createWorkerDependencies(supabaseAdmin: SupabaseClient): WorkerD
       return { status: "ok", reservation: result.data as ReservationEmailData };
     },
     deliver(message): Promise<EmailDeliveryResult> {
-      return deliverTransactionalEmail(message);
+      return deliverTransactionalEmail(message, emailDependencies);
     },
     async complete(eventId, claimToken) {
       const result = await supabaseAdmin.rpc("complete_outbox_event", {

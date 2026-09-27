@@ -4,12 +4,13 @@ import { deliverTransactionalEmail } from "./delivery-service.ts";
 
 const baseData = {
   recipientEmail: "client@example.com",
-  customerName: "Camille Test",
+  customerFirstName: "Camille",
   reservationReference: "TEST-2026-001",
-  productName: "IGLOUE Essential",
-  startDate: "12 juillet 2026",
-  endDate: "19 juillet 2026",
-  totalAmount: "88,00 €",
+  productSummary: "1 × IGLOUE Essential",
+  startDate: "2026-07-12T12:00:00Z",
+  endDate: "2026-07-19T12:00:00Z",
+  totalAmount: "88.00",
+  deliveryAddress: "12 rue du Test, 75001 Paris",
 };
 
 function captureTransport(result: { ok: true } | { ok: false; code: "provider_timeout" | "provider_unavailable" | "provider_rate_limited" | "delivery_rejected" | "missing_configuration" | "invalid_message" | "invalid_sender" | "delivery_failed"; retryable: boolean } = { ok: true }) {
