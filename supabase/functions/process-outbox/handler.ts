@@ -3,7 +3,13 @@ import {
   type EmailDeliveryResult,
 } from "../_shared/email/delivery-service.ts";
 import type { EmailDeliveryDependencies } from "../_shared/email/delivery-service.ts";
-import { processOutboxBatch, type ClaimedOutboxEvent, type ReservationEmailData, type ReservationLoadResult, type WorkerDependencies } from "./worker.ts";
+import {
+  type ClaimedOutboxEvent,
+  processOutboxBatch,
+  type ReservationEmailData,
+  type ReservationLoadResult,
+  type WorkerDependencies,
+} from "./worker.ts";
 
 type QueryResult<T> = { data: T | null; error: unknown | null };
 type SupabaseClient = {
@@ -26,7 +32,10 @@ function response(body: unknown, status = 200) {
 
 function scalarBoolean(data: unknown) {
   if (typeof data === "boolean") return data;
-  if (Array.isArray(data) && data.length === 1 && data[0] && typeof data[0] === "object") {
+  if (
+    Array.isArray(data) && data.length === 1 && data[0] &&
+    typeof data[0] === "object"
+  ) {
     const values = Object.values(data[0] as Record<string, unknown>);
     return values.length === 1 && values[0] === true;
   }
@@ -49,14 +58,18 @@ export function createWorkerDependencies(
       );
       if (recovered.error) throw new Error("stale outbox recovery failed");
 
-      const result = await supabaseAdmin.rpc("claim_outbox_events", { p_limit: limit });
+      const result = await supabaseAdmin.rpc("claim_outbox_events", {
+        p_limit: limit,
+      });
       if (result.error) throw new Error("claim failed");
       return rows(result.data);
     },
     async loadReservation(event): Promise<ReservationLoadResult> {
       const result = await supabaseAdmin
         .from("reservations")
-        .select("id, organisation_id, status, customer_id, product_id, quantity, rental_start, rental_end, total_amount, delivery_address_line_1, delivery_address_line_2, delivery_postcode, delivery_city, customer:customers(organisation_id, first_name, last_name, email), product:products(name), items:reservation_items(product:products(name))")
+        .select(
+          "id, organisation_id, status, customer_id, product_id, quantity, rental_start, rental_end, total_amount, delivery_address_line_1, delivery_address_line_2, delivery_postcode, delivery_city, customer:customers!reservations_customer_organisation_fkey(organisation_id, first_name, last_name, email), product:products(name), items:reservation_items(product:products(name))",
+        )
         .eq("id", event.aggregate_id)
         .maybeSingle();
       if (result.error) return { status: "error" };
@@ -100,7 +113,9 @@ export async function handleProcessOutboxRequest(
   request: Request,
   dependencies: WorkerDependencies,
 ) {
-  if (request.method !== "POST") return response({ ok: false, error: { code: "METHOD_NOT_ALLOWED" } }, 405);
+  if (request.method !== "POST") {
+    return response({ ok: false, error: { code: "METHOD_NOT_ALLOWED" } }, 405);
+  }
   try {
     return response({ ok: true, ...await processOutboxBatch(dependencies) });
   } catch {

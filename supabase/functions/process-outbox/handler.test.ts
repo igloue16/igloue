@@ -50,6 +50,7 @@ Deno.test("CPaaS acceptance completes reservation.confirmed through the injected
   const completionParameters: Record<string, unknown>[] = [];
   let providerCalls = 0;
   let requestBody: Record<string, unknown> | null = null;
+  const reservationSelects: string[] = [];
   const dependencies = createWorkerDependencies({
     async rpc(name, parameters) {
       rpcCalls.push(name);
@@ -71,12 +72,16 @@ Deno.test("CPaaS acceptance completes reservation.confirmed through the injected
           error: null,
         };
       }
-      if (name === "complete_outbox_event") completionParameters.push(parameters);
+      if (name === "complete_outbox_event") {
+        completionParameters.push(parameters);
+      }
       return { data: true, error: null };
     },
-    from() {
+    from(table) {
+      assert.equal(table, "reservations");
       return {
-        select() {
+        select(columns) {
+          reservationSelects.push(columns);
           return {
             eq() {
               return {
@@ -96,7 +101,12 @@ Deno.test("CPaaS acceptance completes reservation.confirmed through the injected
                       delivery_address_line_2: null,
                       delivery_postcode: "75001",
                       delivery_city: "Paris",
-                      customer: { organisation_id: org, first_name: "Camille", last_name: "Internal", email: "client@example.com" },
+                      customer: {
+                        organisation_id: org,
+                        first_name: "Camille",
+                        last_name: "Internal",
+                        email: "client@example.com",
+                      },
                       product: { name: "IGLOUE Essential" },
                       items: [{ product: { name: "IGLOUE Essential" } }],
                     },
@@ -116,20 +126,50 @@ Deno.test("CPaaS acceptance completes reservation.confirmed through the injected
         getToken: () => "test-token-never-real",
         fetchImpl: async (_url, init) => {
           requestBody = JSON.parse(String(init?.body));
-          return Response.json({ data: [{ code: "EM_104" }], request_id: "test-request-id" });
+          return Response.json({
+            data: [{ code: "EM_104" }],
+            request_id: "test-request-id",
+          });
         },
       });
     },
   });
   const result = await processOutboxBatch(dependencies);
-  assert.deepEqual(result, { claimed: 1, completed: 1, retried: 0, failed: 0, lostClaims: 0 });
+  assert.deepEqual(result, {
+    claimed: 1,
+    completed: 1,
+    retried: 0,
+    failed: 0,
+    lostClaims: 0,
+  });
+  assert.equal(reservationSelects.length, 1);
+  assert.equal(
+    reservationSelects[0].includes(
+      "customer:customers!reservations_customer_organisation_fkey(organisation_id, first_name, last_name, email)",
+    ),
+    true,
+  );
   assert.equal(providerCalls, 1);
-  assert.deepEqual(rpcCalls, ["recover_stale_outbox_events", "claim_outbox_events", "complete_outbox_event"]);
-  assert.deepEqual(completionParameters, [{ p_event_id: eventId, p_claim_token: claimToken }]);
+  assert.deepEqual(rpcCalls, [
+    "recover_stale_outbox_events",
+    "claim_outbox_events",
+    "complete_outbox_event",
+  ]);
+  assert.deepEqual(completionParameters, [{
+    p_event_id: eventId,
+    p_claim_token: claimToken,
+  }]);
   const payload = requestBody as unknown as Record<string, unknown>;
   assert.equal(payload.subject, "Réservation confirmée — IGLOUE");
-  assert.equal((payload.from as { address: string }).address, "commandes@igloue.fr");
-  assert.equal(((payload.to as Array<{ email_address: { address: string } }>)[0]).email_address.address, "client@example.com");
+  assert.equal(
+    (payload.from as { address: string }).address,
+    "commandes@igloue.fr",
+  );
+  assert.equal(
+    (payload.to as Array<{ email_address: { address: string } }>)[0]
+      .email_address.address,
+    "client@example.com",
+  );
   assert.equal(typeof payload.htmlbody, "string");
   assert.equal(typeof payload.textbody, "string");
 });

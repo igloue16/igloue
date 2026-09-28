@@ -225,8 +225,16 @@ select is((select status from public.outbox_events where id = '00000000-0000-400
     'completed', 'completed event is untouched');
 select is((select status from public.outbox_events where id = '00000000-0000-4000-8000-000000003001'),
     'processing', 'pending event claimed earlier remains processing');
-select is((select status from public.outbox_events where id = '00000000-0000-4000-8000-000000003007'),
-    'pending', 'pending event is untouched by recovery');
+select ok((
+    select status = 'pending'
+        and attempt_count = 0
+        and last_attempt_at is null
+        and processed_at is null
+        and lease_expires_at is null
+        and claim_token is null
+    from public.outbox_events
+    where id = '00000000-0000-4000-8000-000000003007'
+), 'pending event status and processing fields are untouched by recovery');
 
 select is((select organisation_id from public.outbox_events where id = '00000000-0000-4000-8000-000000003003'),
     (select id from public.organisations where slug = 'igloue'),
