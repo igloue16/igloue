@@ -1,0 +1,108 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #18313d;
+  background: #f2f6f7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: linear-gradient(145deg, #f4f7f6 0%, #e9f0f2 100%);
+}
+
+button, input, select { font: inherit; }
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+
+.admin-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(100% - 32px, 520px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px 0 20px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: auto;
+  padding-bottom: 36px;
+}
+
+.admin-brand {
+  color: #15323e;
+  font-size: 1.25rem;
+  font-weight: 850;
+  letter-spacing: .14em;
+  text-decoration: none;
+}
+
+.admin-label, .admin-eyebrow {
+  color: #56727b;
+  font-size: .78rem;
+  font-weight: 750;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.admin-card {
+  width: 100%;
+  padding: clamp(24px, 6vw, 42px);
+  border: 1px solid #d8e3e5;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgb(24 49 61 / 8%);
+}
+
+.admin-card h1 { margin: 8px 0 12px; font-size: clamp(1.65rem, 6vw, 2.2rem); }
+.admin-status { min-height: 1.5em; color: #526b75; line-height: 1.55; }
+.admin-card h2 { margin: 22px 0 4px; font-size: 1.2rem; }
+.admin-hint { margin: 0; color: #526b75; font-size: .88rem; line-height: 1.5; }
+.admin-error { color: #9b2c2c; line-height: 1.5; }
+
+.admin-form, .admin-membership { display: grid; gap: 12px; margin-top: 26px; }
+.admin-form label, .admin-membership label { font-size: .9rem; font-weight: 700; }
+
+.admin-form input, .admin-membership select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #bacbd0;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.admin-form input:focus, .admin-membership select:focus, button:focus-visible, a:focus-visible {
+  outline: 3px solid #94c8d2;
+  outline-offset: 2px;
+}
+
+.admin-form button, .admin-membership button {
+  min-height: 48px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: #173a48;
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+button:disabled { cursor: wait; opacity: .65; }
+.admin-secondary { margin-top: 20px; padding: 10px 0; border: 0; background: transparent; color: #315b69; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.admin-authorized { margin-top: 24px; color: #526b75; line-height: 1.55; }
+.admin-organisation-name { color: #173a48; font-size: 1.1rem; font-weight: 750; }
+.admin-footer { margin-top: auto; padding-top: 32px; text-align: center; }
+.admin-footer a { color: #45636d; font-size: .9rem; }
+[hidden] { display: none !important; }
+
+@media (max-width: 480px) {
+  .admin-shell { width: min(100% - 24px, 520px); padding-top: 18px; }
+  .admin-header { padding-bottom: 24px; }
+}

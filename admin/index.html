@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Administration | IGLOUE</title>
+  <link rel="stylesheet" href="../assets/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../assets/js/supabase-config.js" defer></script>
+  <script src="../assets/js/admin-auth.js" defer></script>
+  <script src="../assets/js/admin-app.js" defer></script>
+</head>
+<body>
+  <main class="admin-shell" aria-labelledby="admin-title">
+    <header class="admin-header">
+      <a class="admin-brand" href="../index.html" aria-label="IGLOUE, accueil">IGLOUE</a>
+      <span class="admin-label">Administration</span>
+    </header>
+
+    <section class="admin-card" aria-live="polite" aria-busy="true">
+      <p class="admin-eyebrow">Espace équipe</p>
+      <h1 id="admin-title">Administration IGLOUE</h1>
+      <p id="admin-status" class="admin-status">Vérification de votre session…</p>
+
+      <form id="admin-login-form" class="admin-form" hidden>
+        <label for="admin-email">Adresse e-mail</label>
+        <input id="admin-email" name="email" type="email" autocomplete="username" required>
+        <label for="admin-password">Mot de passe</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+        <button id="admin-login-button" type="submit">Se connecter</button>
+      </form>
+
+      <form id="admin-invite-form" class="admin-form" hidden>
+        <h2>Cr&#233;er votre mot de passe</h2>
+        <label for="admin-invite-password">Nouveau mot de passe</label>
+        <input id="admin-invite-password" name="new-password" type="password" autocomplete="new-password" minlength="12" required>
+        <label for="admin-invite-password-confirm">Confirmer le mot de passe</label>
+        <input id="admin-invite-password-confirm" name="new-password-confirm" type="password" autocomplete="new-password" minlength="12" required>
+        <p class="admin-hint">12 caract&#232;res minimum, avec une minuscule, une majuscule et un chiffre.</p>
+        <button id="admin-invite-button" type="submit">Enregistrer mon mot de passe</button>
+      </form>
+
+      <p id="admin-invite-invalid" class="admin-error" hidden>Cette invitation est expir&#233;e ou invalide. Demandez une nouvelle invitation &#224; votre administrateur.</p>
+
+      <section id="admin-membership-selector" class="admin-membership" hidden>
+        <label for="admin-organisation">Choisissez votre organisation</label>
+        <select id="admin-organisation"></select>
+        <button id="admin-organisation-submit" type="button">Continuer</button>
+      </section>
+
+      <section id="admin-authorized" class="admin-authorized" hidden>
+        <p id="admin-organisation-name" class="admin-organisation-name"></p>
+        <p>Votre accès est vérifié. Le tableau de bord sera disponible dans une prochaine étape.</p>
+      </section>
+
+      <button id="admin-sign-out" class="admin-secondary" type="button" hidden>Se déconnecter</button>
+      <button id="admin-retry" class="admin-secondary" type="button" hidden>Réessayer</button>
+    </section>
+
+    <footer class="admin-footer">
+      <a href="../index.html">Retour au site IGLOUE</a>
+    </footer>
+  </main>
+</body>
+</html>
