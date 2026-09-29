@@ -64,14 +64,17 @@ unchanged.
 
 The schedule invokes a private, postgres-only helper. At run time, the helper
 reads these two named entries from `vault.decrypted_secrets` and builds the
-`Authorization: Bearer …` and `apikey` headers for `pg_net`:
+`Content-Type: application/json` and `apikey` headers for `pg_net`. The
+scheduled worker request uses the Vault credential as the `apikey` value only;
+it sends no `Authorization: Bearer` header.
 
 - `igloue_internal_functions_base_url`: environment-specific Supabase
   Functions base URL ending in `/functions/v1`.
 - `igloue_internal_edge_secret_key`: Supabase secret API key (`sb_secret_…`)
   for the same project. This matches the functions' configured `secret` auth
-  mode. The Edge runtime continues to use its own service-role credential for
-  database work; that credential is not copied into Vault for these calls.
+  mode and is sent in the `apikey` header only. The Edge runtime continues to
+  use its own service-role credential for database work; that credential is not
+  copied into Vault for these calls.
 
 Neither value is stored in the migration or cron command. If either Vault entry
 is absent or blank, the helper does not enqueue a request. The jobs remain

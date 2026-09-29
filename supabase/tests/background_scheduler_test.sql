@@ -1,6 +1,6 @@
 begin;
 
-select plan(14);
+select plan(17);
 
 select ok(
     exists (select 1 from pg_extension where extname = 'pg_net'),
@@ -80,6 +80,27 @@ select ok(
         'private.enqueue_internal_edge_call(text)'::regprocedure
     )) > 0,
     'runtime helper reads named Vault entries'
+);
+
+select ok(
+    position('apikey' in pg_get_functiondef(
+        'private.enqueue_internal_edge_call(text)'::regprocedure
+    )) > 0,
+    'scheduled worker request includes the apikey header'
+);
+
+select ok(
+    position('application/json' in pg_get_functiondef(
+        'private.enqueue_internal_edge_call(text)'::regprocedure
+    )) > 0,
+    'scheduled worker request includes JSON content type'
+);
+
+select ok(
+    position('Authorization' in pg_get_functiondef(
+        'private.enqueue_internal_edge_call(text)'::regprocedure
+    )) = 0,
+    'scheduled worker request has no Authorization header'
 );
 
 select ok(

@@ -49,7 +49,6 @@ begin
         body := '{}'::jsonb,
         headers := pg_catalog.jsonb_build_object(
             'Content-Type', 'application/json',
-            'Authorization', 'Bearer ' || v_edge_secret_key,
             'apikey', v_edge_secret_key
         ),
         timeout_milliseconds := 120000
