@@ -96,17 +96,16 @@ select ok(
 );
 
 select ok(
-    not exists (
+    exists (
         select 1
         from pg_policies
         where schemaname = 'public'
           and tablename = 'customers'
-          and (
-              coalesce(qual, '') ilike '%organisation_id%'
-              or coalesce(with_check, '') ilike '%organisation_id%'
-          )
+          and policyname = 'customers_select_active_member'
+          and cmd = 'SELECT'
+          and coalesce(qual, '') ilike '%has_active_organisation_membership%'
     ),
-    'Batch 2 adds no organisation_id-specific customer access policy'
+    'active organisation members can read their tenant customers'
 );
 
 select * from finish();

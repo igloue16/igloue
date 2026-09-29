@@ -34,14 +34,14 @@ select ok(
 );
 
 select ok(
-    not has_table_privilege('authenticated', 'public.customers', 'SELECT')
+    has_table_privilege('authenticated', 'public.customers', 'SELECT')
     and not has_table_privilege('authenticated', 'public.customers', 'INSERT')
     and not has_table_privilege('authenticated', 'public.customers', 'UPDATE')
     and not has_table_privilege('authenticated', 'public.customers', 'DELETE')
     and not has_table_privilege('authenticated', 'public.customers', 'TRUNCATE')
     and not has_table_privilege('authenticated', 'public.customers', 'REFERENCES')
     and not has_table_privilege('authenticated', 'public.customers', 'TRIGGER'),
-    'authenticated has no direct customer table privileges'
+    'authenticated has read-only customer table privileges'
 );
 
 select ok(

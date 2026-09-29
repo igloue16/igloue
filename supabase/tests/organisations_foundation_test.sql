@@ -34,8 +34,8 @@ select is(
         where schemaname = 'public'
           and tablename = 'organisations'
     ),
-    0,
-    'organisations has no browser access policies yet'
+    1,
+    'organisations has one authenticated read policy'
 );
 
 select lives_ok(
