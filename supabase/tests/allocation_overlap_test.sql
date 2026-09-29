@@ -5,12 +5,14 @@ select plan(2);
 -- Create the minimum data needed for an allocation test.
 insert into public.products (
     id,
+    organisation_id,
     name,
     weekly_price,
     deposit_amount
 )
 values (
     'test-product',
+    (select id from public.organisations where slug = 'igloue'),
     'Test Air Conditioner',
     59.00,
     250.00

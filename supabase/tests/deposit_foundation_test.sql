@@ -42,8 +42,8 @@ select is(
 
 insert into public.organisations (id, slug, name)
 values ('00000000-0000-0000-0000-00000000c0a1', 'mm3c0a-org', 'MM3C0A Organisation');
-insert into public.products (id, name, weekly_price, deposit_amount)
-values ('mm3c0a-product', 'MM3C0A Product', 59.00, 250.00);
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount)
+values ('mm3c0a-product', '00000000-0000-0000-0000-00000000c0a1', 'MM3C0A Product', 59.00, 250.00);
 insert into public.customers (id, organisation_id, first_name, last_name, email)
 values ('00000000-0000-0000-0000-00000000c0a2', '00000000-0000-0000-0000-00000000c0a1',
         'MM3C0A', 'Customer', 'mm3c0a@example.test');

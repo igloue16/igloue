@@ -5,6 +5,7 @@ select plan(43);
 -- Product required by the reservation and machine foreign keys.
 insert into public.products (
     id,
+    organisation_id,
     name,
     weekly_price,
     deposit_amount,
@@ -12,6 +13,7 @@ insert into public.products (
 )
 values (
     'essential',
+    (select id from public.organisations where slug = 'igloue'),
     'Essential',
     59,
     250,

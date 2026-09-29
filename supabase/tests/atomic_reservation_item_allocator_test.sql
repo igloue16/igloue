@@ -28,11 +28,11 @@ select ok(
 insert into public.organisations (id, slug, name)
 values ('00000000-0000-0000-0000-00000000a301', 'mm3b-org', 'MM3B Organisation');
 
-insert into public.products (id, name, weekly_price, deposit_amount, active)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount, active)
 values
-    ('mm3b-product-a', 'MM3B Product A', 59.00, 250.00, true),
-    ('mm3b-product-b', 'MM3B Product B', 79.00, 350.00, true),
-    ('mm3b-product-off', 'MM3B Inactive Product', 89.00, 400.00, false);
+    ('mm3b-product-a', '00000000-0000-0000-0000-00000000a301', 'MM3B Product A', 59.00, 250.00, true),
+    ('mm3b-product-b', '00000000-0000-0000-0000-00000000a301', 'MM3B Product B', 79.00, 350.00, true),
+    ('mm3b-product-off', '00000000-0000-0000-0000-00000000a301', 'MM3B Inactive Product', 89.00, 400.00, false);
 
 insert into public.customers (id, organisation_id, first_name, last_name, email)
 values ('00000000-0000-0000-0000-00000000a302',

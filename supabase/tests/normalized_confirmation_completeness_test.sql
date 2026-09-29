@@ -9,11 +9,11 @@ select ok(not has_function_privilege('authenticated', 'public.confirm_reservatio
 select ok((select prosecdef = false from pg_proc where oid = 'public.confirm_reservation(uuid)'::regprocedure), 'confirmation remains SECURITY INVOKER');
 select ok((select proconfig @> array['search_path=""'] from pg_proc where oid = 'public.confirm_reservation(uuid)'::regprocedure), 'confirmation search_path remains hardened');
 
-insert into public.products (id, name, weekly_price, deposit_amount, active)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount, active)
 values
-    ('mm3d-product-a', 'MM3D Product A', 59, 250, true),
-    ('mm3d-product-b', 'MM3D Product B', 79, 350, true),
-    ('mm3d-product-c', 'MM3D Product C', 89, 450, true);
+    ('mm3d-product-a', (select id from public.organisations where slug = 'igloue'), 'MM3D Product A', 59, 250, true),
+    ('mm3d-product-b', (select id from public.organisations where slug = 'igloue'), 'MM3D Product B', 79, 350, true),
+    ('mm3d-product-c', (select id from public.organisations where slug = 'igloue'), 'MM3D Product C', 89, 450, true);
 
 insert into public.physical_machines (id, product_id, status, active)
 values

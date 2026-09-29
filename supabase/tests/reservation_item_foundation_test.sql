@@ -133,9 +133,9 @@ select ok(
 select ok(
     exists (
         select 1 from pg_constraint
-        where conname = 'reservation_items_product_fkey'
+        where conname = 'reservation_items_product_organisation_fkey'
     ),
-    'reservation item product uses the global product foreign key'
+    'reservation item product is constrained to the same organisation'
 );
 
 select ok(
@@ -170,10 +170,10 @@ select ok(
 insert into public.organisations (id, slug, name)
 values ('00000000-0000-0000-0000-000000000002', 'mm1-test-org', 'MM1 Test Organisation');
 
-insert into public.products (id, name, weekly_price, deposit_amount)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount)
 values
-    ('mm1-product-a', 'MM1 Product A', 59.00, 250.00),
-    ('mm1-product-b', 'MM1 Product B', 79.00, 350.00);
+    ('mm1-product-a', (select id from public.organisations where slug = 'igloue'), 'MM1 Product A', 59.00, 250.00),
+    ('mm1-product-b', '00000000-0000-0000-0000-000000000002', 'MM1 Product B', 79.00, 350.00);
 
 insert into public.customers (id, organisation_id, first_name, last_name, email)
 values
@@ -198,7 +198,7 @@ values
      '1 MM1 Street', '16000', 'Angouleme', 59.00, 250.00, 59.00),
     ('00000000-0000-0000-0000-000000000302',
      '00000000-0000-0000-0000-000000000002',
-     '00000000-0000-0000-0000-000000000202', 'mm1-product-a', 1,
+     '00000000-0000-0000-0000-000000000202', 'mm1-product-b', 1,
      '2037-01-01 10:00:00+00', '2037-01-07 10:00:00+00',
      '2 MM1 Street', '16000', 'Angouleme', 59.00, 250.00, 59.00);
 
@@ -260,13 +260,13 @@ insert into public.reservation_items (
 )
 values (
     '00000000-0000-0000-0000-000000000402',
-    (select id from public.organisations where slug = 'igloue'),
-    '00000000-0000-0000-0000-000000000301',
+    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000302',
     'mm1-product-b', 79.00, 79.00
 ), (
     '00000000-0000-0000-0000-000000000403',
-    '00000000-0000-0000-0000-000000000002',
-    '00000000-0000-0000-0000-000000000302',
+    (select id from public.organisations where slug = 'igloue'),
+    '00000000-0000-0000-0000-000000000301',
     'mm1-product-a', 59.00, 59.00
 );
 
@@ -304,7 +304,7 @@ select throws_ok($$
         status, operational_start, operational_end
     ) values (
         '00000000-0000-0000-0000-000000000301', 'mm1-machine-d',
-        '00000000-0000-0000-0000-000000000403', 'held',
+        '00000000-0000-0000-0000-000000000402', 'held',
         '2037-01-01 08:00:00+00', '2037-01-07 12:00:00+00'
     )
 $$, '23503', null, 'item from another organisation cannot be linked');
@@ -314,7 +314,7 @@ select throws_ok($$
         reservation_id, machine_id, reservation_item_id,
         status, operational_start, operational_end
     ) values (
-        '00000000-0000-0000-0000-000000000302', 'mm1-machine-c',
+        '00000000-0000-0000-0000-000000000301', 'mm1-machine-d',
         '00000000-0000-0000-0000-000000000402', 'held',
         '2037-01-01 08:00:00+00', '2037-01-07 12:00:00+00'
     )
@@ -336,7 +336,7 @@ select lives_ok($$
         reservation_id, machine_id, reservation_item_id,
         status, operational_start, operational_end
     ) values (
-        '00000000-0000-0000-0000-000000000301', 'mm1-machine-c',
+        '00000000-0000-0000-0000-000000000302', 'mm1-machine-c',
         '00000000-0000-0000-0000-000000000402', 'held',
         '2037-01-01 08:00:00+00', '2037-01-07 12:00:00+00'
     )

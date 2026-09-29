@@ -15,11 +15,11 @@ select ok((select prosecdef = false and exists (select 1 from unnest(proconfig) 
            from pg_proc where oid = 'public.initiate_reservation_payment(uuid,text,text)'::regprocedure),
           'payment initiation remains invoker-security with an empty search path');
 
-insert into public.products (id, name, weekly_price, deposit_amount, active)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount, active)
 values
-    ('mm3e1-product-a', 'MM3E1 Product A', 59.00, 250.00, true),
-    ('mm3e1-product-b', 'MM3E1 Product B', 79.00, 350.00, true),
-    ('mm3e1-product-c', 'MM3E1 Product C', 89.00, 450.00, true);
+    ('mm3e1-product-a', (select id from public.organisations where slug = 'igloue'), 'MM3E1 Product A', 59.00, 250.00, true),
+    ('mm3e1-product-b', (select id from public.organisations where slug = 'igloue'), 'MM3E1 Product B', 79.00, 350.00, true),
+    ('mm3e1-product-c', (select id from public.organisations where slug = 'igloue'), 'MM3E1 Product C', 89.00, 450.00, true);
 
 insert into public.physical_machines (id, product_id, status, active)
 values

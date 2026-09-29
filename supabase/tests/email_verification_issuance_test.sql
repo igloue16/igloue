@@ -19,8 +19,8 @@ select ok(
     'authenticated cannot issue email verification tokens'
 );
 
-insert into public.products (id, name, weekly_price, deposit_amount)
-values ('essential', 'Essential', 59, 250)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount)
+values ('essential', (select id from public.organisations where slug = 'igloue'), 'Essential', 59, 250)
 on conflict (id) do nothing;
 
 insert into public.customers (id, organisation_id, first_name, last_name, email, phone)

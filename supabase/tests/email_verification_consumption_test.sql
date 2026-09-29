@@ -7,8 +7,8 @@ select ok(not has_function_privilege('public', 'public.consume_email_verificatio
 select ok(not has_function_privilege('anon', 'public.consume_email_verification_token(bytea)', 'EXECUTE'), 'anon cannot consume tokens');
 select ok(not has_function_privilege('authenticated', 'public.consume_email_verification_token(bytea)', 'EXECUTE'), 'authenticated cannot consume tokens');
 
-insert into public.products (id, name, weekly_price, deposit_amount)
-values ('essential', 'Essential', 59, 250) on conflict (id) do nothing;
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount)
+values ('essential', (select id from public.organisations where slug = 'igloue'), 'Essential', 59, 250) on conflict (id) do nothing;
 insert into public.customers (id, organisation_id, first_name, last_name, email, phone)
 values ('00000000-0000-4000-8000-000000000400',
         (select id from public.organisations where slug = 'igloue'),

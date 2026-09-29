@@ -156,8 +156,8 @@ select ok(
 insert into public.organisations (id, slug, name)
 values ('00000000-0000-0000-0000-000000000012', 'mm1c-test-org', 'MM1C Test Organisation');
 
-insert into public.products (id, name, weekly_price, deposit_amount)
-values ('mm1c-product', 'MM1C Product', 59.00, 250.00);
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount)
+values ('mm1c-product', (select id from public.organisations where slug = 'igloue'), 'MM1C Product', 59.00, 250.00);
 
 insert into public.customers (id, organisation_id, first_name, last_name, email, phone)
 values (

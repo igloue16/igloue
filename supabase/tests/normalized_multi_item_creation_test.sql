@@ -25,13 +25,13 @@ select ok(
     'normalized multi-item RPC is service-role-only'
 );
 
-insert into public.products (id, name, weekly_price, deposit_amount, active)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount, active)
 values
-    ('mm3c-product-a', 'MM3C Product A', 59.00, 250.00, true),
-    ('mm3c-product-b', 'MM3C Product B', 79.00, 350.00, true),
-    ('mm3c-product-c', 'MM3C Product C', 89.00, 450.00, true),
-    ('mm3c-product-d', 'MM3C Product D', 99.00, 550.00, true),
-    ('mm3c-product-e', 'MM3C Product E', 109.00, 650.00, true);
+    ('mm3c-product-a', (select id from public.organisations where slug = 'igloue'), 'MM3C Product A', 59.00, 250.00, true),
+    ('mm3c-product-b', (select id from public.organisations where slug = 'igloue'), 'MM3C Product B', 79.00, 350.00, true),
+    ('mm3c-product-c', (select id from public.organisations where slug = 'igloue'), 'MM3C Product C', 89.00, 450.00, true),
+    ('mm3c-product-d', (select id from public.organisations where slug = 'igloue'), 'MM3C Product D', 99.00, 550.00, true),
+    ('mm3c-product-e', (select id from public.organisations where slug = 'igloue'), 'MM3C Product E', 109.00, 650.00, true);
 
 insert into public.physical_machines (id, product_id, status, active)
 values

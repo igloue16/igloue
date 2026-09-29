@@ -11,10 +11,10 @@ select ok((select prosecdef = false from pg_proc where oid = 'public.cleanup_exp
 select ok((select proconfig @> array['search_path=""'] from pg_proc where oid = 'public.expire_reservation_hold(uuid)'::regprocedure), 'expiry search_path remains hardened');
 select ok((select proconfig @> array['search_path=""'] from pg_proc where oid = 'public.cleanup_expired_reservation_holds(integer)'::regprocedure), 'cleanup search_path remains hardened');
 
-insert into public.products (id, name, weekly_price, deposit_amount, active)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount, active)
 values
-    ('mm3d2-product-a', 'MM3D2 Product A', 59, 250, true),
-    ('mm3d2-product-b', 'MM3D2 Product B', 79, 350, true);
+    ('mm3d2-product-a', (select id from public.organisations where slug = 'igloue'), 'MM3D2 Product A', 59, 250, true),
+    ('mm3d2-product-b', (select id from public.organisations where slug = 'igloue'), 'MM3D2 Product B', 79, 350, true);
 
 insert into public.physical_machines (id, product_id, status, active)
 values

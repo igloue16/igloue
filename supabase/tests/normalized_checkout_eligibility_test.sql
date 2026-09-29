@@ -23,11 +23,11 @@ select ok((select prosecdef = false and exists (select 1 from unnest(proconfig) 
            from pg_proc where oid = 'public.persist_reservation_payment_checkout(uuid,uuid,text,text,text)'::regprocedure),
           'Checkout persistence uses invoker security and a hardened search path');
 
-insert into public.products (id, name, weekly_price, deposit_amount, active)
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount, active)
 values
-    ('mm3e2-product-a', 'MM3E2 Product A', 59.00, 250.00, true),
-    ('mm3e2-product-b', 'MM3E2 Product B', 79.00, 350.00, true),
-    ('mm3e2-product-c', 'MM3E2 Product C', 89.00, 450.00, true);
+    ('mm3e2-product-a', (select id from public.organisations where slug = 'igloue'), 'MM3E2 Product A', 59.00, 250.00, true),
+    ('mm3e2-product-b', (select id from public.organisations where slug = 'igloue'), 'MM3E2 Product B', 79.00, 350.00, true),
+    ('mm3e2-product-c', (select id from public.organisations where slug = 'igloue'), 'MM3E2 Product C', 89.00, 450.00, true);
 
 insert into public.physical_machines (id, product_id, status, active)
 values

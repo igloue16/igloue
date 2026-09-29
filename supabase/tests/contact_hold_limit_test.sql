@@ -28,8 +28,14 @@ $$;
 -- fixture. Two held bookings there must not consume IGLOUE's allowance.
 update public.organisations set slug = 'contact-test-original' where slug = 'igloue';
 insert into public.organisations (slug, name) values ('igloue', 'Contact test tenant');
-create temporary table other_first as select * from pg_temp.book_contact('contact@example.com', 'contact-other-1');
-create temporary table other_second as select * from pg_temp.book_contact('contact@example.com', 'contact-other-2');
+insert into public.products (id, organisation_id, name, weekly_price, deposit_amount)
+select 'contact-essential', id, 'Contact test product', 59, 250
+from public.organisations where slug = 'igloue';
+insert into public.physical_machines (id, product_id, serial_number, status, active)
+select 'TEST-CONTACT-OTHER-' || n, 'contact-essential', 'TEST-CONTACT-OTHER-SERIAL-' || n, 'available', true
+from generate_series(1, 2) as n;
+create temporary table other_first as select * from pg_temp.book_contact('contact@example.com', 'contact-other-1', 'contact-essential');
+create temporary table other_second as select * from pg_temp.book_contact('contact@example.com', 'contact-other-2', 'contact-essential');
 update public.organisations set slug = 'contact-test-other' where slug = 'igloue';
 update public.organisations set slug = 'igloue' where slug = 'contact-test-original';
 
