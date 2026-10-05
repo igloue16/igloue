@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Statut de votre livraison</title>
+  <link rel="stylesheet" href="assets/css/base.css">
+  <style>
+    body { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .delivery-status-card { width: min(100%, 700px); padding: clamp(24px, 5vw, 48px); border: 1px solid rgb(217 229 236 / 16%); border-radius: 20px; background: var(--page-alt); }
+    .delivery-status-card .eyebrow { color: var(--tan-soft); font-weight: 800; letter-spacing: .12em; }
+    .delivery-status-card h1 { margin-bottom: 12px; font-size: clamp(1.8rem, 5vw, 2.6rem); }
+    .delivery-status-intro, .delivery-status-help { color: var(--text-on-dark-soft); }
+    .delivery-status-summary { margin: 24px 0; padding: 20px; border: 1px solid rgb(217 229 236 / 20%); border-radius: 12px; background: rgb(255 255 255 / 4%); }
+    .delivery-status-summary h2 { font-size: 1.35rem; }
+    .delivery-status-summary p { margin: 8px 0 0; }
+    .delivery-status-timeline { display: grid; gap: 0; margin: 26px 0; padding: 0; list-style: none; }
+    .delivery-status-step { position: relative; display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 0 0 20px; color: var(--text-on-dark-soft); }
+    .delivery-status-step::before { content: ""; width: 12px; height: 12px; margin: 6px 0 0 4px; border: 2px solid currentColor; border-radius: 50%; background: var(--page-alt); }
+    .delivery-status-step:not(:last-child)::after { position: absolute; top: 20px; bottom: -1px; left: 9px; width: 2px; background: rgb(217 229 236 / 25%); content: ""; }
+    .delivery-status-step[data-reached="true"] { color: var(--tan-soft); }
+    .delivery-status-step[data-reached="true"]::before { border-color: var(--tan-soft); background: var(--tan-soft); }
+    .delivery-status-step strong { display: block; color: inherit; }
+    .delivery-status-step time { display: block; margin-top: 3px; font-size: .9rem; }
+    .delivery-status-message { min-height: 1.5em; color: var(--text-on-dark-soft); }
+    .delivery-status-card[aria-busy="true"] .delivery-status-content { opacity: .7; }
+  </style>
+  <script src="assets/js/supabase-config.js" defer></script>
+  <script src="assets/js/delivery-status.js" defer></script>
+</head>
+<body>
+  <main class="delivery-status-card" id="delivery-status-card" aria-busy="true">
+    <p class="eyebrow" id="delivery-status-brand">Votre prestataire</p>
+    <div class="delivery-status-content">
+      <div id="delivery-status-message" class="delivery-status-message" role="status" aria-live="polite">
+        <h1>Chargement du statut</h1>
+        <p>Nous récupérons les informations de votre livraison.</p>
+      </div>
+      <section id="delivery-status-details" hidden aria-labelledby="delivery-status-title">
+        <p class="delivery-status-intro">Les informations ci-dessous concernent uniquement votre livraison.</p>
+        <div class="delivery-status-summary">
+          <h2 id="delivery-status-title"></h2>
+          <p id="delivery-status-date"></p>
+          <p id="delivery-status-address"></p>
+          <p id="delivery-status-updated"></p>
+        </div>
+        <h2>Étapes de la livraison</h2>
+        <ol id="delivery-status-timeline" class="delivery-status-timeline"></ol>
+        <p class="delivery-status-help">Cette page indique le statut communiqué par votre prestataire. Elle ne montre pas la position du chauffeur et ne fournit pas d’heure d’arrivée estimée. <span id="delivery-status-support" hidden></span></p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
