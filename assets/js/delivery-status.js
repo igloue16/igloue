@@ -88,10 +88,16 @@
     const timeline = byId("delivery-status-timeline");
     timeline.replaceChildren();
     const reached = new Set(data.timeline.filter((item) => item.at).map((item) => item.state));
-    for (const state of timelineOrder) {
+    const currentIndex = timelineOrder.indexOf(data.state);
+    const isCompleted = data.state === "completed";
+    for (const [index, state] of timelineOrder.entries()) {
       const item = data.timeline.find((entry) => entry.state === state);
       const step = global.document.createElement("li");
-      step.className = "delivery-status-step";
+      const lifecycleClass = isCompleted || index < currentIndex
+        ? "delivery-status-step--completed"
+        : index === currentIndex ? "delivery-status-step--active" : "delivery-status-step--upcoming";
+      const animateIncomingConnector = index === currentIndex - 1;
+      step.className = `delivery-status-step ${lifecycleClass}${animateIncomingConnector ? " delivery-status-step--connector-update" : ""}`;
       step.dataset.reached = String(reached.has(state));
       const text = global.document.createElement("span");
       const label = global.document.createElement("strong");

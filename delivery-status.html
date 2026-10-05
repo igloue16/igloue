@@ -23,6 +23,24 @@
     .delivery-status-step:not(:last-child)::after { position: absolute; top: 20px; bottom: -1px; left: 9px; width: 2px; background: rgb(217 229 236 / 25%); content: ""; }
     .delivery-status-step[data-reached="true"] { color: var(--tan-soft); }
     .delivery-status-step[data-reached="true"]::before { border-color: var(--tan-soft); background: var(--tan-soft); }
+    .delivery-status-step--active::before { animation: delivery-active-ring 5s ease-in-out infinite; }
+    .delivery-status-step--connector-update::after {
+      background-image: linear-gradient(to bottom, rgb(217 229 236 / 25%) 0%, var(--tan-soft) 45%, rgb(217 229 236 / 25%) 100%);
+      background-size: 100% 240%;
+      animation: delivery-connector-update 2.8s ease-out 1 both;
+    }
+    @keyframes delivery-active-ring {
+      0%, 100% { box-shadow: 0 0 0 2px rgb(229 201 158 / 35%); }
+      50% { box-shadow: 0 0 0 4px rgb(229 201 158 / 65%); }
+    }
+    @keyframes delivery-connector-update {
+      from { background-position: 0 0; }
+      to { background-position: 0 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .delivery-status-step--active::before,
+      .delivery-status-step--connector-update::after { animation: none; }
+    }
     .delivery-status-step strong { display: block; color: inherit; }
     .delivery-status-step time { display: block; margin-top: 3px; font-size: .9rem; }
     .delivery-status-message { min-height: 1.5em; color: var(--text-on-dark-soft); }
