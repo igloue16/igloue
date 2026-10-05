@@ -24,10 +24,12 @@
     .delivery-status-step[data-reached="true"] { color: var(--tan-soft); }
     .delivery-status-step[data-reached="true"]::before { border-color: var(--tan-soft); background: var(--tan-soft); }
     .delivery-status-step--active::before { animation: delivery-active-ring 5s ease-in-out infinite; }
-    .delivery-status-step--connector-update::after {
-      background-image: linear-gradient(to bottom, rgb(217 229 236 / 25%) 0%, var(--tan-soft) 45%, rgb(217 229 236 / 25%) 100%);
+    .delivery-status-connector-highlight {
+      position: absolute; top: 20px; bottom: -1px; left: 9px; z-index: 1; width: 2px;
+      pointer-events: none;
+      background-image: linear-gradient(to bottom, transparent 0%, var(--tan-soft) 50%, transparent 100%);
       background-size: 100% 240%;
-      animation: delivery-connector-update 2.8s ease-out 1 both;
+      animation: delivery-connector-update 2.8s ease-out 1 forwards;
     }
     @keyframes delivery-active-ring {
       0%, 100% { box-shadow: 0 0 0 2px rgb(229 201 158 / 35%); }
@@ -38,8 +40,8 @@
       to { background-position: 0 100%; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .delivery-status-step--active::before,
-      .delivery-status-step--connector-update::after { animation: none; }
+      .delivery-status-step--active::before { animation: none; }
+      .delivery-status-connector-highlight { display: none; }
     }
     .delivery-status-step strong { display: block; color: inherit; }
     .delivery-status-step time { display: block; margin-top: 3px; font-size: .9rem; }

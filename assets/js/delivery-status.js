@@ -110,6 +110,12 @@
         text.append(time);
       }
       step.append(text);
+      if (animateIncomingConnector) {
+        const highlight = global.document.createElement("span");
+        highlight.className = "delivery-status-connector-highlight";
+        highlight.setAttribute("aria-hidden", "true");
+        step.append(highlight);
+      }
       timeline.append(step);
     }
     details.hidden = false;
