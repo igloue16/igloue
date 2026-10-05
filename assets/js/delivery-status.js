@@ -14,7 +14,7 @@
     planned: "Livraison planifiée",
     driver_assigned: "Chauffeur attribué",
     on_the_way: "En route",
-    arrived: "Arrivée",
+    arrived: "Chauffeur arrivé",
     handover: "Remise en cours",
     completed: "Livraison terminée"
   });
