@@ -23,14 +23,15 @@
     .delivery-status-step:not(:last-child)::after { position: absolute; top: 20px; bottom: -1px; left: 9px; width: 2px; background: rgb(217 229 236 / 25%); content: ""; }
     .delivery-status-step[data-reached="true"] { color: var(--tan-soft); }
     .delivery-status-step[data-reached="true"]::before { border-color: var(--tan-soft); background: var(--tan-soft); }
-    .delivery-status-step--active::before { animation: delivery-active-ring 5s ease-in-out infinite; }
-    .delivery-status-connector-highlight {
+    .delivery-status-step--animate-ring::before { animation: delivery-active-ring 5s ease-in-out infinite; }
+    .delivery-status-step--animate-connector .delivery-status-connector-highlight {
       position: absolute; top: 20px; bottom: -1px; left: 9px; z-index: 1; width: 2px;
-      pointer-events: none;
+      pointer-events: none; opacity: 1;
       background-image: linear-gradient(to bottom, transparent 0%, var(--tan-soft) 50%, transparent 100%);
       background-size: 100% 240%;
       animation: delivery-connector-update 2.8s ease-out 1 forwards;
     }
+    .delivery-status-connector-highlight { position: absolute; top: 20px; bottom: -1px; left: 9px; z-index: 1; width: 2px; pointer-events: none; opacity: 0; }
     @keyframes delivery-active-ring {
       0%, 100% { box-shadow: 0 0 0 2px rgb(229 201 158 / 35%); }
       50% { box-shadow: 0 0 0 4px rgb(229 201 158 / 65%); }
@@ -40,7 +41,8 @@
       to { background-position: 0 100%; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .delivery-status-step--active::before { animation: none; }
+      .delivery-status-step--animate-ring::before,
+      .delivery-status-step--animate-connector .delivery-status-connector-highlight { animation: none; }
       .delivery-status-connector-highlight { display: none; }
     }
     .delivery-status-step strong { display: block; color: inherit; }

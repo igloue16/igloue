@@ -64,6 +64,19 @@
     }).format(new Date(value));
   }
 
+  function scheduleTimelineMotion(activeStep, connectorStep) {
+    const activate = () => {
+      if (activeStep) activeStep.className += " delivery-status-step--animate-ring";
+      if (connectorStep) connectorStep.className += " delivery-status-step--animate-connector";
+    };
+    if (typeof global.requestAnimationFrame !== "function") {
+      activate();
+      return;
+    }
+    // Let the successful status render paint in its static state before CSS animations start.
+    global.requestAnimationFrame(() => global.requestAnimationFrame(activate));
+  }
+
   function renderStatus(data) {
     const details = byId("delivery-status-details");
     const heading = byId("delivery-status-title");
@@ -90,6 +103,8 @@
     const reached = new Set(data.timeline.filter((item) => item.at).map((item) => item.state));
     const currentIndex = timelineOrder.indexOf(data.state);
     const isCompleted = data.state === "completed";
+    let activeStep = null;
+    let connectorStep = null;
     for (const [index, state] of timelineOrder.entries()) {
       const item = data.timeline.find((entry) => entry.state === state);
       const step = global.document.createElement("li");
@@ -98,6 +113,8 @@
         : index === currentIndex ? "delivery-status-step--active" : "delivery-status-step--upcoming";
       const animateIncomingConnector = index === currentIndex - 1;
       step.className = `delivery-status-step ${lifecycleClass}${animateIncomingConnector ? " delivery-status-step--connector-update" : ""}`;
+      if (state === data.state && !isCompleted) activeStep = step;
+      if (animateIncomingConnector) connectorStep = step;
       step.dataset.reached = String(reached.has(state));
       const text = global.document.createElement("span");
       const label = global.document.createElement("strong");
@@ -120,6 +137,7 @@
     }
     details.hidden = false;
     showMessage("Statut de votre livraison", "Consultez les étapes de votre livraison.");
+    scheduleTimelineMotion(activeStep, connectorStep);
   }
 
   async function loadDeliveryStatus(token, config, fetchImpl = global.fetch) {
