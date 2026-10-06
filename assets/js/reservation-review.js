@@ -632,6 +632,10 @@ function showReservationReview(addToHistory = true) {
           result.reservation.reference,
           result.customerEmailVerificationCapability,
           globalThis.IGLOUE_SUPABASE_CONFIG || {},
+          {
+            paymentCapability: result.paymentCapability || null,
+            holdExpiresAt: result.reservation.holdExpiresAt || null,
+          },
         );
       }
     } else {

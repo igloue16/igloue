@@ -237,12 +237,89 @@
     };
   }
 
+  function renderVerificationState(next, elements) {
+    elements.message.textContent = next.message;
+    elements.requestButton.disabled = !next.canRequest;
+    elements.requestButton.textContent = next.resendAfterSeconds > 0 && !next.verified
+      ? `Renvoyer un code (${next.resendAfterSeconds}s)`
+      : "Recevoir un code";
+    elements.form.hidden = !next.challengeId || next.verified;
+    elements.confirmButton.disabled = next.busy || next.verified;
+    elements.requestButton.hidden = next.verified;
+    elements.nextStage.hidden = !next.verified;
+    if (next.verified) {
+      elements.input.value = "";
+      if (!elements.paymentCapability) {
+        elements.checkoutButton.disabled = true;
+        elements.checkoutMessage.textContent = "Votre adresse est vérifiée. Reprenez votre réservation pour accéder à son paiement sécurisé.";
+      } else if (!elements.holdExpiresAt || Date.parse(elements.holdExpiresAt) <= Date.now()) {
+        elements.checkoutButton.disabled = true;
+        elements.checkoutMessage.textContent = "Le délai de réservation a expiré. Recommencez votre réservation pour continuer.";
+      } else {
+        elements.checkoutButton.disabled = false;
+        elements.checkoutMessage.textContent = "Votre réservation peut maintenant être finalisée.";
+      }
+    }
+  }
+
+  function createCheckoutSessionSender(reservationId, paymentCapability, config, fetchImpl) {
+    return async () => {
+      if (!/^[0-9a-f-]{36}$/i.test(reservationId) ||
+          !/^[A-Za-z0-9_-]{43}$/.test(paymentCapability || "") ||
+          !config || typeof config.projectUrl !== "string" ||
+          typeof config.publishableKey !== "string") {
+        return { ok: false, code: "INVALID_REQUEST" };
+      }
+      const projectUrl = config.projectUrl.replace(/\/+$/, "");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const response = await (fetchImpl || global.fetch)(
+          `${projectUrl}/functions/v1/create-checkout-session`,
+          {
+            method: "POST",
+            headers: {
+              apikey: config.publishableKey,
+              "content-type": "application/json",
+            },
+            cache: "no-store",
+            referrerPolicy: "no-referrer",
+            signal: controller.signal,
+            body: JSON.stringify({
+              reservationId,
+              paymentCapability,
+              idempotencyKey: `reservation-checkout-v1:${reservationId}`,
+            }),
+          },
+        );
+        const payload = await response.json();
+        const checkoutUrl = payload && payload.checkout && payload.checkout.url;
+        if (response.ok && payload.ok === true && typeof checkoutUrl === "string") {
+          const url = new URL(checkoutUrl);
+          if (url.protocol === "https:" && url.hostname === "checkout.stripe.com") {
+            return { ok: true, url: url.href };
+          }
+        }
+        return {
+          ok: false,
+          code: payload && payload.error && typeof payload.error.code === "string"
+            ? payload.error.code
+            : "PAYMENT_UNAVAILABLE",
+        };
+      } catch {
+        return { ok: false, code: "PAYMENT_STATUS_UNKNOWN" };
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+  }
+
   function mount(container, reservationId, capability, config, session = {}) {
     if (
       !container || typeof reservationId !== "string" ||
       typeof capability !== "string" || !config
     ) return null;
-    saveSession(reservationId, capability, session.challengeId || null);
+    saveSession(reservationId, capability, session.challengeId || null, session.paymentCapability || null, session.holdExpiresAt || null);
     const section = global.document.createElement("section");
     section.className = "customer-email-verification";
     section.setAttribute(
@@ -251,6 +328,10 @@
     );
     section.innerHTML =
       '<h3 id="customer-email-verification-title">Vérification de votre adresse e-mail</h3><p data-email-verification-message role="status" aria-live="polite"></p><button type="button" data-email-verification-request>Recevoir un code</button><form data-email-verification-form hidden><label for="customer-email-verification-code">Code à six chiffres</label><input id="customer-email-verification-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button type="submit" data-email-verification-confirm>Vérifier le code</button></form>';
+    const nextStage = global.document.createElement("section");
+    nextStage.hidden = true;
+    nextStage.innerHTML = '<h4>Adresse e-mail vérifiée</h4><p data-checkout-message role="status" aria-live="polite">Votre réservation peut maintenant être finalisée.</p><button type="button" data-checkout-start>Continuer vers le paiement sécurisé</button>';
+    section.appendChild(nextStage);
     container.appendChild(section);
     const message = section.querySelector("[data-email-verification-message]");
     const requestButton = section.querySelector(
@@ -261,29 +342,48 @@
     const confirmButton = section.querySelector(
       "[data-email-verification-confirm]",
     );
+    const checkoutMessage = nextStage.querySelector("[data-checkout-message]");
+    const checkoutButton = nextStage.querySelector("[data-checkout-start]");
+    const paymentCapability = session.paymentCapability || null;
+    const holdExpiresAt = session.holdExpiresAt || null;
     const controller = createController({
       send: createApiSender(reservationId, capability, config),
       initialChallengeId: session.challengeId || null,
       onChallenge(challengeId) {
-        saveSession(reservationId, capability, challengeId);
+        saveSession(reservationId, capability, challengeId, paymentCapability, holdExpiresAt);
       },
       onState(next) {
-        message.textContent = next.message;
-        requestButton.disabled = !next.canRequest;
-        requestButton.textContent =
-          next.resendAfterSeconds > 0 && !next.verified
-            ? `Renvoyer un code (${next.resendAfterSeconds}s)`
-            : "Recevoir un code";
-        form.hidden = !next.challengeId || next.verified;
-        confirmButton.disabled = next.busy || next.verified;
-        requestButton.hidden = next.verified;
-        if (next.verified) input.value = "";
+        renderVerificationState(next, {
+          message, requestButton, form, confirmButton, input, nextStage,
+          checkoutButton, checkoutMessage, paymentCapability, holdExpiresAt,
+        });
         if (next.verified && countdown) global.clearInterval(countdown);
-        if (next.verified) clearSession();
       },
     });
     container.hidden = false;
     const countdown = global.setInterval(() => controller.refresh(), 1000);
+    checkoutButton.disabled = !paymentCapability || !holdExpiresAt || Date.parse(holdExpiresAt) <= Date.now();
+    checkoutButton.addEventListener("click", async () => {
+      if (!controller.state().verified || checkoutButton.disabled) return;
+      if (!holdExpiresAt || Date.parse(holdExpiresAt) <= Date.now()) {
+        renderVerificationState(controller.state(), {
+          message, requestButton, form, confirmButton, input, nextStage,
+          checkoutButton, checkoutMessage, paymentCapability, holdExpiresAt,
+        });
+        return;
+      }
+      checkoutButton.disabled = true;
+      checkoutMessage.textContent = "Préparation du paiement sécurisé…";
+      const result = await createCheckoutSessionSender(reservationId, paymentCapability, config)();
+      if (result.ok) {
+        global.location.assign(result.url);
+        return;
+      }
+      checkoutButton.disabled = false;
+      checkoutMessage.textContent = result.code === "PAYMENT_WINDOW_CLOSED"
+        ? "Le délai de réservation a expiré. Recommencez votre réservation pour continuer."
+        : "Le paiement sécurisé n’a pas pu être préparé. Vérifiez l’état de votre réservation avant de réessayer.";
+    });
     requestButton.addEventListener("click", () => controller.requestCode());
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -309,21 +409,25 @@
     capability,
     challengeId,
     now = Date.now(),
+    paymentCapability = null,
+    holdExpiresAt = null,
   ) {
     return {
       reservationId,
       capability,
       challengeId: challengeId || null,
+      paymentCapability,
+      holdExpiresAt,
       expiresAt: now + 30 * 24 * 60 * 60 * 1000,
     };
   }
 
-  function saveSession(reservationId, capability, challengeId) {
+  function saveSession(reservationId, capability, challengeId, paymentCapability = null, holdExpiresAt = null) {
     try {
       global.sessionStorage.setItem(
         SESSION_KEY,
         JSON.stringify(
-          createSessionRecord(reservationId, capability, challengeId),
+          createSessionRecord(reservationId, capability, challengeId, Date.now(), paymentCapability, holdExpiresAt),
         ),
       );
     } catch {
@@ -357,7 +461,15 @@
       !Number.isFinite(saved.expiresAt) || saved.expiresAt <= Date.now() ||
       !(saved.challengeId === null ||
         typeof saved.challengeId === "string" &&
-          /^[0-9a-f-]{36}$/i.test(saved.challengeId))
+          /^[0-9a-f-]{36}$/i.test(saved.challengeId)) ||
+      !(saved.paymentCapability === null ||
+        saved.paymentCapability === undefined ||
+        typeof saved.paymentCapability === "string" &&
+          /^[A-Za-z0-9_-]{43}$/.test(saved.paymentCapability)) ||
+      !(saved.holdExpiresAt === null ||
+        saved.holdExpiresAt === undefined ||
+        typeof saved.holdExpiresAt === "string" &&
+          Number.isFinite(Date.parse(saved.holdExpiresAt)))
     ) {
       clearSession();
       return;
@@ -371,7 +483,7 @@
         saved.reservationId,
         saved.capability,
         global.IGLOUE_SUPABASE_CONFIG || {},
-        { challengeId: saved.challengeId },
+        { challengeId: saved.challengeId, paymentCapability: saved.paymentCapability || null, holdExpiresAt: saved.holdExpiresAt || null },
       );
     }
   }
@@ -382,6 +494,8 @@
     mount,
     restoreSession,
     createSessionRecord,
+    createCheckoutSessionSender,
+    renderVerificationState,
   });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (global) global.IGLOUE_CUSTOMER_EMAIL_VERIFICATION = api;

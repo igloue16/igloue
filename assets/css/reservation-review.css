@@ -321,6 +321,8 @@
 .reservation-contact-verification { margin-top: 18px; }
 .customer-email-verification { padding: 18px; border: 1px solid rgb(217 229 236 / 28%); border-radius: 12px; background: rgb(217 229 236 / 6%); }
 .customer-email-verification h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.customer-email-verification h4 { margin: 12px 0 8px; font-size: 1rem; }
+.customer-email-verification [data-email-verification-next] { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgb(217 229 236 / 35%); }
 .customer-email-verification p { margin: 0 0 12px; }
 .customer-email-verification button { min-height: 44px; padding: 10px 16px; border: 0; border-radius: 7px; background: var(--tan); color: #14222c; font: inherit; font-weight: 700; cursor: pointer; }
 .customer-email-verification button:disabled { opacity: .6; cursor: wait; }

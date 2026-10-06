@@ -149,6 +149,11 @@
         /^[A-Za-z0-9_-]{43}$/.test(payload.customerEmailVerificationCapability)) {
       result.customerEmailVerificationCapability = payload.customerEmailVerificationCapability;
     }
+    if (payload.reservation.status === "pending" &&
+        typeof payload.paymentCapability === "string" &&
+        /^[A-Za-z0-9_-]{43}$/.test(payload.paymentCapability)) {
+      result.paymentCapability = payload.paymentCapability;
+    }
     return result;
   }
 
