@@ -1,0 +1,389 @@
+(function customerEmailVerification(global) {
+  "use strict";
+
+  const MESSAGES = Object.freeze({
+    ready:
+      "Vous pouvez demander un code envoyé à l’adresse enregistrée pour cette réservation.",
+    code_sent:
+      "Code envoyé. Saisissez les six chiffres reçus par e-mail. Il est valable dix minutes après son émission.",
+    already_verified: "Cette adresse e-mail est déjà vérifiée.",
+    verified: "Adresse e-mail vérifiée.",
+    verification_rate_limited:
+      "Veuillez patienter avant de demander un nouveau code.",
+    rate_limited: "Veuillez patienter avant de demander un nouveau code.",
+    verification_code_invalid:
+      "Ce code est invalide, expiré ou déjà utilisé. Demandez un nouveau code si nécessaire.",
+    delivery_unavailable:
+      "L’e-mail n’a pas pu être envoyé. Attendez une minute avant de réessayer.",
+    delivery_status_unknown:
+      "L’envoi n’a pas pu être confirmé. Vérifiez votre boîte e-mail avant de demander un autre code.",
+    proof_invalid:
+      "La session de réservation n’est plus valide. Recommencez votre demande.",
+    server_error: "La vérification est indisponible pour le moment.",
+    verification_status_unknown:
+      "Le résultat n’a pas pu être confirmé. Contrôlez le statut avant de renvoyer un code.",
+    invalid_request: "Vérifiez le code à six chiffres saisi.",
+  });
+  const SESSION_KEY = "igloue.customer-email-verification.v1";
+
+  function createController(options) {
+    let busy = false;
+    let challengeId = options.initialChallengeId || null;
+    let verified = false;
+    let expiresInSeconds = 0;
+    let resendAt = 0;
+    let message = challengeId ? MESSAGES.code_sent : MESSAGES.ready;
+
+    function state() {
+      return {
+        busy,
+        verified,
+        challengeId,
+        message,
+        expiresInSeconds,
+        resendAfterSeconds: Math.max(
+          0,
+          Math.ceil((resendAt - Date.now()) / 1000),
+        ),
+        canRequest: !busy && !verified && Date.now() >= resendAt,
+        canConfirm: !busy && !verified && Boolean(challengeId),
+      };
+    }
+
+    function emit() {
+      if (typeof options.onState === "function") options.onState(state());
+    }
+
+    async function perform(action, extra) {
+      if (busy || verified) return false;
+      busy = true;
+      emit();
+      let result;
+      try {
+        result = await options.send({ action, ...extra });
+      } catch {
+        result = { ok: false, code: "delivery_status_unknown" };
+      }
+      busy = false;
+      if (
+        result && result.ok === true && result.status === "already_verified"
+      ) {
+        verified = true;
+        challengeId = null;
+        message = MESSAGES.already_verified;
+      } else if (
+        result && result.ok === true && result.status === "code_sent" &&
+        typeof result.challengeId === "string"
+      ) {
+        challengeId = result.challengeId;
+        if (typeof options.onChallenge === "function") {
+          options.onChallenge(challengeId);
+        }
+        expiresInSeconds = Number.isInteger(result.expiresInSeconds)
+          ? result.expiresInSeconds
+          : 600;
+        resendAt = Date.now() +
+          (Number.isInteger(result.resendAfterSeconds)
+              ? result.resendAfterSeconds
+              : 60) * 1000;
+        message = MESSAGES.code_sent;
+      } else if (result && result.ok === true && result.verified === true) {
+        verified = true;
+        challengeId = null;
+        message = MESSAGES.verified;
+      } else if (
+        result && result.ok === true && result.status === "unverified"
+      ) {
+        message = MESSAGES.ready;
+      } else {
+        const code = result && typeof result.code === "string"
+          ? result.code
+          : "server_error";
+        message = MESSAGES[code] || MESSAGES.server_error;
+        if (
+          action === "request" && typeof result.challengeId === "string" &&
+          code === "delivery_status_unknown"
+        ) {
+          challengeId = result.challengeId;
+          if (typeof options.onChallenge === "function") {
+            options.onChallenge(challengeId);
+          }
+        } else if (
+          action === "request" &&
+          ["delivery_status_unknown", "delivery_unavailable"].includes(code)
+        ) {
+          challengeId = null;
+          if (typeof options.onChallenge === "function") {
+            options.onChallenge(null);
+          }
+        }
+        if (["verification_rate_limited", "rate_limited"].includes(code)) {
+          const retry = Number.isInteger(result.retryAfterSeconds)
+            ? result.retryAfterSeconds
+            : 60;
+          resendAt = Date.now() + Math.max(1, Math.min(retry, 3600)) * 1000;
+        }
+      }
+      emit();
+      return result && result.ok === true;
+    }
+
+    return Object.freeze({
+      state,
+      refresh() {
+        emit();
+      },
+      async checkStatus() {
+        const result = await perform("status", {});
+        if (!result && !verified) {
+          message = MESSAGES.verification_status_unknown;
+          emit();
+        }
+        return result;
+      },
+      requestCode() {
+        if (!state().canRequest) return Promise.resolve(false);
+        return perform("request", {});
+      },
+      confirm(code) {
+        if (typeof code !== "string" || !/^\d{6}$/.test(code)) {
+          message = MESSAGES.invalid_request;
+          emit();
+          return Promise.resolve(false);
+        }
+        if (!state().canConfirm) return Promise.resolve(false);
+        return perform("confirm", { challengeId, code });
+      },
+    });
+  }
+
+  function createApiSender(reservationId, capability, config, fetchImpl) {
+    return async (payload) => {
+      const gatewayUrl = String(config.verificationGatewayUrl || "").trim();
+      if (!gatewayUrl) return { ok: false, code: "server_error" };
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const response = await (fetchImpl || global.fetch)(
+          gatewayUrl,
+          {
+            method: "POST",
+            headers: {
+              apikey: config.publishableKey,
+              "content-type": "application/json",
+            },
+            cache: "no-store",
+            referrerPolicy: "no-referrer",
+            signal: controller.signal,
+            body: JSON.stringify({
+              action: payload.action,
+              reservationId,
+              capability,
+              ...(payload.challengeId
+                ? { challengeId: payload.challengeId }
+                : {}),
+              ...(payload.code ? { code: payload.code } : {}),
+            }),
+          },
+        );
+        let value;
+        try {
+          value = await response.json();
+        } catch {
+          return { ok: false, code: "server_error" };
+        }
+        if (response.ok && value && value.ok === true) {
+          if (value.status === "code_sent") {
+            return {
+              ok: true,
+              status: value.status,
+              challengeId: value.challengeId,
+              expiresInSeconds: value.expires_in_seconds,
+              resendAfterSeconds: value.resend_after_seconds,
+            };
+          }
+          if (value.status === "already_verified") {
+            return { ok: true, status: value.status };
+          }
+          if (value.status === "unverified") {
+            return { ok: true, status: value.status };
+          }
+          if (value.verified === true) return { ok: true, verified: true };
+        }
+        const detail = value && value.error;
+        return {
+          ok: false,
+          code: detail && typeof detail.code === "string"
+            ? detail.code
+            : "server_error",
+          retryAfterSeconds: detail && detail.retry_after_seconds,
+          challengeId: payload.action === "request" &&
+              typeof value.challengeId === "string"
+            ? value.challengeId
+            : undefined,
+        };
+      } catch {
+        return {
+          ok: false,
+          code: payload.action === "confirm"
+            ? "verification_status_unknown"
+            : payload.action === "request"
+            ? "delivery_status_unknown"
+            : "server_error",
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+  }
+
+  function mount(container, reservationId, capability, config, session = {}) {
+    if (
+      !container || typeof reservationId !== "string" ||
+      typeof capability !== "string" || !config
+    ) return null;
+    saveSession(reservationId, capability, session.challengeId || null);
+    const section = global.document.createElement("section");
+    section.className = "customer-email-verification";
+    section.setAttribute(
+      "aria-labelledby",
+      "customer-email-verification-title",
+    );
+    section.innerHTML =
+      '<h3 id="customer-email-verification-title">Vérification de votre adresse e-mail</h3><p data-email-verification-message role="status" aria-live="polite"></p><button type="button" data-email-verification-request>Recevoir un code</button><form data-email-verification-form hidden><label for="customer-email-verification-code">Code à six chiffres</label><input id="customer-email-verification-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button type="submit" data-email-verification-confirm>Vérifier le code</button></form>';
+    container.appendChild(section);
+    const message = section.querySelector("[data-email-verification-message]");
+    const requestButton = section.querySelector(
+      "[data-email-verification-request]",
+    );
+    const form = section.querySelector("[data-email-verification-form]");
+    const input = section.querySelector("[name=code]");
+    const confirmButton = section.querySelector(
+      "[data-email-verification-confirm]",
+    );
+    const controller = createController({
+      send: createApiSender(reservationId, capability, config),
+      initialChallengeId: session.challengeId || null,
+      onChallenge(challengeId) {
+        saveSession(reservationId, capability, challengeId);
+      },
+      onState(next) {
+        message.textContent = next.message;
+        requestButton.disabled = !next.canRequest;
+        requestButton.textContent =
+          next.resendAfterSeconds > 0 && !next.verified
+            ? `Renvoyer un code (${next.resendAfterSeconds}s)`
+            : "Recevoir un code";
+        form.hidden = !next.challengeId || next.verified;
+        confirmButton.disabled = next.busy || next.verified;
+        requestButton.hidden = next.verified;
+        if (next.verified) input.value = "";
+        if (next.verified && countdown) global.clearInterval(countdown);
+        if (next.verified) clearSession();
+      },
+    });
+    container.hidden = false;
+    const countdown = global.setInterval(() => controller.refresh(), 1000);
+    requestButton.addEventListener("click", () => controller.requestCode());
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      controller.confirm(input.value).then((success) => {
+        if (success) input.value = "";
+        if (
+          !success &&
+          controller.state().message === MESSAGES.verification_status_unknown
+        ) {
+          controller.checkStatus().then((verified) => {
+            if (verified) input.value = "";
+          });
+        }
+        if (controller.state().verified) global.clearInterval(countdown);
+      });
+    });
+    controller.checkStatus();
+    return controller;
+  }
+
+  function createSessionRecord(
+    reservationId,
+    capability,
+    challengeId,
+    now = Date.now(),
+  ) {
+    return {
+      reservationId,
+      capability,
+      challengeId: challengeId || null,
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
+    };
+  }
+
+  function saveSession(reservationId, capability, challengeId) {
+    try {
+      global.sessionStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify(
+          createSessionRecord(reservationId, capability, challengeId),
+        ),
+      );
+    } catch {
+      /* The in-memory flow remains usable when session storage is unavailable. */
+    }
+  }
+
+  function clearSession() {
+    try {
+      global.sessionStorage.removeItem(SESSION_KEY);
+    } catch { /* No-op in restricted browser contexts. */ }
+  }
+
+  function restoreSession() {
+    if (!global.document) return;
+    let saved;
+    try {
+      if (!global.sessionStorage) return;
+      const raw = global.sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      saved = JSON.parse(raw);
+    } catch {
+      clearSession();
+      return;
+    }
+    if (
+      !saved || typeof saved.reservationId !== "string" ||
+      !/^[0-9a-f-]{36}$/i.test(saved.reservationId) ||
+      typeof saved.capability !== "string" ||
+      !/^[A-Za-z0-9_-]{43}$/.test(saved.capability) ||
+      !Number.isFinite(saved.expiresAt) || saved.expiresAt <= Date.now() ||
+      !(saved.challengeId === null ||
+        typeof saved.challengeId === "string" &&
+          /^[0-9a-f-]{36}$/i.test(saved.challengeId))
+    ) {
+      clearSession();
+      return;
+    }
+    const root = global.document.querySelector(
+      "[data-customer-email-verification-session]",
+    );
+    if (root) {
+      mount(
+        root,
+        saved.reservationId,
+        saved.capability,
+        global.IGLOUE_SUPABASE_CONFIG || {},
+        { challengeId: saved.challengeId },
+      );
+    }
+  }
+
+  const api = Object.freeze({
+    createController,
+    createApiSender,
+    mount,
+    restoreSession,
+    createSessionRecord,
+  });
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (global) global.IGLOUE_CUSTOMER_EMAIL_VERIFICATION = api;
+  restoreSession();
+})(typeof window !== "undefined" ? window : globalThis);

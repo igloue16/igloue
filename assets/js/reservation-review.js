@@ -526,6 +526,7 @@ function showReservationReview(addToHistory = true) {
               data-reservation-status
               hidden>
             </p>
+            <div class="reservation-contact-verification" data-customer-email-verification hidden></div>
           </aside>
         </div>
       `
@@ -554,6 +555,7 @@ function showReservationReview(addToHistory = true) {
 
   const submitButton = assistant.querySelector("[data-review-submit]");
   const status = assistant.querySelector("[data-reservation-status]");
+  const emailVerification = assistant.querySelector("[data-customer-email-verification]");
   let submissionPending = false;
   let submissionCompleted = false;
 
@@ -621,6 +623,17 @@ function showReservationReview(addToHistory = true) {
         result.reservation.status === "pending"
         ? "Votre demande est enregistrée et la disponibilité est tenue temporairement. Aucun paiement n'a été effectué."
         : "Votre demande est enregistrée. Aucun paiement n'a été effectué.";
+      if (emailVerification && result.reservation && result.customerEmailVerificationCapability &&
+          globalThis.IGLOUE_CUSTOMER_EMAIL_VERIFICATION &&
+          typeof globalThis.IGLOUE_CUSTOMER_EMAIL_VERIFICATION.mount === "function") {
+        emailVerification.hidden = false;
+        globalThis.IGLOUE_CUSTOMER_EMAIL_VERIFICATION.mount(
+          emailVerification,
+          result.reservation.reference,
+          result.customerEmailVerificationCapability,
+          globalThis.IGLOUE_SUPABASE_CONFIG || {},
+        );
+      }
     } else {
       submitButton.disabled = false;
       submitButton.textContent = manualReview

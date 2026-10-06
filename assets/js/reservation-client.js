@@ -121,7 +121,7 @@
       throw new Error("INVALID_SUCCESS_RESPONSE");
     }
 
-    return {
+    const result = {
       status: "success",
       reservation: {
         reference: payload.reservation.reference,
@@ -145,6 +145,11 @@
         depositAmount: payload.pricing.depositAmount
       }
     };
+    if (typeof payload.customerEmailVerificationCapability === "string" &&
+        /^[A-Za-z0-9_-]{43}$/.test(payload.customerEmailVerificationCapability)) {
+      result.customerEmailVerificationCapability = payload.customerEmailVerificationCapability;
+    }
+    return result;
   }
 
   function normalizeError(payload) {
