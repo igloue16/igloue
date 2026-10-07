@@ -36,6 +36,11 @@ async function run() {
   assert.equal(requestFlow.state().verified, true, "successful OTP enters the verified state");
   assert.equal(requestFlow.state().challengeId, null);
   assert.doesNotMatch(JSON.stringify(requestFlow.state()), /001234/);
+  const otpNodes = { message: {}, requestButton: {}, form: {}, confirmButton: {}, input: { value: "001234" }, verificationContent: {}, nextStage: {}, checkoutButton: {}, checkoutMessage: {}, paymentCapability: "B".repeat(43), holdExpiresAt: "2099-01-01T00:00:00Z" };
+  verification.renderVerificationState(requestFlow.state(), otpNodes);
+  assert.equal(otpNodes.verificationContent.hidden, true, "successful OTP replaces all verification UI");
+  assert.equal(otpNodes.nextStage.hidden, false, "successful OTP reveals the payment-ready state");
+  assert.equal(otpNodes.checkoutButton.disabled, false, "successful OTP keeps the manual Checkout fallback usable");
 
   let ambiguityCalls = 0;
   const ambiguous = verification.createController({
@@ -101,17 +106,21 @@ async function run() {
   const statusFlow = verification.createController({ send: async () => ({ ok: true, status: "already_verified" }) });
   assert.equal(await statusFlow.checkStatus(), true);
   assert.equal(statusFlow.state().verified, true, "refresh/status query restores verified state without reissuing a code");
-  const nodes = { message: {}, requestButton: {}, form: {}, confirmButton: {}, input: { value: "111111" }, nextStage: {}, checkoutButton: {}, checkoutMessage: {}, paymentCapability: "B".repeat(43), holdExpiresAt: "2099-01-01T00:00:00Z" };
+  const nodes = { message: {}, requestButton: {}, form: {}, confirmButton: {}, input: { value: "111111" }, verificationContent: {}, nextStage: {}, checkoutButton: {}, checkoutMessage: {}, paymentCapability: "B".repeat(43), holdExpiresAt: "2099-01-01T00:00:00Z" };
   verification.renderVerificationState(statusFlow.state(), nodes);
   assert.equal(nodes.nextStage.hidden, false, "authoritative verified status opens the next stage after refresh");
+  assert.equal(nodes.verificationContent.hidden, true, "verified status completely hides the prior verification form and message");
   assert.equal(nodes.checkoutButton.disabled, false);
+  assert.notEqual(nodes.checkoutButton.hidden, true, "the manual Checkout fallback remains visible");
   assert.equal(nodes.input.value, "", "success clears the one-time code");
+  assert.match(source, /customer-email-verification__check/, "the verified state includes the success check icon");
+  assert.match(source, /Adresse e-mail vérifiée/, "the verified state has its own clear heading");
   const unverified = verification.createController({ send: async () => ({ ok: false, code: "verification_code_invalid" }) });
   await unverified.confirm("123456");
-  const failureNodes = { ...nodes, nextStage: {}, checkoutButton: {}, input: { value: "123456" } };
+  const failureNodes = { ...nodes, verificationContent: {}, nextStage: {}, checkoutButton: {}, input: { value: "123456" } };
   verification.renderVerificationState(unverified.state(), failureNodes);
   assert.equal(failureNodes.nextStage.hidden, true, "failed verification does not advance");
-  const expiredNodes = { ...nodes, nextStage: {}, checkoutButton: {}, checkoutMessage: {}, holdExpiresAt: "2000-01-01T00:00:00Z" };
+  const expiredNodes = { ...nodes, verificationContent: {}, nextStage: {}, checkoutButton: {}, checkoutMessage: {}, holdExpiresAt: "2000-01-01T00:00:00Z" };
   verification.renderVerificationState(statusFlow.state(), expiredNodes);
   assert.equal(expiredNodes.checkoutButton.disabled, true, "expired hold cannot start payment");
 
@@ -152,6 +161,102 @@ async function run() {
   )();
   assert.equal(liveStatus.ok, false, "server rejection of a live Checkout ID remains a non-success response");
   assert.equal(liveStatusCalled, true, "the server is authoritative about whether a Checkout ID belongs to this environment");
+
+  const countdowns = [];
+  const scheduled = [];
+  let clock = 0;
+  let timerId = 0;
+  let continued = 0;
+  const transition = verification.createAutoCheckoutTransition({
+    seconds: 3,
+    setTimeoutImpl(callback, delay) {
+      const timer = { id: ++timerId, at: clock + delay, callback };
+      scheduled.push(timer);
+      return timer.id;
+    },
+    clearTimeoutImpl(id) {
+      const index = scheduled.findIndex((timer) => timer.id === id);
+      if (index >= 0) scheduled.splice(index, 1);
+    },
+    onCountdown(seconds) { countdowns.push(seconds); },
+    onContinue() { continued += 1; },
+  });
+  async function advance(ms) {
+    const end = clock + ms;
+    while (scheduled.length && scheduled[0].at <= end) {
+      scheduled.sort((a, b) => a.at - b.at);
+      const timer = scheduled.shift();
+      clock = timer.at;
+      timer.callback();
+      await Promise.resolve();
+    }
+    clock = end;
+    await Promise.resolve();
+  }
+  assert.equal(transition.start(), true);
+  assert.deepEqual(countdowns, [3]);
+  await advance(2999);
+  assert.equal(continued, 0, "automatic Checkout does not begin before the three-second countdown");
+  await advance(1);
+  assert.equal(continued, 1, "automatic Checkout begins after three seconds");
+  assert.deepEqual(countdowns, [3, 2, 1, 0]);
+
+  class FakeElement {
+    constructor(tagName) {
+      this.tagName = tagName;
+      this.children = [];
+      this.attributes = {};
+      this.hidden = false;
+      this.listeners = {};
+      this.classes = new Set();
+      this.classList = {
+        add: (name) => this.classes.add(name),
+        remove: (name) => this.classes.delete(name),
+      };
+    }
+    append(...nodes) { this.children.push(...nodes); }
+    appendChild(node) { this.children.push(node); return node; }
+    replaceChildren(...nodes) { this.children = [...nodes]; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    addEventListener(name, callback) { this.listeners[name] = callback; }
+    focus() {}
+  }
+  globalThis.document = { createElement: (tag) => new FakeElement(tag) };
+  globalThis.location = { search: "?checkout=success&session_id=cs_test_123456789" };
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = () => 1;
+  globalThis.clearTimeout = () => {};
+  const returnStates = [
+    { ok: true, state: "pending", amount: 153, currency: "EUR" },
+    { ok: true, state: "confirmed", amount: 153, currency: "EUR" },
+  ];
+  const returnContainer = new FakeElement("aside");
+  returnContainer.appendChild(new FakeElement("old-checkout-content"));
+  const returnScreen = verification.renderCheckoutReturn(
+    returnContainer,
+    { reservationId: "00000000-0000-4000-8000-000000000001", paymentCapability: "B".repeat(43) },
+    { projectUrl: "https://staging.supabase.co", publishableKey: "sb_publishable_test" },
+    async () => new Response(JSON.stringify({ ok: true, ...returnStates.shift() }), { status: 200 }),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  const card = returnContainer.children[0];
+  const title = card.children.find((child) => child.tagName === "h2");
+  assert.equal(returnContainer.children.length, 1, "return card replaces the previous checkout content");
+  assert.match(title.textContent, /Paiement en cours/, "success URL alone stays in the pending state");
+  assert.doesNotMatch(title.textContent, /Paiement confirmé/, "URL parameters cannot claim payment success");
+  await returnScreen.refresh();
+  assert.equal(title.textContent, "Paiement confirmé", "server-confirmed payment changes the confirmation heading");
+  assert.equal(card.children.find((child) => child.tagName === "h3").textContent, "Réservation confirmée");
+  assert.equal(card.children.find((child) => child.className === "customer-payment-confirmation__summary").children[3].textContent, "153,00 €");
+  assert.equal(card.classes.has("is-confirmed"), true);
+  globalThis.setTimeout = realSetTimeout;
+  globalThis.clearTimeout = realClearTimeout;
+  delete globalThis.document;
+  delete globalThis.location;
+  const css = fs.readFileSync(path.join(__dirname, "../assets/css/reservation-review.css"), "utf8");
+  assert.match(css, /customer-payment-confirmation-shell[^}]*place-items:\s*center/s, "confirmation shell centers the opaque card");
+  assert.match(css, /customer-payment-confirmation\s*\{[^}]*background:\s*#fff/s, "confirmation card uses an opaque readable surface");
   console.log("Customer email verification frontend tests passed.");
 }
 

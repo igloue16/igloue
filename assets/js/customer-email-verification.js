@@ -238,6 +238,7 @@
   }
 
   function renderVerificationState(next, elements) {
+    const enteringVerifiedState = next.verified && elements.nextStage.hidden;
     elements.message.textContent = next.message;
     elements.requestButton.disabled = !next.canRequest;
     elements.requestButton.textContent = next.resendAfterSeconds > 0 && !next.verified
@@ -246,7 +247,11 @@
     elements.form.hidden = !next.challengeId || next.verified;
     elements.confirmButton.disabled = next.busy || next.verified;
     elements.requestButton.hidden = next.verified;
+    elements.verificationContent.hidden = next.verified;
     elements.nextStage.hidden = !next.verified;
+    if (enteringVerifiedState && typeof elements.nextStage.focus === "function") {
+      elements.nextStage.focus({ preventScroll: true });
+    }
     if (next.verified) {
       elements.input.value = "";
       if (!elements.paymentCapability) {
@@ -314,6 +319,41 @@
     };
   }
 
+  function createAutoCheckoutTransition(options = {}) {
+    const seconds = Number.isInteger(options.seconds) && options.seconds > 0 ? options.seconds : 3;
+    const setTimeoutImpl = options.setTimeoutImpl || global.setTimeout.bind(global);
+    const clearTimeoutImpl = options.clearTimeoutImpl || global.clearTimeout.bind(global);
+    let timer = null;
+    let active = false;
+    function tick(remaining) {
+      if (!active) return;
+      if (typeof options.onCountdown === "function") options.onCountdown(remaining);
+      if (remaining <= 0) {
+        active = false;
+        timer = null;
+        Promise.resolve().then(() => options.onContinue && options.onContinue());
+        return;
+      }
+      timer = setTimeoutImpl(() => tick(remaining - 1), 1000);
+    }
+    return Object.freeze({
+      start() {
+        if (active) return false;
+        active = true;
+        tick(seconds);
+        return true;
+      },
+      cancel() {
+        if (timer !== null) clearTimeoutImpl(timer);
+        timer = null;
+        active = false;
+      },
+      active() {
+        return active;
+      },
+    });
+  }
+
   function createPaymentStatusSender(reservationId, paymentCapability, sessionId, config, fetchImpl) {
     return async () => {
       if (!/^[0-9a-f-]{36}$/i.test(reservationId) ||
@@ -359,29 +399,73 @@
     const params = new URLSearchParams(global.location.search || "");
     const checkout = params.get("checkout");
     if (checkout !== "success" && checkout !== "cancelled") return null;
-    if (checkout === "success") {
-      for (const child of Array.from(container.children)) child.hidden = true;
-    }
+    container.classList.add("customer-payment-confirmation-shell");
+    container.setAttribute("role", "region");
+    container.setAttribute("aria-label", "Confirmation de la réservation");
+    container.replaceChildren();
     const panel = global.document.createElement("section");
-    panel.className = "customer-email-verification customer-payment-confirmation";
+    panel.className = "customer-payment-confirmation";
     panel.setAttribute("role", "status");
     panel.setAttribute("aria-live", "polite");
-    const heading = global.document.createElement("h3");
+    panel.tabIndex = -1;
+    const icon = global.document.createElement("span");
+    icon.className = "customer-payment-confirmation__icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = checkout === "cancelled" ? "!" : "…";
+    const heading = global.document.createElement("h2");
     const message = global.document.createElement("p");
-    panel.append(heading, message);
+    message.className = "customer-payment-confirmation__message";
+    const reservationHeading = global.document.createElement("h3");
+    reservationHeading.className = "customer-payment-confirmation__reservation-heading";
+    const summary = global.document.createElement("dl");
+    summary.className = "customer-payment-confirmation__summary";
+    const referenceLabel = global.document.createElement("dt");
+    referenceLabel.textContent = "Réservation";
+    const referenceValue = global.document.createElement("dd");
+    referenceValue.textContent = saved && typeof saved.reservationId === "string"
+      ? saved.reservationId.slice(0, 8).toUpperCase()
+      : "—";
+    const amountLabel = global.document.createElement("dt");
+    amountLabel.textContent = "Montant";
+    const amountValue = global.document.createElement("dd");
+    amountValue.textContent = "En attente";
+    summary.append(referenceLabel, referenceValue, amountLabel, amountValue);
+    const action = global.document.createElement("button");
+    action.type = "button";
+    action.className = "customer-payment-confirmation__action";
+    panel.append(icon, heading, reservationHeading, message, summary, action);
     container.appendChild(panel);
     container.hidden = false;
+    if (typeof panel.focus === "function") panel.focus({ preventScroll: true });
 
     if (checkout === "cancelled") {
+      summary.hidden = !saved;
       heading.textContent = "Paiement non finalisé";
+      reservationHeading.textContent = "";
       message.textContent = "Votre réservation reste en attente. Aucun paiement n’est confirmé.";
+      action.textContent = "Continuer vers le paiement sécurisé";
+      action.hidden = !saved || !saved.paymentCapability;
+      action.addEventListener("click", async () => {
+        action.disabled = true;
+        const result = await createCheckoutSessionSender(saved.reservationId, saved.paymentCapability, config)();
+        if (result.ok) global.location.assign(result.url);
+        else {
+          action.disabled = false;
+          message.textContent = "Le paiement sécurisé n’a pas pu être préparé. Vérifiez l’état de votre réservation avant de réessayer.";
+        }
+      });
       return { panel, refresh: async () => ({ ok: false, code: "CANCELLED" }) };
     }
 
-    heading.textContent = "Vérification de votre paiement";
+    heading.textContent = "Paiement en cours de confirmation…";
+    reservationHeading.textContent = "";
+    message.textContent = "Nous vérifions la confirmation du paiement auprès du serveur.";
+    summary.hidden = !saved;
+    action.textContent = "Vérifier à nouveau";
     const sessionId = params.get("session_id") || "";
     if (!saved || !saved.paymentCapability || !sessionId) {
-      message.textContent = "Le paiement n’est pas encore confirmé. Reprenez la page de réservation dans ce navigateur pour vérifier son état.";
+      message.textContent = "Le paiement n’est pas encore confirmé. Actualisez cette page dans le navigateur utilisé pour la réservation afin de vérifier son état.";
+      action.hidden = true;
       return { panel, refresh: async () => ({ ok: false, code: "PAYMENT_STATUS_UNKNOWN" }) };
     }
 
@@ -392,25 +476,37 @@
       const result = await sendStatus();
       if (stopped) return result;
       if (result.ok && result.state === "confirmed") {
+        panel.classList.add("is-confirmed");
+        icon.textContent = "✓";
         heading.textContent = "Paiement confirmé";
-        message.textContent = `Votre réservation est confirmée. Paiement reçu : ${result.amount.toFixed(2).replace(".", ",")} €.`;
+        reservationHeading.textContent = "Réservation confirmée";
+        message.textContent = "Votre réservation est confirmée. Le paiement a été validé par notre serveur.";
+        amountValue.textContent = result.amount.toFixed(2).replace(".", ",") + " €";
+        action.hidden = true;
         stopped = true;
       } else {
-        heading.textContent = "Vérification de votre paiement";
-        message.textContent = "Votre paiement attend encore la confirmation du serveur. Cette page se met à jour automatiquement.";
+        panel.classList.remove("is-confirmed");
+        icon.textContent = "…";
+        heading.textContent = "Paiement en cours de confirmation…";
+        reservationHeading.textContent = "";
+        message.textContent = "Le paiement attend la confirmation du serveur. Cette page vérifie automatiquement son état.";
+        amountValue.textContent = result.ok && typeof result.amount === "number"
+          ? result.amount.toFixed(2).replace(".", ",") + " €"
+          : "En attente";
       }
       return result;
     };
-    let tries = 0;
     const poll = async () => {
       const result = await refresh();
-      tries += 1;
-      if (!stopped && tries < 9) timer = global.setTimeout(poll, 1500);
-      else if (!stopped) message.textContent = "Le paiement n’est pas encore confirmé. Actualisez cette page dans quelques instants pour vérifier à nouveau.";
+      if (!stopped) timer = global.setTimeout(poll, 2500);
       return result;
     };
+    action.addEventListener("click", () => {
+      if (timer) global.clearTimeout(timer);
+      poll();
+    });
     poll();
-    return { panel, refresh: () => { if (timer) global.clearTimeout(timer); stopped = false; tries = 0; return poll(); } };
+    return { panel, refresh: () => { if (timer) global.clearTimeout(timer); stopped = false; return poll(); } };
   }
 
   function mount(container, reservationId, capability, config, session = {}) {
@@ -425,19 +521,26 @@
       "aria-labelledby",
       "customer-email-verification-title",
     );
-    section.innerHTML =
+    const verificationContent = global.document.createElement("div");
+    verificationContent.className = "customer-email-verification__form-content";
+    verificationContent.innerHTML =
       '<h3 id="customer-email-verification-title">Vérification de votre adresse e-mail</h3><p data-email-verification-message role="status" aria-live="polite"></p><button type="button" data-email-verification-request>Recevoir un code</button><form data-email-verification-form hidden><label for="customer-email-verification-code">Code à six chiffres</label><input id="customer-email-verification-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button type="submit" data-email-verification-confirm>Vérifier le code</button></form>';
+    section.appendChild(verificationContent);
     const nextStage = global.document.createElement("section");
+    nextStage.className = "customer-email-verification__verified";
+    nextStage.setAttribute("role", "region");
+    nextStage.setAttribute("aria-labelledby", "customer-email-verified-title");
+    nextStage.tabIndex = -1;
     nextStage.hidden = true;
-    nextStage.innerHTML = '<h4>Adresse e-mail vérifiée</h4><p data-checkout-message role="status" aria-live="polite">Votre réservation peut maintenant être finalisée.</p><button type="button" data-checkout-start>Continuer vers le paiement sécurisé</button>';
+    nextStage.innerHTML = '<span class="customer-email-verification__check" aria-hidden="true">✓</span><h4 id="customer-email-verified-title">Adresse e-mail vérifiée</h4><p>Nous avons confirmé votre adresse. Votre paiement ne sera effectué qu’après votre action dans Checkout.</p><p data-checkout-message role="status" aria-live="polite"></p><button type="button" data-checkout-start>Continuer vers le paiement sécurisé</button>';
     section.appendChild(nextStage);
     container.appendChild(section);
-    const message = section.querySelector("[data-email-verification-message]");
+    const message = verificationContent.querySelector("[data-email-verification-message]");
     const requestButton = section.querySelector(
       "[data-email-verification-request]",
     );
-    const form = section.querySelector("[data-email-verification-form]");
-    const input = section.querySelector("[name=code]");
+    const form = verificationContent.querySelector("[data-email-verification-form]");
+    const input = verificationContent.querySelector("[name=code]");
     const confirmButton = section.querySelector(
       "[data-email-verification-confirm]",
     );
@@ -445,6 +548,38 @@
     const checkoutButton = nextStage.querySelector("[data-checkout-start]");
     const paymentCapability = session.paymentCapability || null;
     const holdExpiresAt = session.holdExpiresAt || null;
+    let checkoutPending = false;
+    let autoCheckoutStarted = false;
+    let autoTransition;
+    const canContinueToCheckout = () => Boolean(
+      paymentCapability && holdExpiresAt && Date.parse(holdExpiresAt) > Date.now(),
+    );
+    const startCheckout = async () => {
+      if (!controller.state().verified || !canContinueToCheckout() || checkoutPending) return false;
+      checkoutPending = true;
+      checkoutButton.disabled = true;
+      checkoutButton.setAttribute("aria-busy", "true");
+      checkoutMessage.textContent = "Préparation du paiement sécurisé…";
+      const result = await createCheckoutSessionSender(reservationId, paymentCapability, config)();
+      if (result.ok) {
+        global.location.assign(result.url);
+        return true;
+      }
+      checkoutPending = false;
+      checkoutButton.disabled = false;
+      checkoutButton.removeAttribute("aria-busy");
+      checkoutMessage.textContent = result.code === "PAYMENT_WINDOW_CLOSED"
+        ? "Le délai de réservation a expiré. Recommencez votre réservation pour continuer."
+        : "Le paiement sécurisé n’a pas pu être préparé. Vérifiez l’état de votre réservation avant de réessayer.";
+      return false;
+    };
+    autoTransition = createAutoCheckoutTransition({
+      onCountdown(seconds) {
+        checkoutMessage.textContent = "Redirection vers le paiement sécurisé dans " +
+          seconds + " seconde" + (seconds > 1 ? "s" : "") + "…";
+      },
+      onContinue: startCheckout,
+    });
     const controller = createController({
       send: createApiSender(reservationId, capability, config),
       initialChallengeId: session.challengeId || null,
@@ -453,10 +588,15 @@
       },
       onState(next) {
         renderVerificationState(next, {
-          message, requestButton, form, confirmButton, input, nextStage,
+          message, requestButton, form, confirmButton, input, verificationContent, nextStage,
           checkoutButton, checkoutMessage, paymentCapability, holdExpiresAt,
         });
         if (next.verified && countdown) global.clearInterval(countdown);
+        if (next.verified && canContinueToCheckout() && !autoCheckoutStarted &&
+            !["success", "cancelled"].includes(new URLSearchParams(global.location.search || "").get("checkout"))) {
+          autoCheckoutStarted = true;
+          autoTransition.start();
+        }
       },
     });
     container.hidden = false;
@@ -466,22 +606,14 @@
       if (!controller.state().verified || checkoutButton.disabled) return;
       if (!holdExpiresAt || Date.parse(holdExpiresAt) <= Date.now()) {
         renderVerificationState(controller.state(), {
-          message, requestButton, form, confirmButton, input, nextStage,
+          message, requestButton, form, confirmButton, input, verificationContent, nextStage,
           checkoutButton, checkoutMessage, paymentCapability, holdExpiresAt,
         });
         return;
       }
-      checkoutButton.disabled = true;
-      checkoutMessage.textContent = "Préparation du paiement sécurisé…";
-      const result = await createCheckoutSessionSender(reservationId, paymentCapability, config)();
-      if (result.ok) {
-        global.location.assign(result.url);
-        return;
-      }
-      checkoutButton.disabled = false;
-      checkoutMessage.textContent = result.code === "PAYMENT_WINDOW_CLOSED"
-        ? "Le délai de réservation a expiré. Recommencez votre réservation pour continuer."
-        : "Le paiement sécurisé n’a pas pu être préparé. Vérifiez l’état de votre réservation avant de réessayer.";
+      autoTransition.cancel();
+      autoCheckoutStarted = true;
+      await startCheckout();
     });
     requestButton.addEventListener("click", () => controller.requestCode());
     form.addEventListener("submit", (event) => {
@@ -542,6 +674,9 @@
 
   function restoreSession() {
     if (!global.document) return;
+    const checkoutReturn = global.location
+      ? new URLSearchParams(global.location.search || "").get("checkout")
+      : null;
     let saved;
     try {
       const raw = global.sessionStorage && global.sessionStorage.getItem(SESSION_KEY);
@@ -574,7 +709,7 @@
     const root = global.document.querySelector(
       "[data-customer-email-verification-session]",
     );
-    if (root && saved) {
+    if (root && saved && !["success", "cancelled"].includes(checkoutReturn)) {
       mount(
         root,
         saved.reservationId,
@@ -593,6 +728,7 @@
     restoreSession,
     createSessionRecord,
     createCheckoutSessionSender,
+    createAutoCheckoutTransition,
     createPaymentStatusSender,
     renderCheckoutReturn,
     renderVerificationState,

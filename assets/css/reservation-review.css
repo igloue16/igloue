@@ -329,5 +329,31 @@
 .customer-email-verification form { display: grid; gap: 10px; margin-top: 14px; }
 .customer-email-verification label { font-weight: 600; }
 .customer-email-verification input { min-height: 46px; max-width: 220px; padding: 8px 12px; border: 1px solid #91a7b5; border-radius: 7px; font: inherit; font-size: 1.25rem; letter-spacing: .16em; }
+.customer-email-verification__verified { padding: 24px; border: 1px solid #c8ded0; border-radius: 16px; background: #f7fbf8; color: #14222c; text-align: center; }
+.customer-email-verification__verified h4 { margin: 12px 0 8px; color: #153c2b; font-size: 1.25rem; }
+.customer-email-verification__verified p { margin: 0 0 12px; }
+.customer-email-verification__check { display: grid; width: 58px; height: 58px; margin: 0 auto; place-items: center; border: 2px solid #b6ddc3; border-radius: 50%; background: #e7f5eb; color: #16834a; font-size: 2rem; font-weight: 800; line-height: 1; }
 [data-customer-email-verification-session]:not([hidden]) { position: fixed; right: 20px; bottom: 20px; z-index: 1100; width: min(420px, calc(100vw - 40px)); }
 @media (max-width: 560px) { [data-customer-email-verification-session]:not([hidden]) { right: 12px; bottom: 12px; width: calc(100vw - 24px); } }
+.customer-payment-confirmation-shell[data-customer-email-verification-session]:not([hidden]) { position: fixed; inset: 0; z-index: 1300; display: grid; width: auto; place-items: center; padding: clamp(16px, 4vw, 36px); background: #111d2a; }
+.customer-payment-confirmation { box-sizing: border-box; width: min(100%, 640px); max-height: min(90vh, 820px); overflow-y: auto; padding: clamp(26px, 5vw, 48px); border: 1px solid #d9e2e8; border-radius: 24px; background: #fff; color: #14222c; box-shadow: 0 24px 72px rgb(0 0 0 / 34%); text-align: center; }
+.customer-payment-confirmation__icon { display: grid; width: 68px; height: 68px; margin: 0 auto 20px; place-items: center; border: 2px solid #c5ddcd; border-radius: 50%; background: #e9f5ec; color: #16834a; font-size: 2.2rem; font-weight: 800; line-height: 1; }
+.customer-payment-confirmation:not(.is-confirmed) .customer-payment-confirmation__icon { border-color: #d9e2e8; background: #eef2f5; color: #34495a; font-size: 1.8rem; }
+.customer-payment-confirmation h2 { margin: 0 0 10px; color: #13283a; font-size: clamp(1.55rem, 4vw, 2rem); line-height: 1.2; }
+.customer-payment-confirmation__reservation-heading { margin: 0 0 10px; color: #17633a; font-size: 1.12rem; }
+.customer-payment-confirmation__reservation-heading:empty { display: none; }
+.customer-payment-confirmation__message { max-width: 48ch; margin: 0 auto 22px; color: #435666; line-height: 1.6; }
+.customer-payment-confirmation__summary { display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; margin: 0 auto 24px; padding: 18px 20px; border: 1px solid #e0e7eb; border-radius: 14px; background: #f4f7f9; text-align: left; }
+.customer-payment-confirmation__summary dt { color: #526574; }
+.customer-payment-confirmation__summary dd { margin: 0; color: #172f42; font-weight: 700; text-align: right; }
+.customer-payment-confirmation__action { min-height: 48px; padding: 12px 20px; border: 0; border-radius: 10px; background: #d6bd94; color: #14222c; font: inherit; font-weight: 700; cursor: pointer; }
+.customer-payment-confirmation__action:focus-visible { outline: 3px solid #397bb0; outline-offset: 3px; }
+.customer-payment-confirmation__action[hidden], .customer-payment-confirmation__summary[hidden] { display: none; }
+@media (max-width: 560px) {
+  .customer-payment-confirmation-shell[data-customer-email-verification-session]:not([hidden]) { padding: 14px; }
+  .customer-payment-confirmation { padding: 28px 20px; border-radius: 18px; }
+  .customer-payment-confirmation__summary { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-payment-confirmation, .customer-email-verification__verified, .customer-payment-confirmation__icon, .customer-email-verification__check { animation: none !important; scroll-behavior: auto; transition: none !important; }
+}
