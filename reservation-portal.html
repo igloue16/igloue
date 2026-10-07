@@ -27,6 +27,14 @@
     .card strong { color:#163b58; }
     .price-row { display:flex; justify-content:space-between; gap:14px; margin-top:9px; color:#486176; }
     .price-row--total { margin-top:14px; padding-top:13px; border-top:1px solid var(--portal-line); color:#143d5c; font-weight:800; }
+    .extension-card { display:grid; gap:12px; }
+    .extension-card form { display:grid; gap:10px; }
+    .extension-card input { width:100%; box-sizing:border-box; padding:12px; border:1px solid var(--portal-line); border-radius:10px; color:var(--portal-ink); font:inherit; }
+    .extension-card button { width:fit-content; min-height:44px; padding:10px 16px; border:1px solid #176b9a; border-radius:10px; background:#176b9a; color:#fff; font:inherit; font-weight:750; cursor:pointer; }
+    .extension-card button:disabled { opacity:.6; cursor:wait; }
+    #extension-quote, #extension-status { color:#486176; line-height:1.55; }
+    #extension-status[data-kind="error"] { color:#873c32; }
+    .extension-result { border-color:#b7d8c7; background:#eff9f3; }
     [hidden] { display:none !important; }
     footer { margin-top:22px; color:#64798a; font-size:.88rem; text-align:center; }
     @media (max-width:560px) { .grid { grid-template-columns:1fr; } .portal { border-radius:18px; } }
@@ -49,6 +57,20 @@
         <article class="card"><h2>Collecte</h2><p id="portal-collection"></p><p id="portal-collection-status"></p></article>
       </section>
       <p class="intro" id="portal-email-state"></p>
+      <section class="card extension-card" id="portal-extension" hidden>
+        <h2>Prolonger la location</h2>
+        <p id="extension-intro">Ajoutez des jours de location à votre réservation confirmée.</p>
+        <button id="extension-open" type="button">Prolonger la location</button>
+        <form id="extension-form" hidden>
+          <label for="extension-date">Nouvelle date de fin</label>
+          <input id="extension-date" type="date" required>
+          <button id="extension-quote-button" type="submit">Calculer le montant</button>
+          <div id="extension-quote" role="status" aria-live="polite"></div>
+          <button id="extension-pay" type="button" hidden>Confirmer et payer</button>
+        </form>
+        <div id="extension-status" role="status" aria-live="polite"></div>
+      </section>
+      <section class="card extension-result" id="extension-result" hidden aria-live="polite"></section>
     </div>
     <footer>Vos informations sont chargées de manière sécurisée depuis votre réservation.</footer>
   </main>
