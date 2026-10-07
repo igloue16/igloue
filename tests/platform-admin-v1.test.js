@@ -14,6 +14,7 @@ function load(hostname = "test.igloue.fr", rpcResult = { environment: "staging" 
   const config = { backend: "staging", projectUrl: "https://staging.example.test", publishableKey: "sb_publishable_staging" };
   const window = {
     location: { hostname },
+    crypto: { randomUUID: () => "00000000-0000-4000-8000-00000000f001" },
     IGLOUE_SUPABASE_CONFIG: config,
     supabase: { createClient(url, key, options) {
       clientOptions = { url, key, options };
@@ -90,6 +91,48 @@ test("support workspace requests are session-bound RPC reads with allowlisted se
   await assert.rejects(denied.api.readSupportWorkspace("session-uuid", "summary"), /DENIED/);
 });
 
+test("support outbox candidates are loaded through the session-bound allowlist RPC", async () => {
+  const expected = { items: [{ event_id: "event-uuid", status: "failed", can_retry: true }] };
+  const loaded = load("test.igloue.fr", { platform_support_outbox_retry_candidates_v1: { data: expected, error: null } });
+  assert.deepEqual(JSON.parse(JSON.stringify(await loaded.api.readSupportOutboxCandidates("session-uuid"))), expected);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_support_outbox_retry_candidates_v1",
+    args: { p_session: "session-uuid" },
+  });
+  await assert.rejects(loaded.api.readSupportOutboxCandidates(null), /DENIED/);
+});
+
+test("outbox retry sends a reason and fresh idempotency key to the dedicated RPC", async () => {
+  const loaded = load("test.igloue.fr", {
+    platform_support_retry_outbox_event_v1: { data: { event_id: "event-uuid", status: "pending", replayed: false }, error: null },
+  });
+  const result = await loaded.api.retrySupportOutboxEvent("session-uuid", "event-uuid", "Retry failed event after provider outage");
+  assert.equal(result.status, "pending");
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_support_retry_outbox_event_v1",
+    args: {
+      p_session: "session-uuid",
+      p_event_id: "event-uuid",
+      p_reason: "Retry failed event after provider outage",
+      p_idempotency_key: "00000000-0000-4000-8000-00000000f001",
+    },
+  });
+  await assert.rejects(loaded.api.retrySupportOutboxEvent("session-uuid", "event-uuid", "too short"), /REASON_REQUIRED/);
+  const denied = load("test.igloue.fr", {
+    platform_support_retry_outbox_event_v1: { data: null, error: { code: "42501", message: "permission denied" } },
+  });
+  await assert.rejects(denied.api.retrySupportOutboxEvent("session-uuid", "event-uuid", "Retry failed event after provider outage"), /DENIED/);
+});
+
+test("outbox retry action is available only for failed eligible events", () => {
+  const { api } = load("test.igloue.fr");
+  assert.equal(api.supportOutboxRetryAvailable({ event_id: "e1", status: "failed", can_retry: true }), true);
+  assert.equal(api.supportOutboxRetryAvailable({ event_id: "e1", status: "failed", can_retry: false }), false);
+  assert.equal(api.supportOutboxRetryAvailable({ event_id: "e1", status: "processing", can_retry: true }), false);
+  assert.equal(api.supportOutboxRetryAvailable({ event_id: "e1", status: "completed", can_retry: true }), false);
+  assert.equal(api.supportOutboxRetryAvailable({ status: "failed", can_retry: true }), false);
+});
+
 test("support exit requires backend confirmation of revocation", async () => {
   const valid = load("test.igloue.fr", { platform_revoke_support_session: { data: true, error: null } });
   assert.equal(await valid.api.revokeSupportSession("session-uuid", "Employee manually exited support mode"), true);
@@ -116,6 +159,12 @@ test("page labels staging, provides controlled support flow, and has no direct p
   assert.match(source, /SUPPORT_SESSION_KEY/);
   assert.match(source, /platform_support_session_read_v1/);
   assert.match(source, /platform_support_workspace_read_v1/);
+  assert.match(source, /platform_support_outbox_retry_candidates_v1/);
+  assert.match(source, /platform_support_retry_outbox_event_v1/);
+  assert.match(source, /function supportOutboxRetryAvailable\(event\)/);
+  assert.match(source, /ACTIONS DE SUPPORT/);
+  assert.match(source, /Confirmer le r\u00e9essai/);
+  assert.match(source, /reason\.minLength = 20/);
   assert.match(source, /handleSupportSessionFailure/);
   assert.doesNotMatch(source, /platform\.support\.write/);
   assert.match(source, /platform_control_plane_read_v1/);

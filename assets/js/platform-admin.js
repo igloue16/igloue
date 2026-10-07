@@ -201,6 +201,39 @@
     if (!data || typeof data !== "object") throw new Error("Réponse de l’espace support invalide.");
     return data;
   }
+  async function readSupportOutboxCandidates(sessionId) {
+    if (!sessionId) throw new Error("DENIED");
+    const { data, error } = await getClient().rpc("platform_support_outbox_retry_candidates_v1", {
+      p_session: sessionId,
+    });
+    if (error) {
+      if (String(error.code || "") === "42501") throw new Error("DENIED");
+      throw new Error("Lecture des communications indisponible.");
+    }
+    if (!data || !Array.isArray(data.items)) throw new Error("Réponse des communications invalide.");
+    return data;
+  }
+  async function retrySupportOutboxEvent(sessionId, eventId, reason) {
+    if (!sessionId || !eventId || String(reason || "").trim().length < 20) throw new Error("REASON_REQUIRED");
+    if (!global.crypto || typeof global.crypto.randomUUID !== "function") throw new Error("IDEMPOTENCY_UNAVAILABLE");
+    const { data, error } = await getClient().rpc("platform_support_retry_outbox_event_v1", {
+      p_session: sessionId,
+      p_event_id: eventId,
+      p_reason: String(reason).trim(),
+      p_idempotency_key: global.crypto.randomUUID(),
+    });
+    if (error) {
+      if (String(error.code || "") === "42501") throw new Error("DENIED");
+      if (String(error.code || "") === "55000") throw new Error("NOT_RETRYABLE");
+      throw new Error("Impossible d’enregistrer le réessai.");
+    }
+    if (!data || data.status !== "pending") throw new Error("Résultat du réessai invalide.");
+    return data;
+  }
+  function supportOutboxRetryAvailable(event) {
+    return Boolean(event && event.status === "failed" && event.can_retry === true &&
+      typeof event.event_id === "string" && event.event_id.length > 0);
+  }
   async function revokeSupportSession(sessionId, reason) {
     const { data, error } = await getClient().rpc("platform_revoke_support_session", {
       p_session: sessionId,
@@ -461,8 +494,65 @@
       return;
     }
     if (section === "communications") {
+      const actions = panel("ACTIONS DE SUPPORT");
+      actions.append(make("p", "row-meta", "Seuls les événements en échec autorisés peuvent être remis en attente. Les données de réservation ne sont pas modifiées."));
+      target.append(actions);
       const card = panel("Événements de communication récents");
-      (data.items || []).forEach((e) => line(card, e.event_type, `Créé ${date(e.created_at)} · tentatives ${e.attempt_count} · dernière tentative ${date(e.last_attempt_at)}${e.error_code ? ` · code ${e.error_code}` : ""}`, e.status));
+      (data.items || []).forEach((e) => {
+        const row = line(card, e.event_type, `Créé ${date(e.created_at)} · tentatives ${e.attempt_count} · dernière tentative ${date(e.last_attempt_at)}${e.error_code ? ` · code ${e.error_code}` : ""}`, e.status);
+        if (!supportOutboxRetryAvailable(e)) return;
+        const retry = make("button", "support-detail-button", "Réessayer");
+        retry.type = "button";
+        retry.addEventListener("click", () => {
+          retry.disabled = true;
+          const form = make("form", "support-retry-form");
+          const label = make("label", "row-meta", "Motif obligatoire pour cette action de support (20 caractères minimum)");
+          const reason = make("textarea", "support-retry-reason");
+          reason.required = true;
+          reason.minLength = 20;
+          reason.maxLength = 500;
+          reason.placeholder = "Ex. Retry failed confirmation email after provider outage";
+          reason.addEventListener("input", () => reason.setCustomValidity(""));
+          label.append(reason);
+          const submit = make("button", "support-detail-button", "Confirmer le réessai");
+          submit.type = "submit";
+          const cancel = make("button", "support-secondary-button", "Annuler");
+          cancel.type = "button";
+          const result = make("p", "row-meta", "");
+          cancel.addEventListener("click", () => { form.remove(); retry.disabled = false; });
+          form.append(label, submit, cancel, result);
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (reason.value.trim().length < 20) { reason.setCustomValidity("Saisissez un motif d’au moins 20 caractères."); reason.reportValidity(); return; }
+            submit.disabled = true;
+            cancel.disabled = true;
+            try {
+              await retrySupportOutboxEvent(app.supportSessionId, e.event_id, reason.value);
+              result.textContent = "Réessai enregistré : l’événement est de nouveau en attente.";
+              retry.textContent = "Réessai enregistré";
+            } catch (error) {
+              if (error && (error.message === "DENIED" || error.message === "EXPIRED")) {
+                await handleSupportSessionFailure(error);
+                return;
+              }
+              result.textContent = error && error.message === "NOT_RETRYABLE"
+                  ? "Cet événement n’est plus réessayable. Actualisez la liste."
+                  : error && error.message === "IDEMPOTENCY_UNAVAILABLE"
+                    ? "Le réessai est indisponible dans ce navigateur."
+                    : error && error.message === "REASON_REQUIRED"
+                      ? "Saisissez un motif d’au moins 20 caractères."
+                      : "Le réessai n’a pas pu être enregistré.";
+              result.classList.add("error");
+              submit.disabled = false;
+              cancel.disabled = false;
+              retry.disabled = false;
+            }
+          });
+          row.append(form);
+          reason.focus();
+        });
+        row.append(retry);
+      });
       if (!(data.items || []).length) card.append(make("p", "empty", "Aucun événement de communication."));
       target.append(card);
       return;
@@ -496,7 +586,9 @@
     if (!sessionId) throw new Error("DENIED");
     try {
       if (!sessionAlreadyVerified) await readSupportSession(sessionId);
-      const data = await readSupportWorkspace(sessionId, section, reference);
+      const data = section === "communications"
+        ? await readSupportOutboxCandidates(sessionId)
+        : await readSupportWorkspace(sessionId, section, reference);
       if (section === "summary") data.issues = await readSupportWorkspace(sessionId, "issues");
       clearContent();
       renderSupportWorkspace(section, data);
@@ -814,6 +906,9 @@
     openSupportSession,
     readSupportSession,
     readSupportWorkspace,
+    readSupportOutboxCandidates,
+    retrySupportOutboxEvent,
+    supportOutboxRetryAvailable,
     revokeSupportSession,
     loadSupportSession,
     loadSupportWorkspace,

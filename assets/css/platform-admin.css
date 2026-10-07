@@ -6,3 +6,9 @@
 .support-nav{display:flex;gap:7px;overflow-x:auto;margin:0 0 18px;padding:5px;border:1px solid var(--line);border-radius:13px;background:#0f1d2d}.support-tab{flex:0 0 auto;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--muted);padding:9px 12px;font-weight:750}.support-tab:hover,.support-tab.active{border-color:#456686;background:#1a344d;color:var(--text)}.support-readonly{color:var(--blue);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.support-detail-button{border:1px solid #456686;border-radius:8px;background:#1a344d;color:var(--text);padding:6px 10px;font-weight:700}.support-issue{border-color:#8a6940;background:linear-gradient(145deg,#332a1e,#172336)}
 .platform-app.support-active{grid-template-columns:minmax(0,1fr)}.support-banner{position:sticky;top:8px;z-index:5}
 @media(max-width:560px){.support-nav{margin-left:-2px;margin-right:-2px}.support-tab{padding:8px 10px;font-size:13px}}
+:root{--support-action-panel:#101f30}
+.support-retry-form{display:grid;gap:10px;width:min(100%,520px);padding:14px;margin-top:12px;border:1px solid #456686;border-radius:12px;background:var(--support-action-panel)}
+.support-retry-form label{display:grid;gap:7px}
+.support-retry-form textarea{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:10px;background:#0b1725;color:var(--text);padding:11px;font:inherit}
+.support-secondary-button{border:1px solid var(--line);border-radius:8px;background:#142438;color:var(--text);padding:6px 10px}
+.support-retry-form button:disabled{cursor:wait;opacity:.65}
