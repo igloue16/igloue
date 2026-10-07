@@ -10,7 +10,7 @@
       (value.status === null || Object.hasOwn(SERVICE, value.status)) &&
       (value.address === null || typeof value.address === "string" && value.address.length <= 240);
   }
-  const id = (value) => global.document.getElementById(value);
+  const id = (value) => global.document?.getElementById(value) ?? null;
   function tokenFromFragment(hash) { return new URLSearchParams(String(hash || "").replace(/^#/, "")).get("token") || ""; }
   function validPayload(data) {
     const expectedPaid = !!data && data.payment_status === "paid" &&
@@ -96,6 +96,33 @@
     }
     return result;
   }
+  const DATE_CHANGE_STATES = new Set(["confirmed", "review_required", "failed", "unchanged", "delegated_to_extension", "held", "checkout_created", "payment_failed", "payment_cancelled", "expired", "paid"]);
+  function validDateChangeQuote(value) {
+    return !!value && value.ok === true && value.quote && typeof value.quote.eligible === "boolean" &&
+      (!value.quote.eligible || DATE(value.quote.oldStartDate) && DATE(value.quote.oldEndDate) &&
+        DATE(value.quote.newStartDate) && DATE(value.quote.newEndDate) &&
+        [value.quote.currentPaidAmount, value.quote.currentRentalAmount, value.quote.newRentalAmount,
+          value.quote.priceDelta, value.quote.additionalAmountDue, value.quote.refundOrCreditAmount].every(Number.isFinite) &&
+        value.quote.currency === "EUR" && ["automatic", "extension", "review_required", "payment_required", "no_change"].includes(value.quote.mode));
+  }
+  function validDateChangeResult(value) {
+    return !!value && value.ok === true && value.change && DATE_CHANGE_STATES.has(value.change.status) &&
+      (value.change.status === "delegated_to_extension" || value.change.status === "unchanged" ||
+        /^[0-9a-f-]{36}$/i.test(value.change.id));
+  }
+  async function dateChangeRequest(token, action, payload = {}, config, fetchImpl = global.fetch) {
+    if (!TOKEN.test(token) || !config || typeof config.projectUrl !== "string" || typeof config.publishableKey !== "string") throw new Error("invalid access");
+    const response = await fetchImpl(`${config.projectUrl.replace(/\/$/, "")}/functions/v1/customer-rental-date-change`, {
+      method: "POST", cache: "no-store", referrerPolicy: "no-referrer",
+      headers: { apikey: config.publishableKey, "content-type": "application/json" },
+      body: JSON.stringify({ action, token, ...payload }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result || result.ok !== true) throw new Error(result?.error?.code || "date change unavailable");
+    if (action === "quote" && !validDateChangeQuote(result)) throw new Error("invalid date change quote");
+    if (action !== "quote" && !validDateChangeResult(result)) throw new Error("invalid date change result");
+    return result;
+  }
   function renderExtensionAvailability(data) {
     return data && data.paid_and_confirmed === true && ["confirmed", "ongoing"].includes(data.reservation_status);
   }
@@ -134,6 +161,162 @@
     return fresh;
   }
   function show(target, visible) { const node = id(target); if (node) node.hidden = !visible; }
+  function renderDateChangeAvailability(data) {
+    return data && data.paid_and_confirmed === true && ["confirmed", "ongoing"].includes(data.reservation_status);
+  }
+  function setDateChangeStatus(message, isError = false) {
+    const node = id("date-change-status");
+    if (!node) return;
+    node.textContent = message;
+    node.dataset.kind = isError ? "error" : "info";
+  }
+  function renderDateChangeResult(change) {
+    const panel = id("date-change-result");
+    if (!panel) return;
+    panel.replaceChildren();
+    const heading = global.document.createElement("h2");
+    const detail = global.document.createElement("p");
+    if (change.status === "confirmed") {
+      heading.textContent = "Dates modifiées";
+      detail.textContent = `Votre location va du ${formatDate(`${change.newStartDate}T12:00:00Z`)} au ${formatDate(`${change.newEndDate}T12:00:00Z`)}. Le montant initialement payé est conservé.`;
+    } else if (["held", "checkout_created", "paid"].includes(change.status)) {
+      heading.textContent = "Paiement de la modification en cours";
+      detail.textContent = "Votre réservation initiale reste inchangée jusqu’à la confirmation du paiement par notre serveur.";
+    } else if (["payment_failed", "payment_cancelled", "expired"].includes(change.status)) {
+      heading.textContent = "Modification non finalisée";
+      detail.textContent = "Votre réservation et ses dates initiales sont conservées. Vous pouvez recalculer les dates et réessayer.";
+    } else if (change.status === "review_required") {
+      heading.textContent = "Demande transmise pour vérification";
+      detail.textContent = "Les dates de votre réservation restent inchangées pendant l’examen. Aucun paiement ni remboursement n’a été effectué.";
+    } else if (change.status === "failed") {
+      heading.textContent = "Dates non modifiées";
+      detail.textContent = "La disponibilité a changé avant la confirmation. Votre réservation initiale reste intacte.";
+    } else if (change.status === "unchanged") {
+      heading.textContent = "Aucune modification nécessaire";
+      detail.textContent = "Les dates sélectionnées correspondent déjà à votre réservation.";
+    } else {
+      heading.textContent = "Utiliser la prolongation sécurisée";
+      detail.textContent = "Cette demande ajoute des jours de location. Le paiement doit passer par le parcours de prolongation existant.";
+    }
+    if (change.status === "confirmed" && Number(change.additionalAmountDue ?? change.priceDelta) > 0) {
+      detail.textContent += ` Montant supplementaire paye : ${formatAmount(Number(change.additionalAmountDue ?? change.priceDelta))}.`;
+    }
+    panel.append(heading, detail);
+    panel.hidden = false;
+  }
+  function setupDateChange(data, token, config) {
+    const panel = id("portal-date-change");
+    if (!panel) return;
+    panel.hidden = !renderDateChangeAvailability(data);
+    if (panel.hidden) return;
+    const start = id("date-change-start");
+    const end = id("date-change-end");
+    const form = id("date-change-form");
+    const quoteNode = id("date-change-quote");
+    const quoteButton = id("date-change-quote-button");
+    const confirmButton = id("date-change-confirm");
+    const extensionButton = id("date-change-use-extension");
+    if (!start || !end || !form || !quoteNode || !quoteButton || !confirmButton || !extensionButton) return;
+    const toDate = (value) => String(value).slice(0, 10);
+    const currentStart = toDate(data.rental_start);
+    const currentEnd = toDate(data.rental_end);
+    start.value = currentStart; end.value = currentEnd;
+    const minimum = new Date(); minimum.setDate(minimum.getDate() + 1);
+    start.min = minimum.toISOString().slice(0, 10); end.min = start.min;
+    const resetQuote = () => { delete quoteNode.dataset.start; delete quoteNode.dataset.end; confirmButton.hidden = true; extensionButton.hidden = true; };
+    start.addEventListener("change", resetQuote); end.addEventListener("change", resetQuote);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault(); resetQuote();
+      if (!DATE(start.value) || !DATE(end.value) || end.value <= start.value) { setDateChangeStatus("Choisissez une période de location valide.", true); return; }
+      quoteButton.disabled = true;
+      try {
+        const { quote } = await dateChangeRequest(token, "quote", { newStartDate: start.value, newEndDate: end.value }, config);
+        if (!quote.eligible) throw new Error("not eligible");
+        quoteNode.textContent = `Période actuelle : du ${formatDate(`${quote.oldStartDate}T12:00:00Z`)} au ${formatDate(`${quote.oldEndDate}T12:00:00Z`)}. Nouvelle période : du ${formatDate(`${quote.newStartDate}T12:00:00Z`)} au ${formatDate(`${quote.newEndDate}T12:00:00Z`)}. Nouveau montant locatif calculé : ${formatAmount(quote.newRentalAmount)}. ` +
+          (quote.mode === "extension" ? `Montant supplémentaire à régler : ${formatAmount(quote.additionalAmountDue)}. Utilisez le parcours de prolongation sécurisé.` :
+            quote.mode === "payment_required" ? `Paiement requis avant modification : ${formatAmount(quote.additionalAmountDue)}.` :
+            quote.mode === "review_required" ? `Montant supplémentaire calculé : ${formatAmount(quote.additionalAmountDue)}. Une vérification est nécessaire avant toute modification.` :
+              quote.priceDelta < 0 ? `Montant initialement payé conservé : ${formatAmount(quote.currentPaidAmount)}. La réduction de la durée ne donne pas automatiquement lieu à un remboursement.` :
+                `Aucun frais de livraison supplémentaire. Aucun montant supplémentaire à régler.`);
+        quoteNode.dataset.start = start.value; quoteNode.dataset.end = end.value; quoteNode.dataset.mode = quote.mode;
+        if (quote.mode === "extension") extensionButton.hidden = false;
+        else confirmButton.hidden = false;
+        setDateChangeStatus("Disponibilité et impact tarifaire calculés par le serveur.");
+      } catch {
+        quoteNode.textContent = "";
+        setDateChangeStatus("Ces dates ne sont pas disponibles pour une modification en ligne. Votre réservation reste inchangée.", true);
+      } finally { quoteButton.disabled = false; }
+    });
+    extensionButton.addEventListener("click", () => {
+      const extensionPanel = id("portal-extension");
+      const extensionForm = id("extension-form");
+      const extensionDate = id("extension-date");
+      const open = id("extension-open");
+      if (!extensionPanel || !extensionForm || !extensionDate) return;
+      extensionPanel.hidden = false;
+      if (open && !extensionForm.hidden) open.hidden = true;
+      else if (open) open.click();
+      extensionDate.value = end.value;
+      extensionDate.focus();
+      setDateChangeStatus("Vérifiez le montant dans le parcours de prolongation avant de payer.");
+    });
+    confirmButton.addEventListener("click", async () => {
+      if (quoteNode.dataset.start !== start.value || quoteNode.dataset.end !== end.value || !global.crypto?.randomUUID) {
+        setDateChangeStatus("Recalculez les dates avant de confirmer.", true); return;
+      }
+      confirmButton.disabled = true;
+      setDateChangeStatus("Confirmation sécurisée en cours…");
+      try {
+        const { change } = await dateChangeRequest(token, "create", { newStartDate: start.value, newEndDate: end.value,
+          idempotencyKey: confirmButton.dataset.idempotencyKey || (confirmButton.dataset.idempotencyKey = global.crypto.randomUUID()) }, config);
+        delete confirmButton.dataset.idempotencyKey;
+        if (change.checkoutUrl && change.checkoutUrl.startsWith("https://checkout.stripe.com/")) {
+          global.location.assign(change.checkoutUrl);
+          return;
+        }
+        renderDateChangeResult(change);
+        if (change.status === "confirmed") {
+          try { await refreshPortal(token, config); } catch { /* Result remains server-confirmed. */ }
+          confirmButton.hidden = true;
+        }
+        setDateChangeStatus(change.status === "review_required" ? "Aucune date ni somme n’a été modifiée automatiquement." : "État confirmé par le serveur.");
+      } catch {
+        try {
+          const fresh = await loadPortal(token, config);
+          render(fresh);
+          const startNow = String(fresh.rental_start).slice(0, 10);
+          const endNow = String(fresh.rental_end).slice(0, 10);
+          if (startNow === start.value && endNow === end.value) {
+            renderDateChangeResult({ status: "confirmed", newStartDate: startNow, newEndDate: endNow });
+            setDateChangeStatus("Les dates demandées sont confirmées par le serveur.");
+          } else {
+            setDateChangeStatus("Impossible de confirmer la modification. L’état actuel de votre réservation a été rechargé.", true);
+          }
+        } catch { setDateChangeStatus("Impossible de vérifier l’état actuel. Actualisez cette page avant de réessayer.", true); }
+      } finally { confirmButton.disabled = false; }
+    });
+  }
+  async function processDateChangeReturn(token, config, search = global.location.search, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), fetchImpl = global.fetch) {
+    const query = new URLSearchParams(search || "");
+    const action = query.get("date_change");
+    const changeId = query.get("change_id");
+    if (!["success", "cancel"].includes(action) || !changeId || !/^[0-9a-f-]{36}$/i.test(changeId)) return null;
+    let result;
+    try { result = await dateChangeRequest(token, action === "cancel" ? "cancel" : "status", { changeId }, config, fetchImpl); }
+    catch { setDateChangeStatus("Impossible de verifier le paiement. Aucune confirmation n'est affichee sans reponse du serveur.", true); return null; }
+    let change = result.change;
+    renderDateChangeResult(change);
+    for (let attempt = 0; attempt < 20 && ["held", "checkout_created", "paid"].includes(change.status); attempt++) {
+      await wait(1500);
+      try { result = await dateChangeRequest(token, "status", { changeId }, config, fetchImpl); change = result.change; renderDateChangeResult(change); }
+      catch { break; }
+    }
+    if (change.status === "confirmed") {
+      try { await refreshPortal(token, config); renderDateChangeResult(change); } catch { /* Backend status remains authoritative. */ }
+    }
+    return change;
+  }
+
   function setupExtension(data, token, config) {
     const panel = id("portal-extension");
     if (!panel) return;
@@ -213,13 +396,16 @@
       const data = await loadPortal(token, global.IGLOUE_SUPABASE_CONFIG);
       render(data);
       setupExtension(data, token, global.IGLOUE_SUPABASE_CONFIG);
+      setupDateChange(data, token, global.IGLOUE_SUPABASE_CONFIG);
       id("portal-message").hidden = true;
       await processExtensionReturn(token, global.IGLOUE_SUPABASE_CONFIG);
+      await processDateChangeReturn(token, global.IGLOUE_SUPABASE_CONFIG);
     } catch {
       showError("Lien invalide ou expiré", "Ce lien ne permet plus d’accéder à la réservation. Utilisez le lien reçu dans votre e-mail de confirmation.");
     } finally { if (root) root.setAttribute("aria-busy", "false"); }
   }
   global.IgReservationPortal = Object.freeze({ tokenFromFragment, validPayload, loadPortal, validExtensionStatus,
-    extensionRequest, renderExtensionAvailability, renderExtensionResult, processExtensionReturn, render, start });
+    extensionRequest, renderExtensionAvailability, renderExtensionResult, processExtensionReturn,
+    validDateChangeQuote, validDateChangeResult, dateChangeRequest, renderDateChangeAvailability, renderDateChangeResult, processDateChangeReturn, render, start });
   if (global.document && typeof global.document.getElementById === "function") start();
 })(window);

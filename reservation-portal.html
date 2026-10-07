@@ -35,6 +35,14 @@
     #extension-quote, #extension-status { color:#486176; line-height:1.55; }
     #extension-status[data-kind="error"] { color:#873c32; }
     .extension-result { border-color:#b7d8c7; background:#eff9f3; }
+    .date-change-card { display:grid; gap:12px; }
+    .date-change-card form { display:grid; gap:10px; }
+    .date-change-card input { width:100%; box-sizing:border-box; padding:12px; border:1px solid var(--portal-line); border-radius:10px; color:var(--portal-ink); font:inherit; }
+    .date-change-card button { width:fit-content; min-height:44px; padding:10px 16px; border:1px solid #176b9a; border-radius:10px; background:#176b9a; color:#fff; font:inherit; font-weight:750; cursor:pointer; }
+    .date-change-card button:disabled { opacity:.6; cursor:wait; }
+    #date-change-quote, #date-change-status { color:#486176; line-height:1.55; }
+    #date-change-status[data-kind="error"] { color:#873c32; }
+    .date-change-result { border-color:#b7d8c7; background:#eff9f3; }
     [hidden] { display:none !important; }
     footer { margin-top:22px; color:#64798a; font-size:.88rem; text-align:center; }
     @media (max-width:560px) { .grid { grid-template-columns:1fr; } .portal { border-radius:18px; } }
@@ -71,6 +79,22 @@
         <div id="extension-status" role="status" aria-live="polite"></div>
       </section>
       <section class="card extension-result" id="extension-result" hidden aria-live="polite"></section>
+      <section class="card date-change-card" id="portal-date-change" hidden>
+        <h2>Modifier les dates</h2>
+        <p>Choisissez vos nouvelles dates. Les disponibilités et le montant sont vérifiés par notre serveur.</p>
+        <form id="date-change-form">
+          <label for="date-change-start">Nouvelle date de début</label>
+          <input id="date-change-start" type="date" required>
+          <label for="date-change-end">Nouvelle date de fin</label>
+          <input id="date-change-end" type="date" required>
+          <button id="date-change-quote-button" type="submit">Vérifier les dates et le montant</button>
+          <div id="date-change-quote" role="status" aria-live="polite"></div>
+          <button id="date-change-use-extension" type="button" hidden>Continuer avec Prolonger la location</button>
+          <button id="date-change-confirm" type="button" hidden>Confirmer la modification</button>
+        </form>
+        <div id="date-change-status" role="status" aria-live="polite"></div>
+      </section>
+      <section class="card date-change-result" id="date-change-result" hidden aria-live="polite"></section>
     </div>
     <footer>Vos informations sont chargées de manière sécurisée depuis votre réservation.</footer>
   </main>
