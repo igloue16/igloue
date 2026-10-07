@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Contrôle plateforme | IGLOUE</title>
+  <link rel="stylesheet" href="/assets/css/platform-admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/assets/js/supabase-config.js" defer></script>
+</head>
+<body>
+  <main class="platform-shell">
+    <header class="platform-topbar">
+      <a class="platform-brand" href="/" aria-label="IGLOUE, accueil">IGLOUE <span>PLATFORM</span></a>
+      <span class="staging-badge">STAGING</span>
+      <button id="platform-sign-out" class="quiet-button" type="button" hidden>Se déconnecter</button>
+    </header>
+
+    <section id="platform-login" class="login-panel" aria-labelledby="login-title">
+      <p class="eyebrow">Accès réservé aux employés plateforme</p>
+      <h1 id="login-title">Contrôle plateforme</h1>
+      <p class="muted">Connectez-vous avec votre compte Supabase staging. Les droits sont vérifiés côté serveur.</p>
+      <form id="platform-login-form" class="login-form">
+        <label for="platform-email">Adresse e-mail</label>
+        <input id="platform-email" name="email" type="email" autocomplete="username" required>
+        <label for="platform-password">Mot de passe</label>
+        <input id="platform-password" name="password" type="password" autocomplete="current-password" required>
+        <button class="primary-button" type="submit">Se connecter</button>
+      </form>
+      <p id="platform-login-status" class="feedback" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="platform-denied" class="login-panel denied-panel" hidden>
+      <p class="eyebrow">Accès refusé</p>
+      <h1>Compte non autorisé</h1>
+      <p class="muted">Ce compte ne dispose pas des permissions plateforme requises.</p>
+      <button id="platform-denied-sign-out" class="quiet-button" type="button">Se déconnecter</button>
+    </section>
+
+    <section id="platform-app" class="platform-app" hidden>
+      <aside class="sidebar">
+        <p class="sidebar-caption">VUE GLOBALE</p>
+        <nav id="platform-nav" aria-label="Navigation plateforme">
+          <button type="button" data-section="overview" class="nav-item active">Vue d’ensemble</button>
+          <button type="button" data-section="tenants" class="nav-item">Organisations</button>
+          <button type="button" data-section="employees" class="nav-item">Employés</button>
+          <button type="button" data-section="roles" class="nav-item">Rôles & permissions</button>
+          <button type="button" data-section="audit" class="nav-item">Audit plateforme</button>
+          <button type="button" data-section="approvals" class="nav-item">Demandes de gouvernance</button>
+        </nav>
+        <p class="sidebar-note">Consultation uniquement<br>Les actions de gestion ne sont pas activées.</p>
+      </aside>
+      <div class="workspace">
+        <header class="workspace-heading">
+          <div><p class="eyebrow">Contrôle plateforme</p><h1 id="section-title">Vue d’ensemble</h1></div>
+          <button id="platform-refresh" class="quiet-button" type="button">Actualiser</button>
+        </header>
+        <p id="platform-feedback" class="feedback" role="status" aria-live="polite"></p>
+        <div id="platform-content" class="content-grid" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+  <script src="/assets/js/platform-admin.js" defer></script>
+</body>
+</html>
