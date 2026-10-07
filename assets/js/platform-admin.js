@@ -571,7 +571,7 @@
     const counts = panel("Activité opérationnelle", "half");
     line(counts, "Personnel actif", data.staff && data.staff.active);
     line(counts, "Personnel inactif", data.staff && data.staff.inactive);
-    line(counts, "Clients / produits / �quipements", `${data.customers ?? 0} / ${data.products ?? 0} / ${data.machines ?? 0}`);
+    line(counts, "Clients / produits / équipements", `${data.customers ?? 0} / ${data.products ?? 0} / ${data.machines ?? 0}`);
     line(counts, "Incidents ouverts", data.open_incidents ?? 0);
     target.append(counts);
     renderMap(target, "Réservations par état", data.reservations);
