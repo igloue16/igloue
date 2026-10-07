@@ -314,6 +314,105 @@
     };
   }
 
+  function createPaymentStatusSender(reservationId, paymentCapability, sessionId, config, fetchImpl) {
+    return async () => {
+      if (!/^[0-9a-f-]{36}$/i.test(reservationId) ||
+          !/^[A-Za-z0-9_-]{43}$/.test(paymentCapability || "") ||
+          !/^cs_(?:test|live)_[A-Za-z0-9]+$/.test(sessionId || "") ||
+          !config || typeof config.projectUrl !== "string" ||
+          typeof config.publishableKey !== "string") {
+        return { ok: false, code: "INVALID_REQUEST" };
+      }
+      const projectUrl = config.projectUrl.replace(/\/+$/, "");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const response = await (fetchImpl || global.fetch)(
+          `${projectUrl}/functions/v1/customer-payment-status`,
+          {
+            method: "POST",
+            headers: { apikey: config.publishableKey, "content-type": "application/json" },
+            cache: "no-store",
+            referrerPolicy: "no-referrer",
+            signal: controller.signal,
+            body: JSON.stringify({ reservationId, paymentCapability, sessionId }),
+          },
+        );
+        const payload = await response.json();
+        if (response.ok && payload && payload.ok === true &&
+            (payload.state === "confirmed" || payload.state === "pending") &&
+            typeof payload.amount === "number" && Number.isFinite(payload.amount) &&
+            payload.currency === "EUR") {
+          return { ok: true, state: payload.state, amount: payload.amount, currency: payload.currency };
+        }
+        return { ok: false, code: payload && payload.error && typeof payload.error.code === "string" ? payload.error.code : "PAYMENT_STATUS_UNKNOWN" };
+      } catch {
+        return { ok: false, code: "PAYMENT_STATUS_UNKNOWN" };
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+  }
+
+  function renderCheckoutReturn(container, saved, config, fetchImpl = global.fetch) {
+    if (!container || !global.location || !global.document) return null;
+    const params = new URLSearchParams(global.location.search || "");
+    const checkout = params.get("checkout");
+    if (checkout !== "success" && checkout !== "cancelled") return null;
+    if (checkout === "success") {
+      for (const child of Array.from(container.children)) child.hidden = true;
+    }
+    const panel = global.document.createElement("section");
+    panel.className = "customer-email-verification customer-payment-confirmation";
+    panel.setAttribute("role", "status");
+    panel.setAttribute("aria-live", "polite");
+    const heading = global.document.createElement("h3");
+    const message = global.document.createElement("p");
+    panel.append(heading, message);
+    container.appendChild(panel);
+    container.hidden = false;
+
+    if (checkout === "cancelled") {
+      heading.textContent = "Paiement non finalisé";
+      message.textContent = "Votre réservation reste en attente. Aucun paiement n’est confirmé.";
+      return { panel, refresh: async () => ({ ok: false, code: "CANCELLED" }) };
+    }
+
+    heading.textContent = "Vérification de votre paiement";
+    const sessionId = params.get("session_id") || "";
+    if (!saved || !saved.paymentCapability || !sessionId) {
+      message.textContent = "Le paiement n’est pas encore confirmé. Reprenez la page de réservation dans ce navigateur pour vérifier son état.";
+      return { panel, refresh: async () => ({ ok: false, code: "PAYMENT_STATUS_UNKNOWN" }) };
+    }
+
+    const sendStatus = createPaymentStatusSender(saved.reservationId, saved.paymentCapability, sessionId, config, fetchImpl);
+    let stopped = false;
+    let timer = null;
+    const refresh = async () => {
+      const result = await sendStatus();
+      if (stopped) return result;
+      if (result.ok && result.state === "confirmed") {
+        heading.textContent = "Paiement confirmé";
+        message.textContent = `Votre réservation est confirmée. Paiement reçu : ${result.amount.toFixed(2).replace(".", ",")} €.`;
+        stopped = true;
+      } else {
+        heading.textContent = "Vérification de votre paiement";
+        message.textContent = "Votre paiement attend encore la confirmation du serveur. Cette page se met à jour automatiquement.";
+      }
+      return result;
+    };
+    let tries = 0;
+    const poll = async () => {
+      const result = await refresh();
+      tries += 1;
+      if (!stopped && tries < 9) timer = global.setTimeout(poll, 1500);
+      else if (!stopped) message.textContent = "Le paiement n’est pas encore confirmé. Actualisez cette page dans quelques instants pour vérifier à nouveau.";
+      return result;
+    };
+    poll();
+    return { panel, refresh: () => { if (timer) global.clearTimeout(timer); stopped = false; tries = 0; return poll(); } };
+  }
+
   function mount(container, reservationId, capability, config, session = {}) {
     if (
       !container || typeof reservationId !== "string" ||
@@ -445,13 +544,11 @@
     if (!global.document) return;
     let saved;
     try {
-      if (!global.sessionStorage) return;
-      const raw = global.sessionStorage.getItem(SESSION_KEY);
-      if (!raw) return;
-      saved = JSON.parse(raw);
+      const raw = global.sessionStorage && global.sessionStorage.getItem(SESSION_KEY);
+      if (raw) saved = JSON.parse(raw);
     } catch {
       clearSession();
-      return;
+      saved = null;
     }
     if (
       !saved || typeof saved.reservationId !== "string" ||
@@ -472,12 +569,12 @@
           Number.isFinite(Date.parse(saved.holdExpiresAt)))
     ) {
       clearSession();
-      return;
+      saved = null;
     }
     const root = global.document.querySelector(
       "[data-customer-email-verification-session]",
     );
-    if (root) {
+    if (root && saved) {
       mount(
         root,
         saved.reservationId,
@@ -486,6 +583,7 @@
         { challengeId: saved.challengeId, paymentCapability: saved.paymentCapability || null, holdExpiresAt: saved.holdExpiresAt || null },
       );
     }
+    if (root) renderCheckoutReturn(root, saved || null, global.IGLOUE_SUPABASE_CONFIG || {});
   }
 
   const api = Object.freeze({
@@ -495,6 +593,8 @@
     restoreSession,
     createSessionRecord,
     createCheckoutSessionSender,
+    createPaymentStatusSender,
+    renderCheckoutReturn,
     renderVerificationState,
   });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
