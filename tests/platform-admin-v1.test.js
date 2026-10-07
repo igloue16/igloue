@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.join(root, "assets/js/platform-admin.js"), "
 const html = fs.readFileSync(path.join(root, "platform-admin.html"), "utf8");
 
 function load(hostname = "test.igloue.fr", rpcResult = { environment: "staging" }) {
-  let rpcCall;
+  const rpcCalls = [];
   let clientOptions;
   const config = { backend: "staging", projectUrl: "https://staging.example.test", publishableKey: "sb_publishable_staging" };
   const window = {
@@ -17,11 +17,15 @@ function load(hostname = "test.igloue.fr", rpcResult = { environment: "staging" 
     IGLOUE_SUPABASE_CONFIG: config,
     supabase: { createClient(url, key, options) {
       clientOptions = { url, key, options };
-      return { rpc: async (name, args) => { rpcCall = { name, args }; return rpcResult && Object.hasOwn(rpcResult, "data") ? rpcResult : { data: rpcResult, error: null }; } };
+      return { rpc: async (name, args) => {
+        rpcCalls.push({ name, args });
+        if (rpcResult && Object.hasOwn(rpcResult, name)) return rpcResult[name];
+        return rpcResult && Object.hasOwn(rpcResult, "data") ? rpcResult : { data: rpcResult, error: null };
+      } };
     } },
   };
   vm.runInNewContext(source, { window, Date, Intl, String, Object, Error, URLSearchParams }, { filename: "platform-admin.js" });
-  return { api: window.IgPlatformAdmin, get rpcCall() { return rpcCall; }, get clientOptions() { return clientOptions; } };
+  return { api: window.IgPlatformAdmin, get rpcCalls() { return rpcCalls; }, get rpcCall() { return rpcCalls.at(-1); }, get clientOptions() { return clientOptions; } };
 }
 
 test("platform read API is staging-only and uses the database RPC", async () => {
@@ -44,12 +48,58 @@ test("backend permission denial is propagated as a closed-access result", async 
   await assert.rejects(loaded.api.read("overview"), /DENIED/);
 });
 
-test("page labels staging, offers only read sections, and has no direct privileged-table path", () => {
+test("support session starts from a tenant slug with explicit read-only scope and fixed expiry", async () => {
+  const loaded = load("test.igloue.fr", {
+    platform_open_support_session_for_tenant: { data: "session-uuid", error: null },
+  });
+  const result = await loaded.api.openSupportSession("tenant-a", "Customer asked for help with reservation status");
+  assert.equal(result, "session-uuid");
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_open_support_session_for_tenant",
+    args: { p_organisation_slug: "tenant-a", p_reason: "Customer asked for help with reservation status", p_ttl_seconds: 1800 },
+  });
+});
+
+test("support view requires server response for the exact session and fails closed when revoked", async () => {
+  const valid = { session: { id: "session-uuid", access_mode: "read" }, tenant: { slug: "tenant-a" } };
+  const loaded = load("test.igloue.fr", { platform_support_session_read_v1: { data: valid, error: null } });
+  assert.deepEqual(JSON.parse(JSON.stringify(await loaded.api.readSupportSession("session-uuid"))), valid);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_support_session_read_v1", args: { p_session: "session-uuid" },
+  });
+
+  const denied = load("test.igloue.fr", { platform_support_session_read_v1: { data: null, error: { code: "42501", message: "revoked" } } });
+  await assert.rejects(denied.api.readSupportSession("session-uuid"), /DENIED/);
+
+  const expired = load("test.igloue.fr", { platform_support_session_read_v1: { data: { error: "expired" }, error: null } });
+  await assert.rejects(expired.api.readSupportSession("session-uuid"), /EXPIRED/);
+});
+
+test("support exit requires backend confirmation of revocation", async () => {
+  const valid = load("test.igloue.fr", { platform_revoke_support_session: { data: true, error: null } });
+  assert.equal(await valid.api.revokeSupportSession("session-uuid", "Employee manually exited support mode"), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(valid.rpcCall)), {
+    name: "platform_revoke_support_session",
+    args: { p_session: "session-uuid", p_reason: "Employee manually exited support mode" },
+  });
+
+  const failed = load("test.igloue.fr", { platform_revoke_support_session: { data: false, error: null } });
+  await assert.rejects(failed.api.revokeSupportSession("session-uuid", "Employee manually exited support mode"), /confirmer/i);
+});
+
+test("page labels staging, provides controlled support flow, and has no direct privileged-table path", () => {
   assert.match(html, /STAGING/);
   for (const section of ["overview", "tenants", "employees", "roles", "audit", "approvals"]) assert.match(html, new RegExp(`data-section="${section}"`));
+  assert.match(html, /Entrer en mode support/);
+  assert.match(html, /lecture seule/i);
+  assert.match(html, /platform-support-exit/);
+  assert.match(html, /minlength="20"/);
   assert.doesNotMatch(html, /approve|reject|suspend|impersonat/i);
   assert.doesNotMatch(source, /\.from\s*\(/);
-  assert.doesNotMatch(source, /localStorage|sessionStorage|user_metadata|app_metadata/);
+  assert.doesNotMatch(source, /localStorage|user_metadata|app_metadata/);
+  assert.match(source, /SUPPORT_SESSION_KEY/);
+  assert.match(source, /platform_support_session_read_v1/);
+  assert.doesNotMatch(source, /platform\.support\.write/);
   assert.match(source, /platform_control_plane_read_v1/);
   assert.match(html, /name="referrer" content="no-referrer"/);
 });

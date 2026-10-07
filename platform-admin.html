@@ -40,7 +40,7 @@
     </section>
 
     <section id="platform-app" class="platform-app" hidden>
-      <aside class="sidebar">
+      <aside id="platform-sidebar" class="sidebar">
         <p class="sidebar-caption">VUE GLOBALE</p>
         <nav id="platform-nav" aria-label="Navigation plateforme">
           <button type="button" data-section="overview" class="nav-item active">Vue d’ensemble</button>
@@ -53,6 +53,14 @@
         <p class="sidebar-note">Consultation uniquement<br>Les actions de gestion ne sont pas activées.</p>
       </aside>
       <div class="workspace">
+        <section id="platform-support-banner" class="support-banner" role="region" aria-label="Mode support" hidden>
+          <div>
+            <p class="eyebrow">Mode support temporaire · lecture seule</p>
+            <h2 id="platform-support-title">MODE SUPPORT</h2>
+            <p id="platform-support-meta" class="support-meta"></p>
+          </div>
+          <button id="platform-support-exit" class="support-exit" type="button">Quitter le mode support</button>
+        </section>
         <header class="workspace-heading">
           <div><p class="eyebrow">Contrôle plateforme</p><h1 id="section-title">Vue d’ensemble</h1></div>
           <button id="platform-refresh" class="quiet-button" type="button">Actualiser</button>
@@ -62,6 +70,24 @@
       </div>
     </section>
   </main>
+  <dialog id="support-entry-dialog" class="support-dialog" aria-labelledby="support-entry-title">
+    <form id="support-entry-form" class="support-form">
+      <p class="eyebrow">Accès temporaire et audité</p>
+      <h2 id="support-entry-title">Entrer en mode support</h2>
+      <p id="support-entry-tenant" class="support-tenant-name"></p>
+      <div class="support-scope-card">
+        <strong>Portée demandée</strong>
+        <span>Cette organisation uniquement · lecture seule · expiration dans 30 minutes</span>
+      </div>
+      <label for="support-entry-reason">Motif requis (20 caractères minimum)</label>
+      <textarea id="support-entry-reason" name="reason" minlength="20" maxlength="1000" rows="4" required></textarea>
+      <p id="support-entry-feedback" class="feedback" role="status" aria-live="polite"></p>
+      <div class="support-dialog-actions">
+        <button id="support-entry-cancel" class="quiet-button" type="button">Annuler</button>
+        <button id="support-entry-submit" class="primary-button" type="submit">Confirmer l’accès</button>
+      </div>
+    </form>
+  </dialog>
   <script src="/assets/js/platform-admin.js" defer></script>
 </body>
 </html>

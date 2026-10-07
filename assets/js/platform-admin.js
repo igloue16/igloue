@@ -3,7 +3,8 @@
 
   const titles = { overview: "Vue d’ensemble", tenants: "Organisations", tenant: "Fiche organisation", employees: "Employés plateforme", roles: "Rôles et permissions", audit: "Audit plateforme", approvals: "Demandes de gouvernance" };
   const labels = { active: "ACTIF", inactive: "INACTIF", suspended: "SUSPENDU", revoked: "RÉVOQUÉ", pending: "EN ATTENTE", approved: "APPROUVÉ", rejected: "REFUSÉ", expired: "EXPIRÉ", failed: "ÉCHEC", resolved: "RÉSOLU", dismissed: "CLOS", success: "SUCCÈS", applied: "APPLIQUÉ" };
-  const app = { client: null, section: "overview", tenantSlug: null, refreshTimer: null, authorized: false };
+  const SUPPORT_SESSION_KEY = "igloue.platform-admin.support-session";
+  const app = { client: null, section: "overview", tenantSlug: null, refreshTimer: null, supportExpireTimer: null, authorized: false, supportSessionId: null, pendingSupportTenant: null };
 
   function el(id) { return global.document && global.document.getElementById(id); }
   function make(tag, className, text) {
@@ -93,6 +94,166 @@
     if (!data || typeof data !== "object") throw new Error("Réponse plateforme invalide.");
     return data;
   }
+  function storedSupportSession() {
+    try { return global.sessionStorage && global.sessionStorage.getItem(SUPPORT_SESSION_KEY); }
+    catch (_) { return null; }
+  }
+  function storeSupportSession(sessionId) {
+    try { if (global.sessionStorage) global.sessionStorage.setItem(SUPPORT_SESSION_KEY, sessionId); }
+    catch (_) { /* Backend authorization does not depend on browser storage. */ }
+  }
+  function clearStoredSupportSession() {
+    try { if (global.sessionStorage) global.sessionStorage.removeItem(SUPPORT_SESSION_KEY); }
+    catch (_) { /* Backend authorization does not depend on browser storage. */ }
+  }
+  async function openSupportSession(organisationSlug, reason) {
+    const normalizedReason = String(reason || "").trim();
+    if (!organisationSlug || normalizedReason.length < 20 || normalizedReason.length > 1000) throw new Error("REASON_REQUIRED");
+    const { data, error } = await getClient().rpc("platform_open_support_session_for_tenant", {
+      p_organisation_slug: organisationSlug, p_reason: normalizedReason, p_ttl_seconds: 1800
+    });
+    if (error) {
+      if (String(error.code || "") === "42501") throw new Error("DENIED");
+      throw new Error("Impossible d’ouvrir la session de support.");
+    }
+    if (typeof data !== "string" || !data) throw new Error("Réponse de session invalide.");
+    return data;
+  }
+  async function readSupportSession(sessionId) {
+    if (!sessionId) throw new Error("DENIED");
+    const { data, error } = await getClient().rpc("platform_support_session_read_v1", { p_session: sessionId });
+    if (error) {
+      if (String(error.code || "") === "42501") throw new Error("DENIED");
+      throw new Error("Lecture du mode support indisponible.");
+    }
+    if (data && data.error === "expired") throw new Error("EXPIRED");
+    if (!data || !data.session || !data.tenant || data.session.access_mode !== "read") throw new Error("DENIED");
+    return data;
+  }
+  async function revokeSupportSession(sessionId, reason) {
+    const { data, error } = await getClient().rpc("platform_revoke_support_session", {
+      p_session: sessionId, p_reason: String(reason || "Employee exited support mode")
+    });
+    if (error || data !== true) throw new Error("Impossible de confirmer la révocation de la session.");
+    return true;
+  }
+  function showSupportBanner(data) {
+    const banner = el("platform-support-banner");
+    const title = el("platform-support-title");
+    const meta = el("platform-support-meta");
+    const tenant = data.tenant;
+    const session = data.session;
+    if (title) title.textContent = `MODE SUPPORT — Vous consultez ${tenant.name}`;
+    if (meta) meta.textContent = `Entré par ${session.employee} · Lecture seule · Expire le ${date(session.expires_at)} · Motif : ${session.reason}`;
+    show(banner, true);
+    show(el("platform-sidebar"), false);
+  }
+  function scheduleSupportExpiry(data) {
+    if (app.supportExpireTimer) global.clearTimeout(app.supportExpireTimer);
+    const expiry = Date.parse(data.session.expires_at);
+    const delay = Number.isFinite(expiry) ? Math.max(0, expiry - Date.now()) : 0;
+    const sessionId = data.session.id;
+    app.supportExpireTimer = global.setTimeout(() => {
+      if (app.supportSessionId === sessionId) handleSupportSessionFailure(new Error("EXPIRED"));
+    }, delay);
+  }
+  async function loadSupportSession(sessionId) {
+    app.supportSessionId = sessionId;
+    app.section = "support";
+    clearContent();
+    setFeedback("Vérification de la session support…");
+    try {
+      const data = await readSupportSession(sessionId);
+      app.tenantSlug = data.tenant.slug;
+      showSupportBanner(data);
+      scheduleSupportExpiry(data);
+      const heading = el("section-title");
+      if (heading) heading.textContent = "Mode support temporaire";
+      await renderTenant(data.tenant, true);
+      setFeedback(`Vue support vérifiée ${date(new Date().toISOString())} · STAGING`);
+      show(el("platform-app"), true);
+      show(el("platform-login"), false);
+      show(el("platform-denied"), false);
+      show(el("platform-sign-out"), true);
+      if (app.refreshTimer) global.clearInterval(app.refreshTimer);
+      app.refreshTimer = null;
+      app.authorized = true;
+      return true;
+    } catch (error) {
+      clearContent();
+      throw error;
+    }
+  }
+  function resetSupportMode() {
+    if (app.supportExpireTimer) global.clearTimeout(app.supportExpireTimer);
+    app.supportExpireTimer = null;
+    clearStoredSupportSession();
+    app.supportSessionId = null;
+    app.pendingSupportTenant = null;
+    show(el("platform-support-banner"), false);
+    show(el("platform-sidebar"), true);
+  }
+  async function endSupportMode() {
+    const sessionId = app.supportSessionId;
+    const tenantSlug = app.tenantSlug;
+    if (!sessionId) return;
+    setFeedback("Révocation de la session support…");
+    await revokeSupportSession(sessionId, "Employee manually exited support mode");
+    resetSupportMode();
+    await loadSection("tenant", tenantSlug);
+  }
+  async function handleSupportSessionFailure(error) {
+    resetSupportMode();
+    const message = error && error.message === "EXPIRED"
+      ? "La session support a expiré. Aucun accès tenant n’est conservé."
+      : "La session support n’est plus autorisée. Aucun accès tenant n’est conservé.";
+    await loadSection("overview");
+    setFeedback(message, true);
+  }
+  function openSupportDialog(tenant) {
+    app.pendingSupportTenant = { slug: tenant.slug, name: tenant.name };
+    const name = el("support-entry-tenant");
+    const reason = el("support-entry-reason");
+    const feedback = el("support-entry-feedback");
+    if (name) name.textContent = `Organisation ciblée : ${tenant.name}`;
+    if (reason) reason.value = "";
+    if (feedback) { feedback.textContent = ""; feedback.classList.remove("error"); }
+    const dialog = el("support-entry-dialog");
+    if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+  }
+  async function submitSupportEntry(event) {
+    event.preventDefault();
+    const tenant = app.pendingSupportTenant;
+    const reason = el("support-entry-reason");
+    const output = el("support-entry-feedback");
+    const submit = el("support-entry-submit");
+    if (!tenant || !reason) return;
+    if (submit) submit.disabled = true;
+    if (output) { output.textContent = "Création et vérification de la session…"; output.classList.remove("error"); }
+    let sessionId = null;
+    try {
+      sessionId = await openSupportSession(tenant.slug, reason.value);
+      app.supportSessionId = sessionId;
+      storeSupportSession(sessionId);
+      const dialog = el("support-entry-dialog");
+      if (dialog && typeof dialog.close === "function") dialog.close();
+      await loadSupportSession(sessionId);
+    } catch (error) {
+      if (sessionId) {
+        try { await revokeSupportSession(sessionId, "Support session could not be opened in the dashboard"); }
+        catch (_) { /* Session remains short-lived and server checks still fail closed. */ }
+      }
+      resetSupportMode();
+      const message = error && error.message === "DENIED"
+        ? "Accès support refusé par le serveur."
+        : error && error.message === "REASON_REQUIRED"
+          ? "Saisissez un motif d’au moins 20 caractères."
+          : error && error.message || "Impossible de démarrer le mode support.";
+      if (output) { output.textContent = message; output.classList.add("error"); }
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
   function clearContent() {
     const content = el("platform-content");
     if (content) content.replaceChildren();
@@ -128,7 +289,7 @@
     if (!(data.tenants || []).length) card.append(make("p", "empty", "Aucune organisation."));
     target.append(card);
   }
-  function renderTenant(data) {
+  async function renderTenant(data, supportMode = false) {
     const target = el("platform-content");
     const head = panel("");
     const headTitle = head.querySelector("h2");
@@ -137,6 +298,7 @@
     const back = make("button", "back-button", "← Organisations");
     back.type = "button";
     back.addEventListener("click", () => loadSection("tenants"));
+    if (supportMode) back.hidden = true;
     headLine.append(back, make("h2", "", data.name));
     head.append(headLine, status(data.status), make("p", "row-meta", `${data.slug} · créée le ${date(data.created_at)}`));
     target.append(head);
@@ -159,6 +321,19 @@
     (data.recent_incidents || []).forEach((incident) => line(incidents, `${incident.category} · ${incident.severity}`, date(incident.created_at), incident.status));
     if (!(data.recent_incidents || []).length) incidents.append(make("p", "empty", "Aucun incident ouvert récent."));
     target.append(incidents);
+    if (!supportMode) {
+      const support = panel("Accès support temporaire");
+      support.append(make("p", "muted", "La session est limitée à cette organisation, en lecture seule, et expire automatiquement après 30 minutes."));
+      const enter = make("button", "support-entry-button", "Entrer en mode support");
+      enter.type = "button";
+      enter.hidden = true;
+      enter.addEventListener("click", () => openSupportDialog(data));
+      support.append(enter);
+      const permission = await getClient().rpc("platform_has_permission", { p_permission: "platform.support.enter_tenant" });
+      if (!permission.error && permission.data === true) show(enter, true);
+      else support.append(make("p", "row-meta", "Votre compte ne dispose pas de la permission d’accès support."));
+      target.append(support);
+    }
   }
   function renderMap(target, title, object) {
     const card = panel(title, "half");
@@ -217,6 +392,7 @@
   }
   const renderers = { overview: renderOverview, tenants: renderTenants, tenant: renderTenant, employees: renderEmployees, roles: renderRoles, audit: renderAudit, approvals: renderApprovals };
   async function loadSection(section, slug = null) {
+    if (app.supportSessionId) return loadSupportSession(app.supportSessionId);
     app.section = section;
     app.tenantSlug = slug;
     const title = el("section-title");
@@ -228,7 +404,7 @@
       const result = await read(section, slug);
       app.authorized = true;
       clearContent();
-      (renderers[section] || renderOverview)(result);
+      await (renderers[section] || renderOverview)(result);
       setFeedback(`Mis à jour ${date(new Date().toISOString())} · STAGING`);
       show(el("platform-app"), true);
       show(el("platform-login"), false);
@@ -253,6 +429,11 @@
     }
   }
   async function signOut() {
+    if (app.supportSessionId) {
+      try { await revokeSupportSession(app.supportSessionId, "Employee signed out while support mode was active"); }
+      catch (_) { /* The server-side expiry still limits any unrevoked session. */ }
+    }
+    resetSupportMode();
     if (app.client) await app.client.auth.signOut({ scope: "local" }).catch(() => {});
     app.authorized = false;
     if (app.refreshTimer) global.clearInterval(app.refreshTimer);
@@ -292,7 +473,22 @@
     form.addEventListener("submit", submitLogin);
     el("platform-sign-out").addEventListener("click", signOut);
     el("platform-denied-sign-out").addEventListener("click", signOut);
-    el("platform-refresh").addEventListener("click", () => loadSection(app.section, app.tenantSlug));
+    el("platform-refresh").addEventListener("click", async () => {
+      if (app.supportSessionId) {
+        try { await loadSupportSession(app.supportSessionId); }
+        catch (error) { await handleSupportSessionFailure(error); }
+      } else loadSection(app.section, app.tenantSlug);
+    });
+    el("support-entry-form").addEventListener("submit", submitSupportEntry);
+    el("support-entry-cancel").addEventListener("click", () => {
+      const dialog = el("support-entry-dialog");
+      if (dialog && typeof dialog.close === "function") dialog.close();
+      app.pendingSupportTenant = null;
+    });
+    el("platform-support-exit").addEventListener("click", async () => {
+      try { await endSupportMode(); }
+      catch (error) { setFeedback(error && error.message || "Impossible de révoquer la session support.", true); }
+    });
     global.document.querySelectorAll("[data-section]").forEach((button) => button.addEventListener("click", () => loadSection(button.dataset.section)));
     const config = configuration();
     if (!config) {
@@ -300,12 +496,22 @@
       el("platform-login-status").textContent = "Cette interface de contrôle est disponible uniquement sur le staging.";
       return;
     }
-    getClient().auth.getSession().then(({ data, error }) => {
-      if (!error && data && data.session) loadSection("overview");
+    getClient().auth.getSession().then(async ({ data, error }) => {
+      if (!error && data && data.session) {
+        const sessionId = storedSupportSession();
+        if (sessionId) {
+          app.supportSessionId = sessionId;
+          try { await loadSupportSession(sessionId); }
+          catch (failure) {
+            if (failure && (failure.message === "EXPIRED" || failure.message === "DENIED")) await handleSupportSessionFailure(failure);
+            else setFeedback("La session support ne peut pas être vérifiée. Actualisez pour réessayer.", true);
+          }
+        } else loadSection("overview");
+      }
     }).catch(() => {});
   }
 
-  const api = Object.freeze({ configuration, read, loadSection, renderers, signOut });
+  const api = Object.freeze({ configuration, read, openSupportSession, readSupportSession, revokeSupportSession, loadSupportSession, loadSection, renderers, signOut });
   global.IgPlatformAdmin = api;
   if (global.document) {
     if (global.document.readyState === "loading") global.document.addEventListener("DOMContentLoaded", initialize, { once: true });
