@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-store, max-age=0">
+  <title>Votre réservation | IGLOUE</title>
+  <style>
+    :root { color-scheme: light; --portal-ink:#102a43; --portal-blue:#176b9a; --portal-line:#d7e2eb; --portal-mist:#eff5f9; }
+    body { min-height:100vh; margin:0; padding:24px 14px; display:grid; place-items:center; background:linear-gradient(145deg,#eaf2f8 0%,#f7f9fb 48%,#e8f1f7 100%); color:var(--portal-ink); font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .portal { width:min(100%,760px); padding:clamp(22px,5vw,42px); border:1px solid var(--portal-line); border-radius:24px; background:#fff; box-shadow:0 24px 70px #12355318; }
+    .brand { margin:0 0 8px; color:var(--portal-blue); font-size:.8rem; font-weight:800; letter-spacing:.18em; }
+    h1 { margin:0; color:#102a43; font-size:clamp(1.8rem,5vw,2.5rem); line-height:1.1; }
+    .intro { margin:12px 0 24px; color:#526b80; line-height:1.6; }
+    .message { min-height:54px; padding:15px 17px; border:1px solid var(--portal-line); border-radius:14px; background:var(--portal-mist); color:#314d63; }
+    .message[data-kind="error"] { border-color:#e7c5bf; background:#fff5f2; color:#873c32; }
+    .content { display:grid; gap:18px; }
+    .status { display:flex; flex-wrap:wrap; gap:10px; }
+    .badge { padding:9px 13px; border:1px solid #b7d8c7; border-radius:999px; background:#eff9f3; color:#246244; font-size:.9rem; font-weight:750; }
+    .badge--soft { border-color:#d8e2ea; background:#f4f7fa; color:#435e73; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .card { padding:18px; border:1px solid var(--portal-line); border-radius:16px; background:linear-gradient(145deg,#fff,#f8fbfd); }
+    .card h2 { margin:0 0 14px; font-size:1.05rem; }
+    .card p { margin:8px 0 0; color:#486176; line-height:1.5; overflow-wrap:anywhere; white-space:pre-line; }
+    .card strong { color:#163b58; }
+    .price-row { display:flex; justify-content:space-between; gap:14px; margin-top:9px; color:#486176; }
+    .price-row--total { margin-top:14px; padding-top:13px; border-top:1px solid var(--portal-line); color:#143d5c; font-weight:800; }
+    [hidden] { display:none !important; }
+    footer { margin-top:22px; color:#64798a; font-size:.88rem; text-align:center; }
+    @media (max-width:560px) { .grid { grid-template-columns:1fr; } .portal { border-radius:18px; } }
+  </style>
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/reservation-portal.js" defer></script>
+</head>
+<body>
+  <main class="portal" id="reservation-portal" aria-busy="true">
+    <p class="brand">IGLOUE · ESPACE CLIENT</p>
+    <h1>Votre réservation</h1>
+    <p class="intro">Retrouvez ici les informations à jour de votre location.</p>
+    <div class="message" id="portal-message" role="status" aria-live="polite">Vérification sécurisée de votre accès…</div>
+    <div class="content" id="portal-content" hidden>
+      <div class="status" id="portal-status"></div>
+      <section class="grid">
+        <article class="card"><h2>Votre location</h2><p><strong id="portal-product"></strong></p><p id="portal-dates"></p><p>Référence : <strong id="portal-reference"></strong></p></article>
+        <article class="card"><h2>Récapitulatif</h2><div class="price-row"><span>Livraison</span><strong id="portal-delivery-price"></strong></div><div class="price-row"><span>Options</span><strong id="portal-options-price"></strong></div><div class="price-row"><span>Dépôt de garantie</span><strong id="portal-deposit"></strong></div><div class="price-row price-row--total"><span>Total</span><strong id="portal-total"></strong></div></article>
+        <article class="card"><h2>Livraison</h2><p id="portal-delivery"></p><p id="portal-delivery-status"></p></article>
+        <article class="card"><h2>Collecte</h2><p id="portal-collection"></p><p id="portal-collection-status"></p></article>
+      </section>
+      <p class="intro" id="portal-email-state"></p>
+    </div>
+    <footer>Vos informations sont chargées de manière sécurisée depuis votre réservation.</footer>
+  </main>
+</body>
+</html>
