@@ -1,19 +1,54 @@
 (function installPlatformAdmin(global) {
   "use strict";
-
-  const titles = { overview: "Vue d’ensemble", tenants: "Organisations", tenant: "Fiche organisation", employees: "Employés plateforme", roles: "Rôles et permissions", audit: "Audit plateforme", approvals: "Demandes de gouvernance" };
-  const labels = { active: "ACTIF", inactive: "INACTIF", suspended: "SUSPENDU", revoked: "RÉVOQUÉ", pending: "EN ATTENTE", approved: "APPROUVÉ", rejected: "REFUSÉ", expired: "EXPIRÉ", failed: "ÉCHEC", resolved: "RÉSOLU", dismissed: "CLOS", success: "SUCCÈS", applied: "APPLIQUÉ" };
+  const titles = {
+    overview: "Vue d’ensemble",
+    tenants: "Organisations",
+    tenant: "Fiche organisation",
+    employees: "Employés plateforme",
+    roles: "Rôles et permissions",
+    audit: "Audit plateforme",
+    approvals: "Demandes de gouvernance",
+  };
+  const labels = {
+    active: "ACTIF",
+    inactive: "INACTIF",
+    suspended: "SUSPENDU",
+    revoked: "RÉVOQUÉ",
+    pending: "EN ATTENTE",
+    approved: "APPROUVÉ",
+    rejected: "REFUSÉ",
+    expired: "EXPIRÉ",
+    failed: "ÉCHEC",
+    resolved: "RÉSOLU",
+    dismissed: "CLOS",
+    success: "SUCCÈS",
+    applied: "APPLIQUÉ",
+  };
   const SUPPORT_SESSION_KEY = "igloue.platform-admin.support-session";
-  const app = { client: null, section: "overview", tenantSlug: null, refreshTimer: null, supportExpireTimer: null, authorized: false, supportSessionId: null, pendingSupportTenant: null };
-
-  function el(id) { return global.document && global.document.getElementById(id); }
+  const app = {
+    client: null,
+    section: "overview",
+    tenantSlug: null,
+    refreshTimer: null,
+    supportExpireTimer: null,
+    authorized: false,
+    supportSessionId: null,
+    pendingSupportTenant: null,
+    supportView: "summary",
+    supportReference: null,
+  };
+  function el(id) {
+    return global.document && global.document.getElementById(id);
+  }
   function make(tag, className, text) {
     const node = global.document.createElement(tag);
     if (className) node.className = className;
     if (text !== undefined && text !== null) node.textContent = String(text);
     return node;
   }
-  function show(node, visible) { if (node) node.hidden = !visible; }
+  function show(node, visible) {
+    if (node) node.hidden = !visible;
+  }
   function status(value) {
     const key = String(value || "").toLowerCase();
     const node = make("span", `status ${key}`, labels[key] || String(value || "—"));
@@ -54,7 +89,12 @@
   function date(value) {
     if (!value) return "—";
     const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
+    return Number.isNaN(parsed.getTime())
+      ? "—"
+      : new Intl.DateTimeFormat("fr-FR", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(parsed);
   }
   function setFeedback(message, isError = false) {
     const target = el("platform-feedback");
@@ -62,7 +102,6 @@
     target.textContent = message || "";
     target.classList.toggle("error", isError);
   }
-
   function configuration() {
     const config = global.IGLOUE_SUPABASE_CONFIG;
     const hostname = String(global.location && global.location.hostname).toLowerCase();
@@ -74,7 +113,11 @@
     const config = configuration();
     if (!config || !global.supabase || typeof global.supabase.createClient !== "function") throw new Error("Configuration staging indisponible.");
     app.client = global.supabase.createClient(config.projectUrl, config.publishableKey, {
-      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
     });
     return app.client;
   }
@@ -85,7 +128,10 @@
   }
   async function read(section, slug) {
     const db = getClient();
-    const { data, error } = await db.rpc("platform_control_plane_read_v1", { p_section: section, p_slug: slug || null });
+    const { data, error } = await db.rpc("platform_control_plane_read_v1", {
+      p_section: section,
+      p_slug: slug || null,
+    });
     if (error) {
       const code = String(error.code || "");
       if (code === "42501" || /access denied|permission/i.test(String(error.message || ""))) throw new Error("DENIED");
@@ -95,22 +141,33 @@
     return data;
   }
   function storedSupportSession() {
-    try { return global.sessionStorage && global.sessionStorage.getItem(SUPPORT_SESSION_KEY); }
-    catch (_) { return null; }
+    try {
+      return global.sessionStorage && global.sessionStorage.getItem(SUPPORT_SESSION_KEY);
+    } catch (_) {
+      return null;
+    }
   }
   function storeSupportSession(sessionId) {
-    try { if (global.sessionStorage) global.sessionStorage.setItem(SUPPORT_SESSION_KEY, sessionId); }
-    catch (_) { /* Backend authorization does not depend on browser storage. */ }
+    try {
+      if (global.sessionStorage) global.sessionStorage.setItem(SUPPORT_SESSION_KEY, sessionId);
+    } catch (_) {
+      /* Backend authorization does not depend on browser storage. */
+    }
   }
   function clearStoredSupportSession() {
-    try { if (global.sessionStorage) global.sessionStorage.removeItem(SUPPORT_SESSION_KEY); }
-    catch (_) { /* Backend authorization does not depend on browser storage. */ }
+    try {
+      if (global.sessionStorage) global.sessionStorage.removeItem(SUPPORT_SESSION_KEY);
+    } catch (_) {
+      /* Backend authorization does not depend on browser storage. */
+    }
   }
   async function openSupportSession(organisationSlug, reason) {
     const normalizedReason = String(reason || "").trim();
     if (!organisationSlug || normalizedReason.length < 20 || normalizedReason.length > 1000) throw new Error("REASON_REQUIRED");
     const { data, error } = await getClient().rpc("platform_open_support_session_for_tenant", {
-      p_organisation_slug: organisationSlug, p_reason: normalizedReason, p_ttl_seconds: 1800
+      p_organisation_slug: organisationSlug,
+      p_reason: normalizedReason,
+      p_ttl_seconds: 1800,
     });
     if (error) {
       if (String(error.code || "") === "42501") throw new Error("DENIED");
@@ -130,9 +187,24 @@
     if (!data || !data.session || !data.tenant || data.session.access_mode !== "read") throw new Error("DENIED");
     return data;
   }
+  async function readSupportWorkspace(sessionId, section, reference = null) {
+    if (!sessionId) throw new Error("DENIED");
+    const { data, error } = await getClient().rpc("platform_support_workspace_read_v1", {
+      p_session: sessionId,
+      p_section: section,
+      p_reservation_reference: reference,
+    });
+    if (error) {
+      if (String(error.code || "") === "42501") throw new Error("DENIED");
+      throw new Error("Lecture de l’espace support indisponible.");
+    }
+    if (!data || typeof data !== "object") throw new Error("Réponse de l’espace support invalide.");
+    return data;
+  }
   async function revokeSupportSession(sessionId, reason) {
     const { data, error } = await getClient().rpc("platform_revoke_support_session", {
-      p_session: sessionId, p_reason: String(reason || "Employee exited support mode")
+      p_session: sessionId,
+      p_reason: String(reason || "Employee exited support mode"),
     });
     if (error || data !== true) throw new Error("Impossible de confirmer la révocation de la session.");
     return true;
@@ -147,6 +219,8 @@
     if (meta) meta.textContent = `Entré par ${session.employee} · Lecture seule · Expire le ${date(session.expires_at)} · Motif : ${session.reason}`;
     show(banner, true);
     show(el("platform-sidebar"), false);
+    show(el("platform-support-nav"), true);
+    if (el("platform-app")) el("platform-app").classList.add("support-active");
   }
   function scheduleSupportExpiry(data) {
     if (app.supportExpireTimer) global.clearTimeout(app.supportExpireTimer);
@@ -167,31 +241,47 @@
       app.tenantSlug = data.tenant.slug;
       showSupportBanner(data);
       scheduleSupportExpiry(data);
+      const activeSessionId = data.session.id;
+      if (app.refreshTimer) global.clearInterval(app.refreshTimer);
+      app.refreshTimer = global.setInterval(() => {
+        if (app.supportSessionId === activeSessionId) readSupportSession(activeSessionId).catch((error) => handleSupportSessionFailure(error));
+      }, 30000);
       const heading = el("section-title");
       if (heading) heading.textContent = "Mode support temporaire";
-      await renderTenant(data.tenant, true);
+      await loadSupportWorkspace(app.supportView || "summary", app.supportReference, true);
       setFeedback(`Vue support vérifiée ${date(new Date().toISOString())} · STAGING`);
       show(el("platform-app"), true);
       show(el("platform-login"), false);
       show(el("platform-denied"), false);
       show(el("platform-sign-out"), true);
-      if (app.refreshTimer) global.clearInterval(app.refreshTimer);
-      app.refreshTimer = null;
       app.authorized = true;
       return true;
     } catch (error) {
       clearContent();
+      resetSupportMode();
+      if (error && (error.message === "DENIED" || error.message === "EXPIRED")) {
+        show(el("platform-app"), false);
+        show(el("platform-login"), false);
+        show(el("platform-denied"), true);
+        setFeedback("La session support n’est plus valide. Les données du tenant ont été effacées.", true);
+      }
       throw error;
     }
   }
   function resetSupportMode() {
     if (app.supportExpireTimer) global.clearTimeout(app.supportExpireTimer);
     app.supportExpireTimer = null;
+    if (app.refreshTimer) global.clearInterval(app.refreshTimer);
+    app.refreshTimer = null;
     clearStoredSupportSession();
     app.supportSessionId = null;
     app.pendingSupportTenant = null;
+    app.supportView = "summary";
+    app.supportReference = null;
     show(el("platform-support-banner"), false);
+    show(el("platform-support-nav"), false);
     show(el("platform-sidebar"), true);
+    if (el("platform-app")) el("platform-app").classList.remove("support-active");
   }
   async function endSupportMode() {
     const sessionId = app.supportSessionId;
@@ -204,9 +294,7 @@
   }
   async function handleSupportSessionFailure(error) {
     resetSupportMode();
-    const message = error && error.message === "EXPIRED"
-      ? "La session support a expiré. Aucun accès tenant n’est conservé."
-      : "La session support n’est plus autorisée. Aucun accès tenant n’est conservé.";
+    const message = error && error.message === "EXPIRED" ? "La session support a expiré. Aucun accès tenant n’est conservé." : "La session support n’est plus autorisée. Aucun accès tenant n’est conservé.";
     await loadSection("overview");
     setFeedback(message, true);
   }
@@ -217,7 +305,10 @@
     const feedback = el("support-entry-feedback");
     if (name) name.textContent = `Organisation ciblée : ${tenant.name}`;
     if (reason) reason.value = "";
-    if (feedback) { feedback.textContent = ""; feedback.classList.remove("error"); }
+    if (feedback) {
+      feedback.textContent = "";
+      feedback.classList.remove("error");
+    }
     const dialog = el("support-entry-dialog");
     if (dialog && typeof dialog.showModal === "function") dialog.showModal();
   }
@@ -229,7 +320,10 @@
     const submit = el("support-entry-submit");
     if (!tenant || !reason) return;
     if (submit) submit.disabled = true;
-    if (output) { output.textContent = "Création et vérification de la session…"; output.classList.remove("error"); }
+    if (output) {
+      output.textContent = "Création et vérification de la session…";
+      output.classList.remove("error");
+    }
     let sessionId = null;
     try {
       sessionId = await openSupportSession(tenant.slug, reason.value);
@@ -240,16 +334,18 @@
       await loadSupportSession(sessionId);
     } catch (error) {
       if (sessionId) {
-        try { await revokeSupportSession(sessionId, "Support session could not be opened in the dashboard"); }
-        catch (_) { /* Session remains short-lived and server checks still fail closed. */ }
+        try {
+          await revokeSupportSession(sessionId, "Support session could not be opened in the dashboard");
+        } catch (_) {
+          /* Session remains short-lived and server checks still fail closed. */
+        }
       }
       resetSupportMode();
-      const message = error && error.message === "DENIED"
-        ? "Accès support refusé par le serveur."
-        : error && error.message === "REASON_REQUIRED"
-          ? "Saisissez un motif d’au moins 20 caractères."
-          : error && error.message || "Impossible de démarrer le mode support.";
-      if (output) { output.textContent = message; output.classList.add("error"); }
+      const message = error && error.message === "DENIED" ? "Accès support refusé par le serveur." : error && error.message === "REASON_REQUIRED" ? "Saisissez un motif d’au moins 20 caractères." : (error && error.message) || "Impossible de démarrer le mode support.";
+      if (output) {
+        output.textContent = message;
+        output.classList.add("error");
+      }
     } finally {
       if (submit) submit.disabled = false;
     }
@@ -258,10 +354,173 @@
     const content = el("platform-content");
     if (content) content.replaceChildren();
   }
+  function renderSupportWorkspace(section, data) {
+    const target = el("platform-content");
+    const nav = el("platform-support-nav");
+    if (nav) nav.querySelectorAll("[data-support-section]").forEach((button) => button.classList.toggle("active", button.dataset.supportSection === section));
+    const titlesBySection = {
+      summary: "Résumé de l’organisation",
+      reservations: "Réservations",
+      reservation: "Détail de la réservation",
+      customers: "Clients",
+      equipment: "Matériel",
+      communications: "Communications",
+      issues: "Points à vérifier",
+      audit: "Activité d’audit du tenant",
+    };
+    const heading = el("section-title");
+    if (heading) heading.textContent = titlesBySection[section] || "Espace support";
+    const readonly = make("p", "support-readonly", "Consultation seule · Données vérifiées par le serveur");
+    target.append(readonly);
+    if (section === "summary") {
+      const org = data.organisation || {};
+      const identity = panel(org.name || "Organisation");
+      line(identity, "Slug", org.slug, org.status);
+      line(identity, "Créée le", date(org.created_at));
+      const counts = data.counts || {};
+      metricGrid(target, [
+        ["Personnel actif", counts.staff],
+        ["Clients", counts.customers],
+        ["Produits", counts.products],
+        ["Équipements physiques", counts.machines],
+        ["Réservations", counts.reservations],
+      ]);
+      target.prepend(identity);
+      const config = panel("Configuration du service");
+      const c = org.configuration || {};
+      line(config, "Vitrine", c.storefront_configured ? "Configurée" : "Non configurée");
+      line(config, "Suivi livraison", c.delivery_status_configured ? "Configuré" : "Non configuré");
+      line(config, "Portail client", c.reservation_portal_configured ? "Configuré" : "Non configuré");
+      line(config, "Fuseau / devise", `${c.timezone || "—"} · ${c.currency || "—"}`);
+      target.append(config);
+      const statuses = panel("États opérationnels", "half");
+      Object.entries(data.reservation_statuses || {}).forEach(([key, value]) => line(statuses, `Réservations · ${key}`, `${value} enregistrements`));
+      Object.entries(data.service_statuses || {}).forEach(([key, value]) => line(statuses, `Interventions · ${key}`, `${value} enregistrements`));
+      target.append(statuses);
+      renderSupportIssues(data.issues || { items: [] }, target);
+      return;
+    }
+    if (section === "reservation") {
+      const r = data;
+      const card = panel(`Réservation ${r.reference || ""}`);
+      line(card, "Client", r.customer_name);
+      line(card, "État / paiement", `${r.status} · ${r.payment_status}`, r.status);
+      line(card, "Location", `${date(r.rental_start)} → ${date(r.rental_end)}`);
+      line(card, "Matériel / quantité", `${r.product || "—"} · ${r.quantity ?? "—"}`);
+      line(card, "Montant total", `${r.total_amount ?? "—"} ${r.currency || "EUR"}`);
+      line(card, "Livraison", r.delivery ? `${r.delivery.status} · ${r.delivery.scheduled_date || "—"} · ${r.delivery.time_slot || "—"}` : "Aucune intervention liée");
+      line(card, "Collecte", r.collection ? `${r.collection.status} · ${r.collection.scheduled_date || "—"} · ${r.collection.time_slot || "—"}` : "Aucune intervention liée");
+      line(card, "Allocation", r.allocation_status || "Aucune allocation active");
+      target.append(card);
+      return;
+    }
+    if (section === "reservations") {
+      const card = panel("Réservations récentes");
+      (data.items || []).forEach((r) => {
+        const row = line(card, `${r.reference} · ${r.customer_name || "Client"}`, `${r.product || "—"} · ${date(r.rental_start)} → ${date(r.rental_end)} · ${r.total_amount ?? "—"} ${r.currency || "EUR"}`, r.payment_status);
+        const sub = make("div", "row-meta", `Réservation ${r.status} · Livraison ${r.delivery_status || "—"} · Collecte ${r.collection_status || "—"} · Allocation ${r.allocation_status || "—"}`);
+        row.querySelector(".row-main").append(sub);
+        if ((r.exceptions || []).length) row.querySelector(".row-main").append(make("div", "row-meta", `À vérifier : ${r.exceptions.join(", ")}`));
+        const open = make("button", "support-detail-button", "Voir le détail");
+        open.type = "button";
+        open.addEventListener("click", () => loadSupportWorkspace("reservation", r.reference));
+        row.append(open);
+      });
+      if (!(data.items || []).length) card.append(make("p", "empty", "Aucune réservation."));
+      target.append(card);
+      return;
+    }
+    if (section === "customers") {
+      const card = panel("Clients récents (coordonnées masquées en V1)");
+      (data.items || []).forEach((c) => line(card, c.name || "Client", `${c.reservation_count} réservation(s) · récente : ${c.recent_reservation_status || "—"} ${c.recent_reservation_reference || ""}`));
+      if (!(data.items || []).length) card.append(make("p", "empty", "Aucun client."));
+      target.append(card);
+      return;
+    }
+    if (section === "equipment") {
+      const products = panel("Produits");
+      (data.products || []).forEach((p) => line(products, p.name, `${p.type || "—"} · ${p.tier || "—"} · ${p.weekly_price} €/semaine`, p.active ? "active" : "inactive"));
+      if (!(data.products || []).length) products.append(make("p", "empty", "Aucun produit."));
+      target.append(products);
+      const machines = panel("Équipements physiques");
+      const machineRows = data.machines || [];
+      const countsByStatus = machineRows.reduce((counts, machine) => {
+        counts[machine.status] = (counts[machine.status] || 0) + 1;
+        return counts;
+      }, {});
+      line(
+        machines,
+        `Répartition des équipements affichés (${machineRows.length}${machineRows.length === 200 ? "+" : ""})`,
+        Object.entries(countsByStatus)
+          .map(([state, count]) => `${state} : ${count}`)
+          .join(" · ") || "Aucun équipement",
+      );
+      machineRows.forEach((m) => line(machines, `Équipement ${m.unit} · ${m.product}`, `État ${m.status} · condition ${m.condition || "—"} · actif ${m.active ? "oui" : "non"} · allocation ${m.allocation_status || "aucune"}${m.reservation_reference ? ` · réservation ${m.reservation_reference}` : ""}${m.unavailable_until ? ` · indisponible jusqu’au ${date(m.unavailable_until)}` : ""}`, m.status));
+      if (!(data.machines || []).length) machines.append(make("p", "empty", "Aucun équipement."));
+      target.append(machines);
+      return;
+    }
+    if (section === "communications") {
+      const card = panel("Événements de communication récents");
+      (data.items || []).forEach((e) => line(card, e.event_type, `Créé ${date(e.created_at)} · tentatives ${e.attempt_count} · dernière tentative ${date(e.last_attempt_at)}${e.error_code ? ` · code ${e.error_code}` : ""}`, e.status));
+      if (!(data.items || []).length) card.append(make("p", "empty", "Aucun événement de communication."));
+      target.append(card);
+      return;
+    }
+    if (section === "issues") {
+      renderSupportIssues(data, target);
+      return;
+    }
+    if (section === "audit") {
+      const card = panel("100 derniers événements (lecture seule)");
+      (data.items || []).forEach((e) => line(card, `${e.event_type} · ${e.entity_type || "—"}`, `${e.actor_role || "—"} · ${e.source || "—"} · ${date(e.created_at)}`));
+      if (!(data.items || []).length) card.append(make("p", "empty", "Aucun événement d’audit visible."));
+      target.append(card);
+    }
+  }
+  function renderSupportIssues(data, target) {
+    const card = panel("Indicateurs dérivés · état canonique inchangé");
+    card.classList.add("support-issue");
+    const labelsByKey = {
+      failed_outbox: "Événements de communication en échec",
+      overdue_reservations: "Réservations potentiellement en retard",
+      expired_holds: "Allocations held arrivées à expiration",
+      payment_attention: "Réservations avec paiement à vérifier",
+    };
+    (data.items || []).forEach((issue) => line(card, labelsByKey[issue.key] || issue.key, `${issue.count} · ${issue.basis}`));
+    if (!(data.items || []).length) card.append(make("p", "empty", "Aucun indicateur dérivé détecté par ces règles."));
+    target.append(card);
+  }
+  async function loadSupportWorkspace(section, reference = null, sessionAlreadyVerified = false) {
+    const sessionId = app.supportSessionId;
+    if (!sessionId) throw new Error("DENIED");
+    try {
+      if (!sessionAlreadyVerified) await readSupportSession(sessionId);
+      const data = await readSupportWorkspace(sessionId, section, reference);
+      if (section === "summary") data.issues = await readSupportWorkspace(sessionId, "issues");
+      clearContent();
+      renderSupportWorkspace(section, data);
+      app.section = `support:${section}`;
+      app.supportView = section;
+      app.supportReference = reference;
+      setFeedback(`Vue support vérifiée ${date(new Date().toISOString())} · STAGING`);
+      return true;
+    } catch (error) {
+      clearContent();
+      if (sessionAlreadyVerified) throw error;
+      await handleSupportSessionFailure(error);
+      return false;
+    }
+  }
   function renderOverview(data) {
     const target = el("platform-content");
     const org = data.organisations || {};
-    metricGrid(target, [["Organisations", org.total], ["Organisations actives", org.active], ["Organisations suspendues", org.suspended], ["Employés plateforme actifs", data.active_platform_employees]]);
+    metricGrid(target, [
+      ["Organisations", org.total],
+      ["Organisations actives", org.active],
+      ["Organisations suspendues", org.suspended],
+      ["Employés plateforme actifs", data.active_platform_employees],
+    ]);
     const jobs = data.jobs || {};
     const activity = panel("Activité récente", "half");
     (data.recent_audit || []).forEach((event) => line(activity, event.action, `${actorLabel(event)} · ${event.target_type || "—"} · ${date(event.created_at)}`, event.outcome));
@@ -312,7 +571,7 @@
     const counts = panel("Activité opérationnelle", "half");
     line(counts, "Personnel actif", data.staff && data.staff.active);
     line(counts, "Personnel inactif", data.staff && data.staff.inactive);
-    line(counts, "Clients / produits / machines", `${data.customers ?? 0} / ${data.products ?? 0} / ${data.machines ?? 0}`);
+    line(counts, "Clients / produits / �quipements", `${data.customers ?? 0} / ${data.products ?? 0} / ${data.machines ?? 0}`);
     line(counts, "Incidents ouverts", data.open_incidents ?? 0);
     target.append(counts);
     renderMap(target, "Réservations par état", data.reservations);
@@ -329,7 +588,9 @@
       enter.hidden = true;
       enter.addEventListener("click", () => openSupportDialog(data));
       support.append(enter);
-      const permission = await getClient().rpc("platform_has_permission", { p_permission: "platform.support.enter_tenant" });
+      const permission = await getClient().rpc("platform_has_permission", {
+        p_permission: "platform.support.enter_tenant",
+      });
       if (!permission.error && permission.data === true) show(enter, true);
       else support.append(make("p", "row-meta", "Votre compte ne dispose pas de la permission d’accès support."));
       target.append(support);
@@ -349,7 +610,10 @@
       line(card, "Statut", `Créé le ${date(employee.created_at)} · mis à jour le ${date(employee.updated_at)}`, employee.status);
       line(card, "Autorité propriétaire", employee.owner_authority ? "Présente" : "Absente");
       card.append(make("h3", "row-title", "Rôles"));
-      tags(card, (employee.roles || []).map((role) => `${role.name} (${role.key})`));
+      tags(
+        card,
+        (employee.roles || []).map((role) => `${role.name} (${role.key})`),
+      );
       card.append(make("h3", "row-title", "Permissions effectives"));
       tags(card, employee.effective_permissions || []);
       target.append(card);
@@ -371,8 +635,7 @@
   function renderAudit(data) {
     const target = el("platform-content");
     const card = panel("100 derniers événements (consultation seule)");
-    (data.events || []).forEach((event) => line(card, `${event.action} · ${event.target_type}${event.target_id ? ` · ${event.target_id}` : ""}`,
-      `${actorLabel(event)} · ${event.permission || "système"} · ${event.tenant || "global"} · ${event.reason} · ${date(event.created_at)}`, event.outcome));
+    (data.events || []).forEach((event) => line(card, `${event.action} · ${event.target_type}${event.target_id ? ` · ${event.target_id}` : ""}`, `${actorLabel(event)} · ${event.permission || "système"} · ${event.tenant || "global"} · ${event.reason} · ${date(event.created_at)}`, event.outcome));
     if (!(data.events || []).length) card.append(make("p", "empty", "Aucun événement d’audit."));
     target.append(card);
   }
@@ -390,7 +653,15 @@
     if (!(data.requests || []).length) card.append(make("p", "empty", "Aucune demande de gouvernance."));
     target.append(card);
   }
-  const renderers = { overview: renderOverview, tenants: renderTenants, tenant: renderTenant, employees: renderEmployees, roles: renderRoles, audit: renderAudit, approvals: renderApprovals };
+  const renderers = {
+    overview: renderOverview,
+    tenants: renderTenants,
+    tenant: renderTenant,
+    employees: renderEmployees,
+    roles: renderRoles,
+    audit: renderAudit,
+    approvals: renderApprovals,
+  };
   async function loadSection(section, slug = null) {
     if (app.supportSessionId) return loadSupportSession(app.supportSessionId);
     app.section = section;
@@ -410,7 +681,10 @@
       show(el("platform-login"), false);
       show(el("platform-denied"), false);
       show(el("platform-sign-out"), true);
-      if (!app.refreshTimer) app.refreshTimer = global.setInterval(() => { if (app.authorized) loadSection(app.section, app.tenantSlug); }, 45000);
+      if (!app.refreshTimer)
+        app.refreshTimer = global.setInterval(() => {
+          if (app.authorized) loadSection(app.section, app.tenantSlug);
+        }, 45000);
     } catch (error) {
       clearContent();
       app.authorized = false;
@@ -430,8 +704,11 @@
   }
   async function signOut() {
     if (app.supportSessionId) {
-      try { await revokeSupportSession(app.supportSessionId, "Employee signed out while support mode was active"); }
-      catch (_) { /* The server-side expiry still limits any unrevoked session. */ }
+      try {
+        await revokeSupportSession(app.supportSessionId, "Employee signed out while support mode was active");
+      } catch (_) {
+        /* The server-side expiry still limits any unrevoked session. */
+      }
     }
     resetSupportMode();
     if (app.client) await app.client.auth.signOut({ scope: "local" }).catch(() => {});
@@ -453,7 +730,8 @@
       const config = configuration();
       if (!config) throw new Error("Cette interface est disponible uniquement sur le staging.");
       const { error } = await getClient().auth.signInWithPassword({
-        email: el("platform-email").value.trim(), password: el("platform-password").value
+        email: el("platform-email").value.trim(),
+        password: el("platform-password").value,
       });
       if (error) throw new Error("Connexion impossible. Vérifiez vos identifiants staging.");
       await verifyIdentity();
@@ -463,7 +741,10 @@
         if (output) output.textContent = "";
       }
     } catch (error) {
-      if (output) { output.textContent = error && error.message || "Connexion indisponible."; output.classList.add("error"); }
+      if (output) {
+        output.textContent = (error && error.message) || "Connexion indisponible.";
+        output.classList.add("error");
+      }
     }
   }
   function initialize() {
@@ -475,8 +756,11 @@
     el("platform-denied-sign-out").addEventListener("click", signOut);
     el("platform-refresh").addEventListener("click", async () => {
       if (app.supportSessionId) {
-        try { await loadSupportSession(app.supportSessionId); }
-        catch (error) { await handleSupportSessionFailure(error); }
+        try {
+          await loadSupportSession(app.supportSessionId);
+        } catch (error) {
+          await handleSupportSessionFailure(error);
+        }
       } else loadSection(app.section, app.tenantSlug);
     });
     el("support-entry-form").addEventListener("submit", submitSupportEntry);
@@ -486,9 +770,19 @@
       app.pendingSupportTenant = null;
     });
     el("platform-support-exit").addEventListener("click", async () => {
-      try { await endSupportMode(); }
-      catch (error) { setFeedback(error && error.message || "Impossible de révoquer la session support.", true); }
+      try {
+        await endSupportMode();
+      } catch (error) {
+        setFeedback((error && error.message) || "Impossible de révoquer la session support.", true);
+      }
     });
+    el("platform-support-nav")
+      .querySelectorAll("[data-support-section]")
+      .forEach((button) =>
+        button.addEventListener("click", () => {
+          loadSupportWorkspace(button.dataset.supportSection).catch((error) => handleSupportSessionFailure(error));
+        }),
+      );
     global.document.querySelectorAll("[data-section]").forEach((button) => button.addEventListener("click", () => loadSection(button.dataset.section)));
     const config = configuration();
     if (!config) {
@@ -496,25 +790,43 @@
       el("platform-login-status").textContent = "Cette interface de contrôle est disponible uniquement sur le staging.";
       return;
     }
-    getClient().auth.getSession().then(async ({ data, error }) => {
-      if (!error && data && data.session) {
-        const sessionId = storedSupportSession();
-        if (sessionId) {
-          app.supportSessionId = sessionId;
-          try { await loadSupportSession(sessionId); }
-          catch (failure) {
-            if (failure && (failure.message === "EXPIRED" || failure.message === "DENIED")) await handleSupportSessionFailure(failure);
-            else setFeedback("La session support ne peut pas être vérifiée. Actualisez pour réessayer.", true);
-          }
-        } else loadSection("overview");
-      }
-    }).catch(() => {});
+    getClient()
+      .auth.getSession()
+      .then(async ({ data, error }) => {
+        if (!error && data && data.session) {
+          const sessionId = storedSupportSession();
+          if (sessionId) {
+            app.supportSessionId = sessionId;
+            try {
+              await loadSupportSession(sessionId);
+            } catch (failure) {
+              if (failure && (failure.message === "EXPIRED" || failure.message === "DENIED")) await handleSupportSessionFailure(failure);
+              else setFeedback("La session support ne peut pas être vérifiée. Actualisez pour réessayer.", true);
+            }
+          } else loadSection("overview");
+        }
+      })
+      .catch(() => {});
   }
-
-  const api = Object.freeze({ configuration, read, openSupportSession, readSupportSession, revokeSupportSession, loadSupportSession, loadSection, renderers, signOut });
+  const api = Object.freeze({
+    configuration,
+    read,
+    openSupportSession,
+    readSupportSession,
+    readSupportWorkspace,
+    revokeSupportSession,
+    loadSupportSession,
+    loadSupportWorkspace,
+    loadSection,
+    renderers,
+    signOut,
+  });
   global.IgPlatformAdmin = api;
   if (global.document) {
-    if (global.document.readyState === "loading") global.document.addEventListener("DOMContentLoaded", initialize, { once: true });
+    if (global.document.readyState === "loading")
+      global.document.addEventListener("DOMContentLoaded", initialize, {
+        once: true,
+      });
     else initialize();
   }
 })(window);
