@@ -137,6 +137,14 @@ const context = vm.createContext({
   requestAnimationFrame: (callback) => animationCallbacks.push(callback)
 });
 context.window = context;
+context.IGLOUE_SERVICE_SLOT_CLIENT = {
+  async loadAvailability(input) {
+    const windows = [{ id: input.serviceType === "delivery" ? "0830-1030" : "1630-1830", label: "08:30–10:30",
+      startTime: "08:30", endTime: "10:30", timeZone: "Europe/Paris", remainingCapacity: 1, available: true }];
+    context.IGLOUE_DELIVERY_SLOT_PROVIDER?.setAvailableSlots({ productId: input.productId, date: input.date, serviceType: input.serviceType }, windows);
+    return { windows, alternatives: null };
+  }
+};
 
 [
   "pricing.js", "delivery.js", "schedule-provider.js", "bookings-provider.js",
@@ -176,6 +184,10 @@ vm.runInContext(`
 (async () => {
 const continueButton = assistantRoot.querySelector("[data-dates-continue]");
 assert.ok(continueButton, "the actual Dates Continue control is rendered");
+await new Promise((resolve) => setImmediate(resolve));
+const initialSlotButtons = assistantRoot.querySelectorAll("[data-slot-id]");
+initialSlotButtons[0].click();
+initialSlotButtons[1].click();
 continueButton.click();
 await Promise.resolve();
 
@@ -268,7 +280,7 @@ assert.equal(
 );
 assert.equal(alternativeCalls.length, 2, "selecting a confirmed alternative does not recheck it");
 
-function resetDatesForBranch({ productId = "essential", roomArea = 20, openingType = "casement" } = {}) {
+async function resetDatesForBranch({ productId = "essential", roomArea = 20, openingType = "casement" } = {}) {
   vm.runInContext(`
     availabilityState.reset();
     alternativeAvailabilityState.reset();
@@ -278,6 +290,10 @@ function resetDatesForBranch({ productId = "essential", roomArea = 20, openingTy
     assistantState.idealProduct = assistantState.recommendedProduct;
     showDatesStage(false);
   `, context);
+  await new Promise((resolve) => setImmediate(resolve));
+  const buttons = assistantRoot.querySelectorAll("[data-slot-id]");
+  for (const button of buttons) button.click();
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 const allUnavailableCalls = [];
@@ -292,7 +308,7 @@ context.IGLOUE_AVAILABILITY_CLIENT = {
     return new Promise((resolve) => { resolveUnavailableAlternative = resolve; });
   }
 };
-resetDatesForBranch();
+await resetDatesForBranch();
 assistantRoot.querySelector("[data-dates-continue]").click();
 await Promise.resolve();
 resolveUnavailableIdeal({ status: "unavailable", available: false, productId: "essential" });
@@ -314,7 +330,7 @@ context.IGLOUE_AVAILABILITY_CLIENT = {
     );
   }
 };
-resetDatesForBranch();
+await resetDatesForBranch();
 assistantRoot.querySelector("[data-dates-continue]").click();
 await new Promise((resolve) => setImmediate(resolve));
 assert.equal(retryCalls, 2, "all-error branch checks each suitable candidate once");
@@ -337,7 +353,7 @@ context.IGLOUE_AVAILABILITY_CLIENT = {
     return Promise.resolve({ status: "error", available: null, productId: selection.productId });
   }
 };
-resetDatesForBranch({ productId: "mobile-duo", roomArea: 21 });
+await resetDatesForBranch({ productId: "mobile-duo", roomArea: 21 });
 assistantRoot.querySelector("[data-dates-continue]").click();
 await new Promise((resolve) => setImmediate(resolve));
 assert.equal(mixedCalls, 3, "mixed branch checks the ideal and both suitable adjacent candidates");

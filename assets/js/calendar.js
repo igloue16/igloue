@@ -630,6 +630,24 @@ function createIgloueCalendar({
       clearSelection();
     },
 
+    selectRange(startValue, endValue) {
+      const nextStart = calendarValueToDate(startValue);
+      const nextEnd = calendarValueToDate(endValue);
+      if (!nextStart || !nextEnd || !isSelectable(nextStart) || !isSelectable(nextEnd) ||
+          nextEnd <= nextStart || getCalendarNightCount(nextStart, nextEnd) < minimumNights) {
+        emitFeedback("Cette période n'est plus disponible.");
+        return false;
+      }
+      selectedStart = nextStart;
+      selectedEnd = nextEnd;
+      editingEndpoint = null;
+      visibleMonth = new Date(nextStart.getFullYear(), nextStart.getMonth(), 1);
+      emitChange();
+      emitFeedback("");
+      render(calendarDateToValue(nextStart));
+      return true;
+    },
+
     editEndpoint(endpoint) {
       if (
         endpoint !== "start" &&

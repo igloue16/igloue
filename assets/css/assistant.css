@@ -2465,6 +2465,31 @@
   margin: 2px 0 !important;
 }
 
+.assistant-slot-alternatives {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px;
+  border: 1px solid var(--blue-dark);
+  border-radius: 6px;
+  background: #f2f7fb;
+}
+
+.assistant-slot-alternative-side {
+  display: grid;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-strong);
+  color: var(--text);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.assistant-slot-alternative-side h4,
+.assistant-slot-alternative-side p {
+  margin: 0;
+}
+
 .assistant-slot-feedback {
   margin: 0 !important;
 }

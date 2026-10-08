@@ -2139,23 +2139,18 @@ function getAssistantServiceSlots(serviceType) {
       ? assistantState.startDate
       : assistantState.endDate;
 
-  if (
-    !date ||
-    !globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER ||
-    typeof globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER.getAvailableSlots !== "function"
-  ) {
+  const productId = assistantState.recommendedProduct
+    ? assistantState.recommendedProduct.id
+    : assistantState.selectedProductId || "";
+  if (!date || !productId || !globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER ||
+    typeof globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER.getAvailableSlots !== "function") {
     return [];
   }
 
   return globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER.getAvailableSlots({
     date,
     serviceType,
-    postcode: assistantState.postcode,
-    zone: assistantState.deliveryZone,
-    productId: assistantState.recommendedProduct
-      ? assistantState.recommendedProduct.id
-      : null,
-    bookingContext: assistantState
+    productId
   });
 }
 
@@ -2364,6 +2359,7 @@ function showDatesStage(
                     class="assistant-slot-options"
                     data-delivery-slots>
                   </div>
+                  <div class="assistant-slot-alternatives" data-delivery-alternatives hidden></div>
                 </section>
 
                 <section
@@ -2377,6 +2373,7 @@ function showDatesStage(
                     class="assistant-slot-options"
                     data-collection-slots>
                   </div>
+                  <div class="assistant-slot-alternatives" data-collection-alternatives hidden></div>
                 </section>
               </div>
 
@@ -2510,6 +2507,9 @@ function showDatesStage(
       "[data-collection-slots]"
     );
 
+  const deliveryAlternativesContainer = assistant.querySelector("[data-delivery-alternatives]");
+  const collectionAlternativesContainer = assistant.querySelector("[data-collection-alternatives]");
+
   const deliverySlotDate =
     assistant.querySelector(
       "[data-delivery-slot-date]"
@@ -2531,6 +2531,11 @@ function showDatesStage(
     slotFeedback.hidden = !message;
   }
 
+  function escapeServiceSlotText(value) {
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
   function renderSlotOptions(container, slots, serviceType) {
     const stateProperty =
       serviceType === "delivery"
@@ -2539,7 +2544,7 @@ function showDatesStage(
 
     if (slots.length === 0) {
       container.innerHTML =
-        '<p class="assistant-slot-empty">Aucun créneau disponible</p>';
+        `<p class="assistant-slot-empty">Aucun créneau de ${serviceType === "delivery" ? "livraison" : "reprise"} n’est disponible à cette date.</p>`;
       return;
     }
 
@@ -2550,7 +2555,7 @@ function showDatesStage(
         data-service-type="${serviceType}"
         data-slot-id="${slot.id}"
         aria-pressed="${assistantState[stateProperty] === slot.id}">
-        ${slot.label}
+        ${escapeServiceSlotText(slot.label)}
       </button>
     `).join("");
 
@@ -2579,6 +2584,34 @@ function showDatesStage(
     });
   }
 
+  function euro(value) {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(value);
+  }
+
+  let calendarController;
+  let pendingExplicitSlot = null;
+  function renderAlternativeSide(container, side, serviceType) {
+    if (!side || !side.windows?.length || !side.pricing) return;
+    const p = side.pricing;
+    const delta = Number(p.delta);
+    const deltaText = delta === 0 ? "Prix inchangé" : `${delta > 0 ? "+" : "−"}${euro(Math.abs(delta))}`;
+    container.innerHTML = `<h4>Créneau ${serviceType === "delivery" ? "de livraison" : "de reprise"} disponible ${side.direction === "earlier" ? "le plus proche avant" : "le plus proche après"} — ${escapeServiceSlotText(formatDate(side.date))}</h4>
+      <p>Location : ${euro(p.proposedRental)} (${p.rentalImpact === 0 ? "impact inchangé" : `${p.rentalImpact > 0 ? "+" : "−"}${euro(Math.abs(p.rentalImpact))}`}) · Livraison : ${euro(p.deliveryCharge)} · Reprise : ${euro(p.collectionCharge)} · Options : ${euro(p.setupCharge)} · Express : ${euro(p.expressCharge)} · Supplément horaire : ${euro(p.schedulingSurcharge)}</p>
+      <p>Total : <strong>${euro(p.total)}</strong> · Écart avec le choix actuel : <strong>${deltaText}</strong> · TVA : non configurée${p.depositChargedNow === false ? " · Dépôt non débité à cette étape" : ""}</p>
+      ${side.windows.map((slot) => `<button class="assistant-slot-option" type="button" data-alternative-date="${escapeServiceSlotText(side.date)}" data-alternative-type="${serviceType}" data-alternative-slot="${escapeServiceSlotText(slot.id)}">${escapeServiceSlotText(slot.label)} — choisir ce créneau</button>`).join("")}`;
+    container.querySelectorAll("[data-alternative-slot]").forEach((button) => button.addEventListener("click", () => {
+      const selectedDate = button.dataset.alternativeDate;
+      const start = serviceType === "delivery" ? selectedDate : assistantState.startDate;
+      const end = serviceType === "collection" ? selectedDate : assistantState.endDate;
+      pendingExplicitSlot = { date: selectedDate, serviceType, slotId: button.dataset.alternativeSlot };
+      if (!calendarController?.selectRange(start, end)) {
+        pendingExplicitSlot = null;
+        showSlotNotice("Cette période n’est plus disponible. Choisissez une autre date.");
+      }
+    }));
+  }
+
+  let serviceSlotLoadVersion = 0;
   function renderServiceSlots() {
     const hasCompleteRange = Boolean(
       assistantState.startDate && assistantState.endDate
@@ -2589,6 +2622,8 @@ function showDatesStage(
     if (!hasCompleteRange) {
       deliverySlotsContainer.innerHTML = "";
       collectionSlotsContainer.innerHTML = "";
+      deliveryAlternativesContainer.hidden = true;
+      collectionAlternativesContainer.hidden = true;
       return;
     }
 
@@ -2604,17 +2639,55 @@ function showDatesStage(
 
     deliverySlotDate.textContent = formatDate(assistantState.startDate);
     collectionSlotDate.textContent = formatDate(assistantState.endDate);
-
-    renderSlotOptions(
-      deliverySlotsContainer,
-      getAssistantServiceSlots("delivery"),
-      "delivery"
-    );
-    renderSlotOptions(
-      collectionSlotsContainer,
-      getAssistantServiceSlots("collection"),
-      "collection"
-    );
+    const productId = assistantState.recommendedProduct
+      ? assistantState.recommendedProduct.id
+      : assistantState.selectedProductId || "";
+    const version = ++serviceSlotLoadVersion;
+    if (!productId || !globalThis.IGLOUE_SERVICE_SLOT_CLIENT) {
+      deliverySlotsContainer.innerHTML = '<p class="assistant-slot-empty">Les créneaux seront chargés après le choix du matériel.</p>';
+      collectionSlotsContainer.innerHTML = '<p class="assistant-slot-empty">Les créneaux seront chargés après le choix du matériel.</p>';
+      return;
+    }
+    deliverySlotsContainer.innerHTML = '<p class="assistant-slot-empty">Chargement des créneaux…</p>';
+    collectionSlotsContainer.innerHTML = '<p class="assistant-slot-empty">Chargement des créneaux…</p>';
+    const quoteContext = { startDate: assistantState.startDate, endDate: assistantState.endDate, postcode: assistantState.postcode,
+      setupMode: assistantState.setupMode || "none", expressSelected: assistantState.sameDayExpressSelected,
+      items: [{ productId, quantity: 1 }] };
+    Promise.all([
+      globalThis.IGLOUE_SERVICE_SLOT_CLIENT.loadAvailability({ productId, date: assistantState.startDate, serviceType: "delivery", includeAlternatives: true, quoteContext }),
+      globalThis.IGLOUE_SERVICE_SLOT_CLIENT.loadAvailability({ productId, date: assistantState.endDate, serviceType: "collection", includeAlternatives: true, quoteContext })
+    ]).then(([deliveryResult, collectionResult]) => {
+      if (version !== serviceSlotLoadVersion) return;
+      revalidateAssistantServiceSlots({ delivery: true, collection: true, announceInvalidation: true });
+      if (pendingExplicitSlot) {
+        const result = pendingExplicitSlot.serviceType === "delivery" ? deliveryResult : collectionResult;
+        const selectedDate = pendingExplicitSlot.serviceType === "delivery" ? assistantState.startDate : assistantState.endDate;
+        if (pendingExplicitSlot.date === selectedDate && result.windows.some((slot) => slot.id === pendingExplicitSlot.slotId)) {
+          assistantState[pendingExplicitSlot.serviceType === "delivery" ? "deliverySlotId" : "collectionSlotId"] = pendingExplicitSlot.slotId;
+        } else showSlotNotice("Ce créneau vient d’être complet. Les disponibilités ont été actualisées.");
+        pendingExplicitSlot = null;
+      }
+      renderSlotOptions(deliverySlotsContainer, deliveryResult.windows, "delivery");
+      renderSlotOptions(collectionSlotsContainer, collectionResult.windows, "collection");
+      for (const [result, container, serviceType] of [[deliveryResult, deliveryAlternativesContainer, "delivery"], [collectionResult, collectionAlternativesContainer, "collection"]]) {
+        const alternatives = result.alternatives;
+        const sides = alternatives ? [{ ...(alternatives.earlier || {}), direction: "earlier" }, { ...(alternatives.later || {}), direction: "later" }] : [];
+        const availableSides = sides.filter((side) => side.date && side.windows);
+        if (!result.windows.length && availableSides.length) {
+          container.innerHTML = availableSides.map((side) => `<div class="assistant-slot-alternative-side" data-side="${side.direction}"></div>`).join("");
+          container.hidden = false;
+          availableSides.forEach((side) => renderAlternativeSide(container.querySelector(`[data-side="${side.direction}"]`), side, serviceType));
+        } else { container.innerHTML = ""; container.hidden = true; }
+      }
+      updateExpressOption();
+    }).catch(() => {
+      if (version !== serviceSlotLoadVersion) return;
+      assistantState.deliverySlotId = "";
+      assistantState.collectionSlotId = "";
+      deliverySlotsContainer.innerHTML = '<p class="assistant-slot-empty">Les créneaux sont momentanément indisponibles.</p>';
+      collectionSlotsContainer.innerHTML = '<p class="assistant-slot-empty">Les créneaux sont momentanément indisponibles.</p>';
+      showSlotNotice("Impossible de vérifier les créneaux. Réessayez dans un instant.");
+    });
   }
 
   function updateDateSummary(startDate, endDate) {
@@ -2672,7 +2745,7 @@ function showDatesStage(
 
   renderServiceSlots();
 
-  const calendarController = createIgloueCalendar({
+  calendarController = createIgloueCalendar({
     container:
       calendarContainer,
 
