@@ -3,95 +3,36 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const projectRoot = path.resolve(__dirname, "..");
-const context = vm.createContext({ console, Date, Intl });
+const source = fs.readFileSync(path.resolve(__dirname, "../assets/js/availability.js"), "utf8");
+const context = vm.createContext({});
+context.window = context;
+vm.runInContext(source, context, { filename: "availability.js" });
 
-[
-  "delivery.js",
-  "schedule-provider.js",
-  "bookings-provider.js",
-  "availability.js"
-].forEach((filename) => {
-  vm.runInContext(
-    fs.readFileSync(path.join(projectRoot, "assets/js", filename), "utf8"),
-    context,
-    { filename }
-  );
-});
+const provider = context.IGLOUE_DELIVERY_SLOT_PROVIDER;
+assert.ok(provider, "backend service-window cache is available to the page");
 
-function evaluate(expression) {
-  return vm.runInContext(expression, context);
-}
+const deliveryRequest = { productId: "tenant-a-product", date: "2026-10-08", serviceType: "delivery" };
+assert.deepEqual(Array.from(provider.getAvailableSlots(deliveryRequest)), [], "an unqueried date has no invented slots");
+assert.equal(provider.hasAvailableSameDaySlot({ deliveryDate: deliveryRequest.date, productId: deliveryRequest.productId }), false);
 
-function availableIds(date, serviceType = "delivery") {
-  return Array.from(evaluate(`
-    getAvailableIgloueServiceSlots({
-      date: "${date}",
-      serviceType: "${serviceType}",
-      postcode: "16000",
-      now: { date: "2026-09-09", hour: 8, minute: 0 }
-    }).map((slot) => slot.id)
-  `));
-}
-
-const allSlots = [
-  "0830-1030",
-  "1030-1230",
-  "1230-1430",
-  "1430-1630",
-  "1630-1830",
-  "1830-2030"
-];
-
-assert.deepEqual(availableIds("2026-09-10"), allSlots, "A: free day");
+assert.equal(provider.setAvailableSlots(deliveryRequest, [
+  { id: "available", label: "08:00–10:00", available: true, remainingCapacity: 1 },
+  { id: "full", label: "10:00–12:00", available: false, remainingCapacity: 0 },
+  { label: "malformed", available: true },
+]), true);
 assert.deepEqual(
-  availableIds("2026-09-11"),
-  ["1430-1630", "1630-1830", "1830-2030"],
-  "B: early shift plus buffer"
+  Array.from(provider.getAvailableSlots(deliveryRequest), (slot) => slot.id),
+  ["available"],
+  "only backend rows with remaining capacity are selectable",
 );
-assert.deepEqual(
-  availableIds("2026-09-12"),
-  ["0830-1030"],
-  "C: afternoon shift plus buffer"
-);
-assert.deepEqual(availableIds("2026-09-13"), [], "D: closed day");
-assert.equal(
-  availableIds("2026-09-15", "delivery").includes("1030-1230"),
-  false,
-  "E: full delivery slot"
-);
-assert.equal(
-  availableIds("2026-09-15", "collection").includes("1430-1630"),
-  false,
-  "E: full collection slot"
-);
-assert.equal(
-  evaluate(`IGLOUE_AVAILABILITY_PROVIDER.hasAvailableSameDaySlot({
-    postcode: "16000",
-    deliveryDate: "2026-09-10",
-    now: { date: "2026-09-10", hour: 9, minute: 0 }
-  })`),
-  true,
-  "F: Express before cutoff with a remaining slot"
-);
-assert.equal(
-  evaluate(`IGLOUE_AVAILABILITY_PROVIDER.hasAvailableSameDaySlot({
-    postcode: "16000",
-    deliveryDate: "2026-09-10",
-    now: { date: "2026-09-10", hour: 10, minute: 1 }
-  })`),
-  false,
-  "G: Express after cutoff"
-);
-assert.equal(
-  evaluate(`evaluateIgloueServiceSlots({
-    date: "2026-09-10",
-    serviceType: "delivery",
-    postcode: "99999",
-    now: { date: "2026-09-09", hour: 8, minute: 0 }
-  })[0].reasonUnavailable`),
-  "outside-service-area",
-  "J: unsupported postcode"
-);
+assert.equal(provider.hasAvailableSameDaySlot({ deliveryDate: deliveryRequest.date, productId: deliveryRequest.productId }), true);
+assert.equal(provider.hasAvailableSameDaySlot({ deliveryDate: deliveryRequest.date, productId: "tenant-b-product" }), false,
+  "availability cache is scoped by product and cannot bleed between tenants");
+assert.equal(provider.getWindowById("full", deliveryRequest).available, false,
+  "a full backend window remains visible only as non-selectable data");
 
-console.log("Availability V1 scenarios A–G and service-area revalidation passed.");
+provider.clear();
+assert.deepEqual(Array.from(provider.getAvailableSlots(deliveryRequest)), [], "clearing the backend cache removes availability");
+assert.equal(provider.hasAvailableSameDaySlot({ deliveryDate: deliveryRequest.date, productId: deliveryRequest.productId }), false);
+
+console.log("Availability V1 backend-cache scenarios passed (no browser-invented schedule).");
