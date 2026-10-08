@@ -2,6 +2,7 @@
   "use strict";
   const titles = {
     overview: "Vue d’ensemble",
+    health: "Santé de la plateforme",
     tenants: "Organisations",
     tenant: "Fiche organisation",
     employees: "Employés plateforme",
@@ -23,6 +24,10 @@
     dismissed: "CLOS",
     success: "SUCCÈS",
     applied: "APPLIQUÉ",
+    healthy: "SAIN",
+    attention: "ATTENTION",
+    critical: "CRITIQUE",
+    unknown: "INCONNU",
   };
   const SUPPORT_SESSION_KEY = "igloue.platform-admin.support-session";
   const app = {
@@ -138,6 +143,18 @@
       throw new Error("Lecture plateforme indisponible.");
     }
     if (!data || typeof data !== "object") throw new Error("Réponse plateforme invalide.");
+    return data;
+  }
+  async function readOperationalHealth() {
+    const { data, error } = await getClient().rpc("platform_operational_health_v1");
+    if (error) {
+      const code = String(error.code || "");
+      if (code === "42501" || /access denied|permission/i.test(String(error.message || ""))) throw new Error("DENIED");
+      throw new Error("Lecture de la santé plateforme indisponible.");
+    }
+    if (!data || typeof data !== "object" || !["healthy", "attention", "critical", "unknown"].includes(data.status)) {
+      throw new Error("Réponse de santé plateforme invalide.");
+    }
     return data;
   }
   function storedSupportSession() {
@@ -745,8 +762,51 @@
     if (!(data.requests || []).length) card.append(make("p", "empty", "Aucune demande de gouvernance."));
     target.append(card);
   }
+  function renderOperationalHealth(data) {
+    const target = el("platform-content");
+    const summary = panel("État général", "health-summary");
+    const summaryLine = line(summary, `État évalué ${date(data.evaluated_at)}`, "Indicateurs agrégés à partir des données opérationnelles et de l’historique cron.", data.status);
+    summaryLine.classList.add(`health-${data.status}`);
+    target.append(summary);
+    const sections = [
+      ["payments", "Paiements", [
+        ["Exceptions de paiement non résolues", "unresolved_paid_exceptions"],
+        ["Réceptions webhook en échec", "failed_provider_events"],
+        ["Reprises épuisées", "provider_events_retry_exhausted"],
+        ["Paiements confirmés à réconcilier", "paid_reservation_mismatches"],
+      ]],
+      ["reservations", "Réservations", [
+        ["Holds expirés en attente de nettoyage (> 10 min)", "expired_reservation_holds_over_10m"],
+        ["Incohérences paiement / réservation", "paid_reservation_mismatches"],
+      ]],
+      ["communications", "Communications", [
+        ["Événements en échec", "failed"],
+        ["En attente trop longtemps (> 15 min)", "due_pending_over_15m"],
+        ["Traitement après expiration du bail (> 2 min)", "processing_past_lease_over_2m"],
+      ]],
+      ["scheduling", "Planification", [
+        ["Créneaux expirés non libérés (> 5 min)", "expired_service_slot_holds_over_5m"],
+        ["Changements de dates expirés (> 5 min)", "expired_date_change_holds_over_5m"],
+        ["Prolongations expirées (> 5 min)", "expired_extension_holds_over_5m"],
+      ]],
+    ];
+    sections.forEach(([key, title, metrics]) => {
+      const section = data[key] || {};
+      const card = panel(title, "half");
+      line(card, "État", "Indicateurs issus des registres actifs", section.status || "unknown");
+      metrics.forEach(([label, field]) => line(card, label, String(section[field] ?? "—")));
+      target.append(card);
+    });
+    const jobs = panel("Tâches planifiées", "health-jobs");
+    line(jobs, "État des exécutions cron", "La réussite cron confirme l’exécution SQL, pas à elle seule le succès du worker HTTP.", data.background_jobs && data.background_jobs.status || "unknown");
+    ((data.background_jobs && data.background_jobs.items) || []).forEach((job) => {
+      line(jobs, job.name, `Actif : ${job.active === true ? "oui" : job.active === false ? "non" : "inconnu"} · dernière exécution : ${date(job.last_started_at)} · échecs sur une heure : ${job.failures_last_hour ?? "—"}`, job.status || "unknown");
+    });
+    target.append(jobs);
+  }
   const renderers = {
     overview: renderOverview,
+    health: renderOperationalHealth,
     tenants: renderTenants,
     tenant: renderTenant,
     employees: renderEmployees,
@@ -764,7 +824,7 @@
     setFeedback("Chargement…");
     try {
       await verifyIdentity();
-      const result = await read(section, slug);
+      const result = section === "health" ? await readOperationalHealth() : await read(section, slug);
       app.authorized = true;
       clearContent();
       await (renderers[section] || renderOverview)(result);
@@ -903,6 +963,7 @@
   const api = Object.freeze({
     configuration,
     read,
+    readOperationalHealth,
     openSupportSession,
     readSupportSession,
     readSupportWorkspace,

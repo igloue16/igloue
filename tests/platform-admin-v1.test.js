@@ -49,6 +49,24 @@ test("backend permission denial is propagated as a closed-access result", async 
   await assert.rejects(loaded.api.read("overview"), /DENIED/);
 });
 
+test("platform health uses its dedicated permission-gated aggregate RPC", async () => {
+  const health = {
+    evaluated_at: "2026-10-08T17:00:00Z", status: "unknown",
+    payments: { status: "healthy", unresolved_paid_exceptions: 0 },
+    communications: { status: "attention", failed: 1, due_pending_over_15m: 0, processing_past_lease_over_2m: 0 },
+    reservations: { status: "healthy", expired_reservation_holds_over_10m: 0 },
+    scheduling: { status: "healthy", expired_service_slot_holds_over_5m: 0 },
+    background_jobs: { status: "unknown", items: [] },
+  };
+  const loaded = load("test.igloue.fr", { platform_operational_health_v1: { data: health, error: null } });
+  assert.deepEqual(JSON.parse(JSON.stringify(await loaded.api.readOperationalHealth())), health);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), { name: "platform_operational_health_v1" });
+  const denied = load("test.igloue.fr", { platform_operational_health_v1: { data: null, error: { code: "42501", message: "platform access denied" } } });
+  await assert.rejects(denied.api.readOperationalHealth(), /DENIED/);
+  const invalid = load("test.igloue.fr", { platform_operational_health_v1: { data: { status: "healthyish" }, error: null } });
+  await assert.rejects(invalid.api.readOperationalHealth(), /invalide/i);
+});
+
 test("support session starts from a tenant slug with explicit read-only scope and fixed expiry", async () => {
   const loaded = load("test.igloue.fr", {
     platform_open_support_session_for_tenant: { data: "session-uuid", error: null },
@@ -147,7 +165,7 @@ test("support exit requires backend confirmation of revocation", async () => {
 
 test("page labels staging, provides controlled support flow, and has no direct privileged-table path", () => {
   assert.match(html, /STAGING/);
-  for (const section of ["overview", "tenants", "employees", "roles", "audit", "approvals"]) assert.match(html, new RegExp(`data-section="${section}"`));
+  for (const section of ["overview", "health", "tenants", "employees", "roles", "audit", "approvals"]) assert.match(html, new RegExp(`data-section="${section}"`));
   assert.match(html, /Entrer en mode support/);
   assert.match(html, /lecture seule/i);
   assert.match(html, /platform-support-exit/);
@@ -168,6 +186,8 @@ test("page labels staging, provides controlled support flow, and has no direct p
   assert.match(source, /handleSupportSessionFailure/);
   assert.doesNotMatch(source, /platform\.support\.write/);
   assert.match(source, /platform_control_plane_read_v1/);
+  assert.match(source, /platform_operational_health_v1/);
+  assert.match(source, /Santé de la plateforme/);
   assert.match(html, /name="referrer" content="no-referrer"/);
 });
 
