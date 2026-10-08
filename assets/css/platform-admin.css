@@ -13,3 +13,5 @@
 .support-secondary-button{border:1px solid var(--line);border-radius:8px;background:#142438;color:var(--text);padding:6px 10px}
 .support-retry-form button:disabled{cursor:wait;opacity:.65}
 .status.healthy{color:var(--green);border-color:#39785f}.status.attention{color:var(--amber);border-color:#806b45}.status.critical{color:var(--red);border-color:#a34c47}.status.unknown{color:var(--muted);border-color:#65778a}.health-summary{border-color:#456686}.health-critical{background:linear-gradient(110deg,#3b2326,#172336)}.health-attention{background:linear-gradient(110deg,#352d20,#172336)}.health-unknown{background:linear-gradient(110deg,#27313b,#172336)}
+
+.platform-incident-row{align-items:center}.incident-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}.platform-incidents-recovered{border-color:#39785f}.incident-trace{background:linear-gradient(145deg,#15291f,#102033)}.status.acknowledged{color:var(--blue);border-color:#456686}

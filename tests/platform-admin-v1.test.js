@@ -67,6 +67,50 @@ test("platform health uses its dedicated permission-gated aggregate RPC", async 
   await assert.rejects(invalid.api.readOperationalHealth(), /invalide/i);
 });
 
+test("incident reads use the permission-gated RPC and validate response shape", async () => {
+  const incident = {
+    incident_id: "00000000-0000-4000-8000-00000000f001", incident_type: "confirmation_delivery_failure",
+    severity: "critical", status: "open", safe_code: "confirmation_email_failed", workflow_id: null,
+    source_reference: "outbox:fixture", evidence: { attempt_count: 5 }, first_detected_at: "2026-10-09T10:00:00Z",
+    last_observed_at: "2026-10-09T10:01:00Z", occurrence_count: 1, acknowledged_at: null, recovered_at: null,
+  };
+  const loaded = load("test.igloue.fr", { platform_incidents_v1: { data: [incident], error: null } });
+  assert.deepEqual(JSON.parse(JSON.stringify(await loaded.api.readIncidents("active", 20))), [incident]);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_incidents_v1", args: { p_status: "active", p_limit: 20 },
+  });
+  await assert.rejects(loaded.api.readIncidents("bogus"), /invalide/i);
+  const denied = load("test.igloue.fr", { platform_incidents_v1: { data: null, error: { code: "42501", message: "platform access denied" } } });
+  await assert.rejects(denied.api.readIncidents(), /DENIED/);
+  const invalid = load("test.igloue.fr", { platform_incidents_v1: { data: [{ ...incident, status: "secret" }], error: null } });
+  await assert.rejects(invalid.api.readIncidents(), /invalide/i);
+});
+
+test("incident acknowledgement and trace drill-down use dedicated backend RPCs", async () => {
+  const loaded = load("test.igloue.fr", {
+    platform_incident_acknowledge_v1: { data: true, error: null },
+    platform_workflow_trace_v1: { data: [{ event_key: "payment.failed", outcome: "failure" }], error: null },
+  });
+  assert.equal(await loaded.api.acknowledgeIncident("00000000-0000-4000-8000-00000000f001", "Reviewed webhook and reservation state"), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_incident_acknowledge_v1",
+    args: { p_incident_id: "00000000-0000-4000-8000-00000000f001", p_reason: "Reviewed webhook and reservation state" },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(await loaded.api.readWorkflowTrace("00000000-0000-4000-8000-00000000f002"))), [
+    { event_key: "payment.failed", outcome: "failure" },
+  ]);
+  await assert.rejects(loaded.api.acknowledgeIncident("00000000-0000-4000-8000-00000000f001", "no"), /Motif/);
+});
+
+test("incident evaluator health uses database cron evidence", async () => {
+  const result = { name: "igloue-platform-incident-evaluation", status: "unknown", active: true, last_started_at: null };
+  const loaded = load("test.igloue.fr", { platform_incident_engine_health_v1: { data: result, error: null } });
+  assert.deepEqual(JSON.parse(JSON.stringify(await loaded.api.readIncidentEngineHealth())), result);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), { name: "platform_incident_engine_health_v1" });
+  const invalid = load("test.igloue.fr", { platform_incident_engine_health_v1: { data: { ...result, status: "healthyish" }, error: null } });
+  await assert.rejects(invalid.api.readIncidentEngineHealth(), /invalide/i);
+});
+
 test("support session starts from a tenant slug with explicit read-only scope and fixed expiry", async () => {
   const loaded = load("test.igloue.fr", {
     platform_open_support_session_for_tenant: { data: "session-uuid", error: null },
@@ -187,6 +231,10 @@ test("page labels staging, provides controlled support flow, and has no direct p
   assert.doesNotMatch(source, /platform\.support\.write/);
   assert.match(source, /platform_control_plane_read_v1/);
   assert.match(source, /platform_operational_health_v1/);
+  assert.match(source, /platform_incidents_v1/);
+  assert.match(source, /platform_incident_acknowledge_v1/);
+  assert.match(source, /platform_incident_engine_health_v1/);
+  assert.match(source, /aucun e-mail ni SMS/);
   assert.match(source, /Santé de la plateforme/);
   assert.match(html, /name="referrer" content="no-referrer"/);
 });
