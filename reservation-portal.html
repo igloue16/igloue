@@ -27,6 +27,10 @@
     .card strong { color:#163b58; }
     .price-row { display:flex; justify-content:space-between; gap:14px; margin-top:9px; color:#486176; }
     .price-row--total { margin-top:14px; padding-top:13px; border-top:1px solid var(--portal-line); color:#143d5c; font-weight:800; }
+    .slot-alternatives { margin:10px 0; padding:12px; border:1px solid #8eb5d0; border-radius:12px; background:#f2f7fb; }
+    .slot-alternatives h4 { margin:0 0 8px; color:#143d5c; }
+    .slot-alternatives p { margin:6px 0; color:#486176; line-height:1.5; }
+    .slot-alternatives button { display:block; width:100%; margin-top:7px; padding:10px; border:1px solid #9bb6ca; border-radius:8px; background:#fff; color:#102a43; font:inherit; font-weight:700; cursor:pointer; }
     .extension-card { display:grid; gap:12px; }
     .extension-card form { display:grid; gap:10px; }
     .extension-card input { width:100%; box-sizing:border-box; padding:12px; border:1px solid var(--portal-line); border-radius:10px; color:var(--portal-ink); font:inherit; }
@@ -72,6 +76,8 @@
         <form id="extension-form" hidden>
           <label for="extension-date">Nouvelle date de fin</label>
           <input id="extension-date" type="date" required>
+          <label for="extension-collection-window">Nouvelle date de collecte — créneau</label>
+          <select id="extension-collection-window"><option value="">Le créneau actuel sera conservé s’il est disponible</option></select>
           <button id="extension-quote-button" type="submit">Calculer le montant</button>
           <div id="extension-quote" role="status" aria-live="polite"></div>
           <button id="extension-pay" type="button" hidden>Confirmer et payer</button>
@@ -87,6 +93,12 @@
           <input id="date-change-start" type="date" required>
           <label for="date-change-end">Nouvelle date de fin</label>
           <input id="date-change-end" type="date" required>
+          <label for="date-change-delivery-window">Nouvelle date de livraison — créneau</label>
+          <select id="date-change-delivery-window" required><option value="">Choisissez d’abord la date de début</option></select>
+          <div class="slot-alternatives" id="date-change-delivery-alternatives" role="status" aria-live="polite" hidden></div>
+          <label for="date-change-collection-window">Nouvelle date de collecte — créneau</label>
+          <select id="date-change-collection-window" required><option value="">Choisissez d’abord la date de fin</option></select>
+          <div class="slot-alternatives" id="date-change-collection-alternatives" role="status" aria-live="polite" hidden></div>
           <button id="date-change-quote-button" type="submit">Vérifier les dates et le montant</button>
           <div id="date-change-quote" role="status" aria-live="polite"></div>
           <button id="date-change-use-extension" type="button" hidden>Continuer avec Prolonger la location</button>

@@ -96,6 +96,11 @@
     }
     return result;
   }
+  async function extensionWindows(token, newEndDate, config, fetchImpl = global.fetch) {
+    const result = await extensionRequest(token, "windows", { newEndDate }, config, fetchImpl);
+    if (!Array.isArray(result.windows)) throw new Error("invalid service windows");
+    return result.windows;
+  }
   const DATE_CHANGE_STATES = new Set(["confirmed", "review_required", "failed", "unchanged", "delegated_to_extension", "held", "checkout_created", "payment_failed", "payment_cancelled", "expired", "paid"]);
   function validDateChangeQuote(value) {
     return !!value && value.ok === true && value.quote && typeof value.quote.eligible === "boolean" &&
@@ -120,8 +125,19 @@
     const result = await response.json();
     if (!response.ok || !result || result.ok !== true) throw new Error(result?.error?.code || "date change unavailable");
     if (action === "quote" && !validDateChangeQuote(result)) throw new Error("invalid date change quote");
-    if (action !== "quote" && !validDateChangeResult(result)) throw new Error("invalid date change result");
+    if (action === "windows" && (!Array.isArray(result.windows) || result.windows.some((w) => !w || typeof w.code !== "string" ||
+      typeof w.label !== "string" || typeof w.startTime !== "string" || typeof w.endTime !== "string"))) throw new Error("invalid service windows");
+    if (action === "nearest" && (!result.alternatives || !["earlier", "later"].every((key) => result.alternatives[key] === null || result.alternatives[key] && DATE(result.alternatives[key].date) && Array.isArray(result.alternatives[key].windows) && result.alternatives[key].quote?.eligible === true && Number.isFinite(result.alternatives[key].quote.additionalAmountDue)))) throw new Error("invalid nearest alternatives");
+    if (!( ["quote", "windows", "nearest"].includes(action)) && !validDateChangeResult(result)) throw new Error("invalid date change result");
     return result;
+  }
+  async function dateChangeWindows(token, serviceDate, serviceType, config, fetchImpl = global.fetch) {
+    const result = await dateChangeRequest(token, "windows", { serviceDate, serviceType }, config, fetchImpl);
+    if (!Array.isArray(result.windows)) throw new Error("invalid service windows");
+    return result.windows;
+  }
+  async function dateChangeNearest(token, serviceDate, serviceType, newStartDate, newEndDate, config, fetchImpl = global.fetch) {
+    return dateChangeRequest(token, "nearest", { serviceDate, serviceType, newStartDate, newEndDate }, config, fetchImpl);
   }
   function renderExtensionAvailability(data) {
     return data && data.paid_and_confirmed === true && ["confirmed", "ongoing"].includes(data.reservation_status);
@@ -216,34 +232,101 @@
     const quoteButton = id("date-change-quote-button");
     const confirmButton = id("date-change-confirm");
     const extensionButton = id("date-change-use-extension");
-    if (!start || !end || !form || !quoteNode || !quoteButton || !confirmButton || !extensionButton) return;
+    const deliveryWindow = id("date-change-delivery-window");
+    const collectionWindow = id("date-change-collection-window");
+    const deliveryAlternatives = id("date-change-delivery-alternatives");
+    const collectionAlternatives = id("date-change-collection-alternatives");
+    if (!start || !end || !form || !quoteNode || !quoteButton || !confirmButton || !extensionButton || !deliveryWindow || !collectionWindow) return;
     const toDate = (value) => String(value).slice(0, 10);
     const currentStart = toDate(data.rental_start);
     const currentEnd = toDate(data.rental_end);
     start.value = currentStart; end.value = currentEnd;
     const minimum = new Date(); minimum.setDate(minimum.getDate() + 1);
     start.min = minimum.toISOString().slice(0, 10); end.min = start.min;
-    const resetQuote = () => { delete quoteNode.dataset.start; delete quoteNode.dataset.end; confirmButton.hidden = true; extensionButton.hidden = true; };
-    start.addEventListener("change", resetQuote); end.addEventListener("change", resetQuote);
+    const resetQuote = () => { delete quoteNode.dataset.start; delete quoteNode.dataset.end; delete quoteNode.dataset.delivery; delete quoteNode.dataset.collection; confirmButton.hidden = true; extensionButton.hidden = true; };
+    const loadWindows = async (date, originalDate, type, select, allowAlternatives = true) => {
+      const alternativesNode = type === "delivery" ? deliveryAlternatives : collectionAlternatives;
+      alternativesNode.replaceChildren(); alternativesNode.hidden = true;
+      const changed = date !== originalDate;
+      select.required = changed; select.disabled = !changed; select.hidden = !changed;
+      if (!changed) { select.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Créneau actuel conservé" })); return []; }
+      select.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Chargement des créneaux…" }));
+      try {
+        const windows = await dateChangeWindows(token, date, type, config);
+        select.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Choisissez un créneau" }));
+        for (const window of windows) {
+          const option = document.createElement("option"); option.value = window.code;
+          option.textContent = `${window.label} (${window.startTime}–${window.endTime})`; select.append(option);
+        }
+        if (!windows.length) {
+          select.firstChild.textContent = type === "delivery" ? "Aucun créneau de livraison n’est disponible à cette date" : "Aucun créneau de collecte n’est disponible à cette date";
+          if (allowAlternatives) {
+            const nearest = await dateChangeNearest(token, date, type, start.value, end.value, config);
+            for (const direction of ["earlier", "later"]) {
+              const side = nearest.alternatives[direction]; if (!side) continue;
+              const heading = document.createElement("h4");
+              heading.textContent = `Créneau ${type === "delivery" ? "de livraison" : "de collecte"} disponible le plus proche ${direction === "earlier" ? "avant" : "après"} — ${formatDate(`${side.date}T12:00:00Z`)}`;
+              const quote = side.quote;
+              const details = document.createElement("p");
+              details.textContent = `Location actuelle : ${formatAmount(quote.currentRentalAmount)}. Nouvelle valorisation : ${formatAmount(quote.newRentalAmount)}. Montant à régler : ${formatAmount(quote.additionalAmountDue)}. Livraison : frais inchangés (${formatAmount(quote.deliveryChargeImpact)}). ${quote.priceDelta === 0 ? "Prix inchangé." : `Écart : ${quote.priceDelta > 0 ? "+" : "−"}${formatAmount(Math.abs(quote.priceDelta))}.`} TVA : non configurée. Le paiement déjà effectué ne sera pas débité à nouveau.`;
+              alternativesNode.append(heading, details);
+              for (const window of side.windows) {
+                const button = document.createElement("button"); button.type = "button";
+                button.textContent = `${window.label} (${window.startTime}–${window.endTime}) — choisir ce créneau`;
+                button.addEventListener("click", async () => {
+                  const targetDate = side.date;
+                  if (type === "delivery") start.value = targetDate; else end.value = targetDate;
+                  resetQuote();
+                  await loadWindows(targetDate, originalDate, type, select, false);
+                  if ([...select.options].some((option) => option.value === window.code)) {
+                    select.value = window.code;
+                    if (start.value !== currentStart && !deliveryWindow.value || end.value !== currentEnd && !collectionWindow.value) {
+                      setDateChangeStatus("Créneau sélectionné. Choisissez également l’autre créneau requis, puis vérifiez le montant.");
+                    } else form.requestSubmit();
+                  } else {
+                    setDateChangeStatus("Ce créneau vient d’être complet. Les disponibilités ont été actualisées.", true);
+                  }
+                });
+                alternativesNode.append(button);
+              }
+            }
+            alternativesNode.hidden = alternativesNode.childElementCount === 0;
+          }
+        }
+        return windows;
+      } catch { select.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Créneaux indisponibles" })); return []; }
+    };
+    start.addEventListener("change", () => { resetQuote(); void loadWindows(start.value, currentStart, "delivery", deliveryWindow); });
+    end.addEventListener("change", () => { resetQuote(); void loadWindows(end.value, currentEnd, "collection", collectionWindow); });
+    void loadWindows(currentStart, currentStart, "delivery", deliveryWindow);
+    void loadWindows(currentEnd, currentEnd, "collection", collectionWindow);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); resetQuote();
       if (!DATE(start.value) || !DATE(end.value) || end.value <= start.value) { setDateChangeStatus("Choisissez une période de location valide.", true); return; }
+      if (start.value !== currentStart && !deliveryWindow.value || end.value !== currentEnd && !collectionWindow.value) {
+        setDateChangeStatus("Choisissez un créneau de livraison et de collecte disponible.", true); return;
+      }
       quoteButton.disabled = true;
       try {
-        const { quote } = await dateChangeRequest(token, "quote", { newStartDate: start.value, newEndDate: end.value }, config);
+        const { quote } = await dateChangeRequest(token, "quote", { newStartDate: start.value, newEndDate: end.value,
+          ...(start.value !== currentStart ? { deliveryWindowCode: deliveryWindow.value } : {}),
+          ...(end.value !== currentEnd ? { collectionWindowCode: collectionWindow.value } : {}) }, config);
         if (!quote.eligible) throw new Error("not eligible");
-        quoteNode.textContent = `Période actuelle : du ${formatDate(`${quote.oldStartDate}T12:00:00Z`)} au ${formatDate(`${quote.oldEndDate}T12:00:00Z`)}. Nouvelle période : du ${formatDate(`${quote.newStartDate}T12:00:00Z`)} au ${formatDate(`${quote.newEndDate}T12:00:00Z`)}. Nouveau montant locatif calculé : ${formatAmount(quote.newRentalAmount)}. ` +
+        quoteNode.textContent = `Période actuelle : du ${formatDate(`${quote.oldStartDate}T12:00:00Z`)} au ${formatDate(`${quote.oldEndDate}T12:00:00Z`)}. Nouvelle période : du ${formatDate(`${quote.newStartDate}T12:00:00Z`)} au ${formatDate(`${quote.newEndDate}T12:00:00Z`)}. Montant historiquement payé : ${formatAmount(quote.currentPaidAmount)}. Valorisation locative actuelle : ${formatAmount(quote.currentRentalAmount)}. Nouvelle valorisation : ${formatAmount(quote.newRentalAmount)}. ` +
           (quote.mode === "extension" ? `Montant supplémentaire à régler : ${formatAmount(quote.additionalAmountDue)}. Utilisez le parcours de prolongation sécurisé.` :
             quote.mode === "payment_required" ? `Paiement requis avant modification : ${formatAmount(quote.additionalAmountDue)}.` :
             quote.mode === "review_required" ? `Montant supplémentaire calculé : ${formatAmount(quote.additionalAmountDue)}. Une vérification est nécessaire avant toute modification.` :
               quote.priceDelta < 0 ? `Montant initialement payé conservé : ${formatAmount(quote.currentPaidAmount)}. La réduction de la durée ne donne pas automatiquement lieu à un remboursement.` :
                 `Aucun frais de livraison supplémentaire. Aucun montant supplémentaire à régler.`);
-        quoteNode.dataset.start = start.value; quoteNode.dataset.end = end.value; quoteNode.dataset.mode = quote.mode;
+        quoteNode.textContent += ` Livraison : ${quote.deliveryWindow?.label || data.delivery?.time_slot || "créneau actuel conservé"}. Collecte : ${quote.collectionWindow?.label || data.collection?.time_slot || "créneau actuel conservé"}. Frais de livraison : inchangés (${formatAmount(quote.deliveryChargeImpact)}). TVA : non configurée. Le paiement déjà effectué ne sera pas débité à nouveau.`;
+        quoteNode.dataset.start = start.value; quoteNode.dataset.end = end.value; quoteNode.dataset.delivery = deliveryWindow.value; quoteNode.dataset.collection = collectionWindow.value; quoteNode.dataset.mode = quote.mode;
         if (quote.mode === "extension") extensionButton.hidden = false;
         else confirmButton.hidden = false;
         setDateChangeStatus("Disponibilité et impact tarifaire calculés par le serveur.");
       } catch {
         quoteNode.textContent = "";
+        if (start.value !== currentStart) await loadWindows(start.value, currentStart, "delivery", deliveryWindow);
+        if (end.value !== currentEnd) await loadWindows(end.value, currentEnd, "collection", collectionWindow);
         setDateChangeStatus("Ces dates ne sont pas disponibles pour une modification en ligne. Votre réservation reste inchangée.", true);
       } finally { quoteButton.disabled = false; }
     });
@@ -261,13 +344,15 @@
       setDateChangeStatus("Vérifiez le montant dans le parcours de prolongation avant de payer.");
     });
     confirmButton.addEventListener("click", async () => {
-      if (quoteNode.dataset.start !== start.value || quoteNode.dataset.end !== end.value || !global.crypto?.randomUUID) {
+      if (quoteNode.dataset.start !== start.value || quoteNode.dataset.end !== end.value || quoteNode.dataset.delivery !== deliveryWindow.value || quoteNode.dataset.collection !== collectionWindow.value || !global.crypto?.randomUUID) {
         setDateChangeStatus("Recalculez les dates avant de confirmer.", true); return;
       }
       confirmButton.disabled = true;
       setDateChangeStatus("Confirmation sécurisée en cours…");
       try {
         const { change } = await dateChangeRequest(token, "create", { newStartDate: start.value, newEndDate: end.value,
+          ...(start.value !== currentStart ? { deliveryWindowCode: deliveryWindow.value } : {}),
+          ...(end.value !== currentEnd ? { collectionWindowCode: collectionWindow.value } : {}),
           idempotencyKey: confirmButton.dataset.idempotencyKey || (confirmButton.dataset.idempotencyKey = global.crypto.randomUUID()) }, config);
         delete confirmButton.dataset.idempotencyKey;
         if (change.checkoutUrl && change.checkoutUrl.startsWith("https://checkout.stripe.com/")) {
@@ -281,6 +366,8 @@
         }
         setDateChangeStatus(change.status === "review_required" ? "Aucune date ni somme n’a été modifiée automatiquement." : "État confirmé par le serveur.");
       } catch {
+        if (start.value !== currentStart) await loadWindows(start.value, currentStart, "delivery", deliveryWindow);
+        if (end.value !== currentEnd) await loadWindows(end.value, currentEnd, "collection", collectionWindow);
         try {
           const fresh = await loadPortal(token, config);
           render(fresh);
@@ -327,10 +414,29 @@
     const quoteButton = id("extension-quote-button");
     const pay = id("extension-pay");
     const quote = id("extension-quote");
+    const collectionWindow = id("extension-collection-window");
     if (!panel.hidden && input) {
       const [year, month, day] = String(data.rental_end).slice(0, 10).split("-").map(Number);
       input.min = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
     }
+    input?.addEventListener("change", async () => {
+      if (quote) { quote.dataset.quoteDate = ""; delete quote.dataset.window; }
+      if (pay) pay.hidden = true;
+      if (!collectionWindow) return;
+      collectionWindow.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Chargement des créneaux…" }));
+      try {
+        const windows = await extensionWindows(token, input.value, config);
+        collectionWindow.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Conserver le créneau actuel s’il est disponible" }));
+        for (const window of windows) {
+          const option = document.createElement("option"); option.value = window.code;
+          option.textContent = `${window.label} (${window.startTime}–${window.endTime})`; collectionWindow.append(option);
+        }
+      } catch { collectionWindow.replaceChildren(Object.assign(document.createElement("option"), { value: "", textContent: "Créneaux indisponibles" })); }
+    });
+    collectionWindow?.addEventListener("change", () => {
+      if (quote) { quote.dataset.quoteDate = ""; delete quote.dataset.window; }
+      if (pay) pay.hidden = true;
+    });
     if (open && form) open.addEventListener("click", () => { form.hidden = false; open.hidden = true; input?.focus(); });
     if (form) form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -338,12 +444,19 @@
       quoteButton.disabled = true;
       if (pay) pay.hidden = true;
       try {
-        const result = await extensionRequest(token, "quote", { newEndDate: input.value }, config);
+        const result = await extensionRequest(token, "quote", { newEndDate: input.value,
+          ...(collectionWindow?.value ? { collectionWindowCode: collectionWindow.value } : {}) }, config);
         const q = result.quote;
         if (!q || !DATE(q.currentEndDate) || !DATE(q.newEndDate) || !Number.isInteger(q.addedDays) ||
             !Number.isFinite(q.additionalAmount) || q.currency !== "EUR" || q.newEndDate <= q.currentEndDate) throw new Error("invalid quote");
+        if (q.collectionWindowRequired) {
+          quote.textContent = "Le créneau de collecte actuel est indisponible à cette date. Choisissez un créneau puis recalculez le montant.";
+          quote.dataset.quoteDate = ""; if (pay) pay.hidden = true; return;
+        }
         quote.textContent = `Fin actuelle : ${formatDate(`${q.currentEndDate}T12:00:00Z`)}. Nouvelle fin : ${formatDate(`${q.newEndDate}T12:00:00Z`)}. ${q.addedDays} jour(s) supplémentaire(s) : ${formatAmount(q.additionalAmount)}. Aucun nouveau frais de livraison ni dépôt n’est inclus.`;
-        quote.dataset.quoteDate = q.newEndDate;
+        quote.textContent += ` Collecte : ${q.collectionWindow?.label || "créneau actuel conservé"}.`;
+        quote.dataset.quoteDate = q.newEndDate; quote.dataset.window = q.collectionWindow?.code || "";
+        quote.dataset.window = q.collectionWindow?.code || "";
         if (pay) pay.hidden = false;
         setExtensionStatus("Le montant et la disponibilité ont été vérifiés par le serveur.");
       } catch (error) {
@@ -358,7 +471,9 @@
       pay.disabled = true;
       setExtensionStatus("Création sécurisée du paiement supplémentaire…");
       try {
-        const result = await extensionRequest(token, "create", { newEndDate: input.value, idempotencyKey: global.crypto.randomUUID() }, config);
+        if (!quote.dataset.window) { setExtensionStatus("Le serveur n’a pas confirmé de créneau de collecte.", true); return; }
+        const result = await extensionRequest(token, "create", { newEndDate: input.value, collectionWindowCode: quote.dataset.window,
+          idempotencyKey: global.crypto.randomUUID() }, config);
         if (!result.checkout || typeof result.checkout.url !== "string" || !result.checkout.url.startsWith("https://checkout.stripe.com/")) throw new Error("invalid checkout");
         global.location.assign(result.checkout.url);
       } catch {
@@ -405,7 +520,7 @@
     } finally { if (root) root.setAttribute("aria-busy", "false"); }
   }
   global.IgReservationPortal = Object.freeze({ tokenFromFragment, validPayload, loadPortal, validExtensionStatus,
-    extensionRequest, renderExtensionAvailability, renderExtensionResult, processExtensionReturn,
+    extensionRequest, renderExtensionAvailability, renderExtensionResult, processExtensionReturn, extensionWindows, dateChangeWindows, dateChangeNearest,
     validDateChangeQuote, validDateChangeResult, dateChangeRequest, renderDateChangeAvailability, renderDateChangeResult, processDateChangeReturn, render, start });
   if (global.document && typeof global.document.getElementById === "function") start();
 })(window);

@@ -46,6 +46,51 @@ test("date-change request sends portal capability to server without reservation 
   assert.equal(source.includes("sessionStorage"), false);
 });
 
+test("date-change flow asks backend for capability-scoped delivery and collection windows", async () => {
+  const api = loadApi();
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body); calls.push(request);
+    return { ok: true, async json() { return { ok: true, serviceDate: request.serviceDate,
+      serviceType: request.serviceType, windows: [{ code: "0900-1100", label: "Matin", startTime: "09:00", endTime: "11:00" }] }; } };
+  };
+  const token = `p1.${"b".repeat(64)}`;
+  const windows = await api.dateChangeWindows(token, "2039-01-11", "delivery",
+    { projectUrl: "https://fxhdxilvbzojkyyhktnu.supabase.co", publishableKey: "public-test" }, fetchImpl);
+  assert.equal(windows[0].code, "0900-1100");
+  assert.deepEqual(calls[0], { action: "windows", token, serviceDate: "2039-01-11", serviceType: "delivery" });
+  assert.match(html, /date-change-delivery-window/);
+  assert.match(html, /date-change-collection-window/);
+  assert.match(source, /quote\.currentPaidAmount/);
+  assert.match(source, /quote\.currentRentalAmount/);
+  assert.match(source, /quote\.newRentalAmount/);
+  assert.match(source, /ne sera pas débité à nouveau/);
+});
+
+test("no-slot date-change lookup returns nearest alternatives with backend-authoritative quote data", async () => {
+  const api = loadApi();
+  const token = `p1.${"c".repeat(64)}`;
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body); calls.push(request);
+    return { ok: true, async json() { return { ok: true, alternatives: {
+      earlier: { date: "2039-01-09", timeZone: "Europe/Paris", windows: [{ code: "0900-1100", label: "Matin", startTime: "09:00", endTime: "11:00" }],
+        quote: { eligible: true, additionalAmountDue: 10, currentRentalAmount: 59, newRentalAmount: 69, priceDelta: 10 } },
+      later: null,
+    } }; } };
+  };
+  const result = await api.dateChangeRequest(token, "nearest", { serviceDate: "2039-01-10", serviceType: "delivery",
+    newStartDate: "2039-01-10", newEndDate: "2039-01-17" },
+    { projectUrl: "https://fxhdxilvbzojkyyhktnu.supabase.co", publishableKey: "test" }, fetchImpl);
+  assert.equal(result.alternatives.earlier.quote.additionalAmountDue, 10);
+  assert.deepEqual(calls[0], { action: "nearest", token, serviceDate: "2039-01-10", serviceType: "delivery",
+    newStartDate: "2039-01-10", newEndDate: "2039-01-17" });
+  assert.match(html, /date-change-delivery-alternatives/);
+  assert.match(html, /date-change-collection-alternatives/);
+  assert.match(source, /Aucun créneau de livraison n’est disponible à cette date/);
+  assert.match(source, /Ce créneau vient d’être complet/);
+});
+
 test("change status is accepted only from backend-shaped server state", () => {
   const api = loadApi();
   assert.equal(api.validDateChangeResult({ ok: true, change: { id: "00000000-0000-4000-8000-000000000001", status: "confirmed" } }), true);
