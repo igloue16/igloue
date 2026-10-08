@@ -6,6 +6,7 @@ const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 const authSource = fs.readFileSync(path.join(root, "assets/js/admin-auth.js"), "utf8");
 const appSource = fs.readFileSync(path.join(root, "assets/js/admin-app.js"), "utf8");
+const boardSource = fs.readFileSync(path.join(root, "assets/js/operations-board.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "admin/index.html"), "utf8");
 const configToml = fs.readFileSync(path.join(root, "supabase/config.toml"), "utf8");
 
@@ -16,7 +17,8 @@ function createSdkEnvironment() {
   let signInResult = null;
   let updateUserResult = null;
   const authListeners = new Set();
-  const calls = { createdWith: null, signIns: [], signOuts: [], updatedPasswords: [], tableQueries: [], replacedUrl: null };
+  let operationsBoardResult = null;
+  const calls = { createdWith: null, signIns: [], signOuts: [], updatedPasswords: [], tableQueries: [], rpcCalls: [], replacedUrl: null };
 
   const client = {
     auth: {
@@ -66,6 +68,10 @@ function createSdkEnvironment() {
         }
       };
       return builder;
+    },
+    async rpc(name, parameters) {
+      calls.rpcCalls.push({ name, parameters });
+      return { data: operationsBoardResult, error: null };
     }
   };
 
@@ -93,6 +99,7 @@ function createSdkEnvironment() {
       session = nextUser ? { ...nextSession, user: nextUser } : null;
     },
     setMemberships(rows) { membershipRows = rows; },
+    setOperationsBoardResult(value) { operationsBoardResult = value; },
     setSignInResult(result) { signInResult = result; },
     setUpdateUserResult(result) { updateUserResult = result; },
     async detectInviteCallback(params = { type: "invite", access_token: "callback-token-must-not-leak" }) {
@@ -127,7 +134,8 @@ function createFakeDocument() {
     "admin-login-form", "admin-email", "admin-password", "admin-login-button",
     "admin-membership-selector", "admin-organisation", "admin-organisation-submit",
     "admin-authorized", "admin-organisation-name", "admin-sign-out", "admin-retry", "admin-status",
-    "admin-invite-form", "admin-invite-password", "admin-invite-password-confirm", "admin-invite-button", "admin-invite-invalid"
+    "admin-invite-form", "admin-invite-password", "admin-invite-password-confirm", "admin-invite-button", "admin-invite-invalid",
+    "ops-feedback", "ops-summary", "ops-jobs", "ops-date", "ops-timezone", "ops-filter", "ops-refresh"
   ];
   const nodes = new Map(ids.map((id) => [id, new FakeElement()]));
   const card = new FakeElement();
@@ -181,6 +189,18 @@ async function settle() { await new Promise((resolve) => setImmediate(resolve));
   assert.equal((await env.auth.loadActiveMemberships()).length, 2, "multiple active memberships are retained");
   assert.equal(env.auth.getSelectedOrganisation(), null, "multiple memberships require an explicit choice");
   assert.equal(env.auth.selectOrganisation("org-b").id, "org-b", "selection is limited to a verified membership");
+
+  env.setOperationsBoardResult({ metadata: { organisationName: "Wrong tenant", timezone: "Europe/Paris", localToday: "2026-10-08", selectedDate: "2026-10-08" },
+    summary: { deliveriesToday: 0, collectionsToday: 0, overdueJobs: 0, completedJobs: 0, attentionJobs: 0 }, jobs: [] });
+  await assert.rejects(() => env.auth.loadDailyOperationsBoard(), /ADMIN_OPERATIONS_BOARD_UNAVAILABLE/,
+    "invalid server response fails closed");
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.rpcCalls.at(-1))), { name: "get_admin_daily_operations_board_v1",
+    parameters: { p_organisation_id: "org-b", p_scheduled_date: null } },
+    "board query uses only a verified membership and the dedicated read RPC");
+  env.setOperationsBoardResult({ metadata: { organisationName: "Other", timezone: "Europe/Paris", localToday: "2026-10-08", selectedDate: "2026-10-08" },
+    summary: { deliveriesToday: 0, collectionsToday: 0, overdueJobs: 0, completedJobs: 0, attentionJobs: 0 }, jobs: [] });
+  assert.equal((await env.auth.loadDailyOperationsBoard()).metadata.organisationName, "Other",
+    "valid scoped board data is returned after backend response validation");
 
   const signedOut = await env.auth.signOut();
   assert.equal(signedOut.ok, true, "sign-out succeeds");
@@ -364,15 +384,17 @@ async function settle() { await new Promise((resolve) => setImmediate(resolve));
   assert.match(emailConfig, /^enable_signup = false$/m, "local email provider disables public signup");
   assert.match(emailConfig, /^enable_confirmations = true$/m, "local Supabase Auth requires confirmed email");
   assert.doesNotMatch(html, /sign\s*up|créer\s+un\s+compte/i, "admin page has no public registration flow");
-  assert.match(html, /admin-auth\.js[\s\S]*admin-app\.js/, "admin page loads its separate auth and app modules");
+  assert.match(html, /admin-auth\.js[\s\S]*operations-board\.js[\s\S]*admin-app\.js/, "admin page loads auth, board renderer, and app modules in order");
+  assert.match(html, /readonly|lecture seule/i, "support workspace is explicitly presented as read-only");
+  assert.match(authSource, /rpc\("get_admin_daily_operations_board_v1"/, "board data uses the dedicated backend RPC");
   assert.match(html, /id="admin-invite-form"[\s\S]*autocomplete="new-password"/, "admin page includes an invitation password form");
   assert.match(authSource, /detectSessionInUrl:\s*detectAuthCallback/, "Supabase JS callback detection is enabled for the static page");
   assert.match(authSource, /auth\.updateUser\(\{ password \}\)/, "invite password uses the authenticated updateUser API");
   assert.match(authSource, /history\.replaceState/, "successful invite completion removes callback state from browser history");
-  assert.doesNotMatch(authSource + appSource, /console\.(?:log|error|warn)\s*\([^\n]*(?:token|callback|session)/i, "admin code never logs auth callback credentials");
-  assert.doesNotMatch(authSource + appSource, /textContent\s*=\s*[^;]*(?:access_token|refresh_token|error_description)/i, "admin code never renders callback credentials");
+  assert.doesNotMatch(authSource + appSource + boardSource, /console\.(?:log|error|warn)\s*\([^\n]*(?:token|callback|session)/i, "admin code never logs auth callback credentials");
+  assert.doesNotMatch(authSource + appSource + boardSource, /textContent\s*=\s*[^;]*(?:access_token|refresh_token|error_description)/i, "admin code never renders callback credentials");
   assert.equal(/\.from\s*\(\s*["'](?!organisation_members)/.test(authSource + appSource), false, "admin code makes no customer, payment, or dashboard query");
-  assert.equal(/service_role|sb_secret_|SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|ZEPTOMAIL_API_TOKEN/i.test(authSource + appSource + html), false, "admin source contains no server secret key material");
+  assert.equal(/service_role|sb_secret_|SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|ZEPTOMAIL_API_TOKEN/i.test(authSource + appSource + boardSource + html), false, "admin source contains no server secret key material");
   assert.equal(/localStorage|sessionStorage|location\.search|URLSearchParams/.test(authSource + appSource), false, "organisation selection is not trusted from browser storage or URL");
   console.log("Admin auth V1 tests passed (auth, membership, and route-gating scenarios).");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

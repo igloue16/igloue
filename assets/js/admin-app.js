@@ -6,9 +6,13 @@
       status: "checking",
       memberships: [],
       selectedOrganisation: null,
+      board: null,
+      boardFilter: "all",
+      boardMessage: "Chargement du planning…",
       message: "Vérification de votre session…"
     };
     let revision = 0;
+    let boardRevision = 0;
     let unsubscribe = null;
 
     const byId = (id) => document.getElementById(id);
@@ -46,6 +50,52 @@
       if (state.selectedOrganisation && byId("admin-organisation-name")) {
         byId("admin-organisation-name").textContent = state.selectedOrganisation.name || state.selectedOrganisation.slug;
       }
+      renderBoard();
+    }
+
+    function renderBoard() {
+      const feedback = byId("ops-feedback");
+      const summary = byId("ops-summary");
+      const jobs = byId("ops-jobs");
+      if (!feedback || !summary || !jobs) return;
+      feedback.textContent = state.boardMessage;
+      summary.replaceChildren();
+      jobs.replaceChildren();
+      if (state.status !== "ready" || !state.board) return;
+      const renderer = global.IGLOUE_OPERATIONS_BOARD;
+      if (!renderer || typeof renderer.render !== "function") {
+        feedback.textContent = "Le planning opérationnel est indisponible.";
+        return;
+      }
+      const view = renderer.render(state.board, state.boardFilter);
+      const dateControl = byId("ops-date");
+      if (dateControl && dateControl.value !== view.date) dateControl.value = view.date;
+      const timezone = byId("ops-timezone");
+      if (timezone) timezone.textContent = view.timezone;
+      feedback.textContent = `Journée ${view.date.split("-").reverse().join("/")} · ${view.timezone}`;
+      summary.innerHTML = view.summary;
+      jobs.innerHTML = view.jobs;
+    }
+
+    async function loadOperationsBoard(scheduledDate = null) {
+      const requestRevision = ++boardRevision;
+      const organisationId = state.selectedOrganisation && state.selectedOrganisation.id;
+      if (state.status !== "ready" || !organisationId || typeof auth.loadDailyOperationsBoard !== "function") return;
+      state.board = null;
+      state.boardMessage = "Chargement du planning…";
+      render();
+      try {
+        const board = await auth.loadDailyOperationsBoard(scheduledDate);
+        if (requestRevision !== boardRevision || state.status !== "ready" ||
+            !state.selectedOrganisation || state.selectedOrganisation.id !== organisationId) return;
+        state.board = board;
+        state.boardMessage = "";
+      } catch {
+        if (requestRevision !== boardRevision) return;
+        state.board = null;
+        state.boardMessage = "Impossible de charger le planning. Vérifiez votre accès puis réessayez.";
+      }
+      render();
     }
 
     async function processSession(session) {
@@ -53,6 +103,9 @@
       state.status = "checking";
       state.memberships = [];
       state.selectedOrganisation = null;
+      state.board = null;
+      state.boardMessage = "Chargement du planning…";
+      boardRevision += 1;
       state.message = "Vérification de votre session…";
       render();
 
@@ -109,6 +162,7 @@
           state.status = state.selectedOrganisation ? "ready" : "no_membership";
           state.message = state.selectedOrganisation ? "Accès à votre organisation vérifié." : "Aucun accès actif à une organisation n’est configuré.";
           render();
+          if (state.status === "ready") await loadOperationsBoard(null);
         } else {
           state.status = "needs_selection";
           state.message = "Plusieurs organisations sont accessibles. Choisissez celle à ouvrir.";
@@ -182,10 +236,13 @@
     }
     async function handleSignOut() {
       ++revision;
+      boardRevision += 1;
       state.status = "signing_out";
       state.message = "Déconnexion…";
       state.memberships = [];
       state.selectedOrganisation = null;
+      state.board = null;
+      state.boardMessage = "Connectez-vous pour consulter le planning.";
       render();
       await auth.signOut();
       state.status = "signed_out";
@@ -207,6 +264,7 @@
       state.status = "ready";
       state.message = "Accès à votre organisation vérifié.";
       render();
+      void loadOperationsBoard(null);
     }
 
     async function init() {
@@ -220,6 +278,18 @@
       choiceButton && choiceButton.addEventListener("click", handleOrganisationChoice);
       const retryButton = byId("admin-retry");
       retryButton && retryButton.addEventListener("click", () => initSession());
+      const refreshBoard = byId("ops-refresh");
+      refreshBoard && refreshBoard.addEventListener("click", () => {
+        const date = byId("ops-date") && byId("ops-date").value;
+        void loadOperationsBoard(date || null);
+      });
+      const dateControl = byId("ops-date");
+      dateControl && dateControl.addEventListener("change", () => void loadOperationsBoard(dateControl.value || null));
+      const filterControl = byId("ops-filter");
+      filterControl && filterControl.addEventListener("change", () => {
+        state.boardFilter = ["all", "delivery", "collection", "attention"].includes(filterControl.value) ? filterControl.value : "all";
+        render();
+      });
 
       try {
         unsubscribe = auth.subscribe(({ event, session }) => {
@@ -228,6 +298,9 @@
             state.status = "signed_out";
             state.memberships = [];
             state.selectedOrganisation = null;
+            state.board = null;
+            state.boardMessage = "Connectez-vous pour consulter le planning.";
+            boardRevision += 1;
             state.message = "Vous êtes déconnecté.";
             render();
           } else if (["INITIAL_SESSION", "SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) {
@@ -259,7 +332,9 @@
         status: state.status,
         message: state.message,
         memberships: state.memberships.map((membership) => ({ ...membership })),
-        selectedOrganisation: state.selectedOrganisation ? { ...state.selectedOrganisation } : null
+        selectedOrganisation: state.selectedOrganisation ? { ...state.selectedOrganisation } : null,
+        board: state.board,
+        boardMessage: state.boardMessage
       };
     }
 

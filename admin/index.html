@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../assets/js/supabase-config.js" defer></script>
   <script src="../assets/js/admin-auth.js" defer></script>
+  <script src="../assets/js/operations-board.js" defer></script>
   <script src="../assets/js/admin-app.js" defer></script>
 </head>
 <body>
@@ -51,8 +52,29 @@
       </section>
 
       <section id="admin-authorized" class="admin-authorized" hidden>
-        <p id="admin-organisation-name" class="admin-organisation-name"></p>
-        <p>Votre accès est vérifié. Le tableau de bord sera disponible dans une prochaine étape.</p>
+        <header class="ops-header">
+          <div>
+            <p id="admin-organisation-name" class="admin-organisation-name"></p>
+            <h1>Livraisons et collectes</h1>
+            <p class="ops-readonly">Planning op&#233;rationnel &middot; lecture seule</p>
+          </div>
+        </header>
+        <p class="ops-timezone-line">Fuseau horaire du tenant : <strong id="ops-timezone"></strong></p>
+        <div class="ops-controls">
+          <label for="ops-date">Journ&#233;e</label>
+          <input id="ops-date" type="date">
+          <label for="ops-filter">Afficher</label>
+          <select id="ops-filter">
+            <option value="all">Tout</option>
+            <option value="delivery">Livraisons</option>
+            <option value="collection">Collectes</option>
+            <option value="attention">&#192; suivre</option>
+          </select>
+          <button id="ops-refresh" type="button">Actualiser</button>
+        </div>
+        <p id="ops-feedback" class="admin-status" role="status" aria-live="polite">Chargement du planning...</p>
+        <div id="ops-summary" class="ops-summary" aria-label="R&#233;sum&#233; de la journ&#233;e"></div>
+        <div id="ops-jobs" class="ops-jobs"></div>
       </section>
 
       <button id="admin-sign-out" class="admin-secondary" type="button" hidden>Se déconnecter</button>

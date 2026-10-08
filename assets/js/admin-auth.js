@@ -5,6 +5,7 @@
   let currentUser = null;
   let memberships = [];
   let selectedOrganisation = null;
+  let accessRevision = 0;
   let inviteCallbackDetected = false;
   let inviteCallbackError = false;
   const listeners = new Set();
@@ -52,6 +53,7 @@
   }
 
   function clearAdminState() {
+    accessRevision += 1;
     currentUser = null;
     memberships = [];
     selectedOrganisation = null;
@@ -189,6 +191,7 @@
   }
 
   async function loadActiveMemberships() {
+    accessRevision += 1;
     memberships = [];
     selectedOrganisation = null;
     if (!currentUser || !currentUser.emailConfirmed) throw new Error("ADMIN_MEMBERSHIP_UNAVAILABLE");
@@ -216,9 +219,45 @@
   }
 
   function selectOrganisation(organisationId) {
+    accessRevision += 1;
     const match = memberships.find((membership) => membership.id === String(organisationId || ""));
     selectedOrganisation = match || null;
     return match ? { ...match } : null;
+  }
+
+  async function loadDailyOperationsBoard(scheduledDate = null) {
+    if (!currentUser || !currentUser.emailConfirmed || !selectedOrganisation ||
+        !memberships.some((membership) => membership.id === selectedOrganisation.id)) {
+      throw new Error("ADMIN_OPERATIONS_ACCESS_UNAVAILABLE");
+    }
+    if (scheduledDate !== null && (typeof scheduledDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate))) {
+      throw new Error("ADMIN_OPERATIONS_DATE_INVALID");
+    }
+    const organisationId = selectedOrganisation.id;
+    const userId = currentUser.id;
+    const requestRevision = ++accessRevision;
+    try {
+      const { data, error } = await getClient().rpc("get_admin_daily_operations_board_v1", {
+        p_organisation_id: organisationId,
+        p_scheduled_date: scheduledDate
+      });
+      if (error || !data || typeof data !== "object" || Array.isArray(data) ||
+          !data.metadata || data.metadata.organisationName !== selectedOrganisation.name ||
+          typeof data.metadata.timezone !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data.metadata.localToday) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(data.metadata.selectedDate) ||
+          !data.summary || !["deliveriesToday", "collectionsToday", "overdueJobs", "completedJobs", "attentionJobs"]
+            .every((key) => Number.isInteger(data.summary[key]) && data.summary[key] >= 0) || !Array.isArray(data.jobs)) {
+        throw new Error("Invalid operations board response");
+      }
+      if (requestRevision !== accessRevision || !currentUser || currentUser.id !== userId ||
+          !selectedOrganisation || selectedOrganisation.id !== organisationId ||
+          !memberships.some((membership) => membership.id === organisationId)) {
+        throw new Error("Operations board request superseded");
+      }
+      return data;
+    } catch {
+      throw new Error("ADMIN_OPERATIONS_BOARD_UNAVAILABLE");
+    }
   }
 
   function subscribe(listener) {
@@ -243,6 +282,7 @@
     discardInvitationCallback,
     completeInvitation,
     selectOrganisation,
+    loadDailyOperationsBoard,
     getActiveMemberships: () => memberships.map((membership) => ({ ...membership })),
     getSelectedOrganisation: () => selectedOrganisation ? { ...selectedOrganisation } : null,
     subscribe
