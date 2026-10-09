@@ -19,6 +19,7 @@
     approved: "APPROUVÉ",
     rejected: "REFUSÉ",
     expired: "EXPIRÉ",
+    acknowledged: "ACQUITTÉ",
     failed: "ÉCHEC",
     resolved: "RÉSOLU",
     dismissed: "CLOS",
@@ -28,6 +29,27 @@
     attention: "ATTENTION",
     critical: "CRITIQUE",
     unknown: "INCONNU",
+  };
+  const incidentTypeLabels = {
+    payment_reservation_mismatch: "Incohérence paiement / réservation",
+    provider_processing_failures: "Échecs de traitement webhook",
+    confirmation_delivery_failure: "Échec de confirmation e-mail",
+    scheduled_job_health: "Tâche planifiée",
+    expired_hold_accumulation: "Accumulation de holds expirés",
+    workflow_failure_cluster: "Échecs répétés d’un parcours",
+  };
+  const incidentCodeLabels = {
+    paid_reservation_not_paid: "Paiement enregistré, réservation non confirmée",
+    provider_retry_exhausted: "Échecs webhook répétés ou reprises épuisées",
+    confirmation_email_failed: "Confirmation e-mail en échec ou reprise trop longue",
+    repeated_workflow_failures: "Plusieurs étapes du parcours ont échoué",
+    expired_holds_accumulating: "Plusieurs holds expirés restent actifs",
+    scheduled_job_evidence_missing: "Aucune preuve récente d’exécution",
+    scheduled_job_disabled: "Tâche désactivée",
+    scheduled_job_repeated_failures: "Échecs répétés de la tâche",
+    scheduled_job_failed: "Dernière exécution en échec",
+    scheduled_job_late: "Exécution attendue en retard",
+    scheduled_job_state_unknown: "État de la dernière exécution inconnu",
   };
   const SUPPORT_SESSION_KEY = "igloue.platform-admin.support-session";
   const app = {
@@ -154,6 +176,69 @@
     }
     if (!data || typeof data !== "object" || !["healthy", "attention", "critical", "unknown"].includes(data.status)) {
       throw new Error("Réponse de santé plateforme invalide.");
+    }
+    return data;
+  }
+  async function readIncidents(statusFilter = "active", limit = 50) {
+    if (!["active", "recovered", "all"].includes(statusFilter) || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new Error("Requête d’incidents invalide.");
+    }
+    const { data, error } = await getClient().rpc("platform_incidents_v1", {
+      p_status: statusFilter,
+      p_limit: limit,
+    });
+    if (error) {
+      const code = String(error.code || "");
+      if (code === "42501" || /access denied|permission/i.test(String(error.message || ""))) throw new Error("DENIED");
+      throw new Error("Lecture des incidents indisponible.");
+    }
+    if (!Array.isArray(data) || data.some((item) => !item || typeof item !== "object" ||
+      !["healthy", "attention", "critical", "unknown"].includes(item.severity) ||
+      !["open", "acknowledged", "recovered"].includes(item.status))) {
+      throw new Error("Réponse d’incidents invalide.");
+    }
+    return data;
+  }
+  async function readIncidentEngineHealth() {
+    const { data, error } = await getClient().rpc("platform_incident_engine_health_v1");
+    if (error) {
+      const code = String(error.code || "");
+      if (code === "42501" || /access denied|permission/i.test(String(error.message || ""))) throw new Error("DENIED");
+      throw new Error("État du détecteur d’incidents indisponible.");
+    }
+    if (!data || data.name !== "igloue-platform-incident-evaluation" ||
+      !["healthy", "attention", "critical", "unknown"].includes(data.status)) {
+      throw new Error("Réponse du détecteur d’incidents invalide.");
+    }
+    return data;
+  }
+  async function acknowledgeIncident(incidentId, reason) {
+    if (typeof incidentId !== "string" || !/^[0-9a-f-]{36}$/i.test(incidentId) ||
+      typeof reason !== "string" || reason.trim().length < 5 || reason.trim().length > 500) {
+      throw new Error("Motif d’acquittement requis.");
+    }
+    const { data, error } = await getClient().rpc("platform_incident_acknowledge_v1", {
+      p_incident_id: incidentId,
+      p_reason: reason.trim(),
+    });
+    if (error) {
+      const code = String(error.code || "");
+      if (code === "42501" || /access denied|permission/i.test(String(error.message || ""))) throw new Error("DENIED");
+      throw new Error("Acquittement de l’incident impossible.");
+    }
+    if (data !== true) throw new Error("L’incident n’a pas pu être acquitté.");
+    return true;
+  }
+  async function readWorkflowTrace(workflowId) {
+    if (typeof workflowId !== "string" || !/^[0-9a-f-]{36}$/i.test(workflowId)) throw new Error("Référence de trace invalide.");
+    const { data, error } = await getClient().rpc("platform_workflow_trace_v1", { p_workflow_id: workflowId });
+    if (error) {
+      const code = String(error.code || "");
+      if (code === "42501" || /access denied|permission/i.test(String(error.message || ""))) throw new Error("DENIED");
+      throw new Error("Lecture de la trace indisponible.");
+    }
+    if (!Array.isArray(data) || data.some((event) => !event || typeof event !== "object" || typeof event.event_key !== "string")) {
+      throw new Error("Réponse de trace invalide.");
     }
     return data;
   }
@@ -762,7 +847,7 @@
     if (!(data.requests || []).length) card.append(make("p", "empty", "Aucune demande de gouvernance."));
     target.append(card);
   }
-  function renderOperationalHealth(data) {
+  async function renderOperationalHealth(data) {
     const target = el("platform-content");
     const summary = panel("État général", "health-summary");
     const summaryLine = line(summary, `État évalué ${date(data.evaluated_at)}`, "Indicateurs agrégés à partir des données opérationnelles et de l’historique cron.", data.status);
@@ -803,6 +888,61 @@
       line(jobs, job.name, `Actif : ${job.active === true ? "oui" : job.active === false ? "non" : "inconnu"} · dernière exécution : ${date(job.last_started_at)} · échecs sur une heure : ${job.failures_last_hour ?? "—"}`, job.status || "unknown");
     });
     target.append(jobs);
+    const incidents = panel("Incidents détectés", "platform-incidents");
+    const [activeIncidents, recoveredIncidents] = await Promise.all([readIncidents("active", 50), readIncidents("recovered", 20)]);
+    const engineHealth = await readIncidentEngineHealth();
+    const engine = panel("Détecteur d’incidents", "incident-engine");
+    line(engine, engineHealth.name, `Actif : ${engineHealth.active === true ? "oui" : engineHealth.active === false ? "non" : "inconnu"} · dernière évaluation SQL : ${date(engineHealth.last_started_at)} · statut : ${engineHealth.last_run_status || "inconnu"}`, engineHealth.status);
+    target.append(engine);
+    const canManageResult = await getClient().rpc("platform_has_permission", { p_permission: "platform.incidents.manage" });
+    const canManage = !canManageResult.error && canManageResult.data === true;
+    incidents.append(make("p", "row-meta", "Détection issue des registres opérationnels. Les alertes restent internes au tableau de bord; aucun e-mail ni SMS n’est envoyé."));
+    if (!activeIncidents.length) incidents.append(make("p", "empty", "Aucun incident actif."));
+    activeIncidents.forEach((incident) => {
+      const item = line(incidents, `${incidentTypeLabels[incident.incident_type] || incident.incident_type} · ${incidentCodeLabels[incident.safe_code] || incident.safe_code}`,
+        `Détecté ${date(incident.first_detected_at)} · dernière observation ${date(incident.last_observed_at)} · occurrences ${incident.occurrence_count}`,
+        incident.severity);
+      item.classList.add("platform-incident-row");
+      const controls = make("div", "incident-controls");
+      if (incident.status === "acknowledged") controls.append(status("acknowledged"));
+      if (incident.workflow_id) {
+        const trace = make("button", "support-detail-button", "Ouvrir la trace");
+        trace.type = "button";
+        trace.addEventListener("click", async () => {
+          trace.disabled = true;
+          try {
+            const events = await readWorkflowTrace(incident.workflow_id);
+            const tracePanel = panel(`Trace · ${incident.safe_code}`, "incident-trace");
+            events.forEach((event) => line(tracePanel, event.event_key, `${event.outcome} · ${date(event.occurred_at)}${event.safe_error_code ? ` · ${event.safe_error_code}` : ""}`, event.outcome === "success" ? "healthy" : event.outcome.includes("failure") ? "attention" : null));
+            if (!events.length) tracePanel.append(make("p", "empty", "Aucun événement de trace disponible."));
+            target.append(tracePanel);
+          } catch (_) {
+            setFeedback("Impossible de lire la trace avec les permissions actuelles.", true);
+          } finally { trace.disabled = false; }
+        });
+        controls.append(trace);
+      }
+      if (canManage && incident.status === "open") {
+        const acknowledge = make("button", "support-detail-button", "Acquitter");
+        acknowledge.type = "button";
+        acknowledge.addEventListener("click", async () => {
+          const reason = global.prompt("Motif d’acquittement (5 caractères minimum)");
+          if (reason === null) return;
+          try {
+            await acknowledgeIncident(incident.incident_id, reason);
+            await loadSection("health");
+          } catch (_) { setFeedback("Acquittement refusé ou indisponible. Vérifiez votre permission et le motif.", true); }
+        });
+        controls.append(acknowledge);
+      }
+      if (controls.childNodes.length) item.append(controls);
+    });
+    const recovered = panel(`Incidents récupérés récents (${recoveredIncidents.length})`, "platform-incidents-recovered");
+    recoveredIncidents.forEach((incident) => line(recovered,
+      `${incidentTypeLabels[incident.incident_type] || incident.incident_type} · ${incidentCodeLabels[incident.safe_code] || incident.safe_code}`,
+      `Récupéré ${date(incident.recovered_at)} · occurrences ${incident.occurrence_count}`,incident.severity));
+    if (!recoveredIncidents.length) recovered.append(make("p", "empty", "Aucun incident récupéré récent."));
+    target.append(incidents, recovered);
   }
   const renderers = {
     overview: renderOverview,
@@ -964,6 +1104,10 @@
     configuration,
     read,
     readOperationalHealth,
+    readIncidents,
+    readIncidentEngineHealth,
+    acknowledgeIncident,
+    readWorkflowTrace,
     openSupportSession,
     readSupportSession,
     readSupportWorkspace,
