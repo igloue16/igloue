@@ -60,6 +60,12 @@
       : "<li>\u00c9quipement non renseign\u00e9</li>";
     const phone = job.customerPhone ? `<a href="tel:${escape(job.customerPhone)}">${escape(job.customerPhone)}</a>` : "T\u00e9l\u00e9phone non renseign\u00e9";
     const notes = job.notes ? `<p><strong>Note op\u00e9rationnelle</strong><br>${escape(job.notes)}</p>` : "";
+    const verifyAction = job.type === "delivery" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(job.serviceJobId || "")) &&
+      ["assigned", "en_route", "arrived", "handover_in_progress"].includes(String(job.status || "")) &&
+      !["completed", "cancelled"].includes(String(job.state || ""))
+      ? `<button class="handover-open-button" type="button" data-verify-delivery="${escape(job.serviceJobId)}">Vérifier la livraison</button>`
+      : "";
     return `<details class="ops-job ops-state-${escape(job.state)}${job.needsAttention ? " ops-needs-attention" : ""}">
       <summary>
         <span class="ops-job-time">${escape(job.window?.start || "\u2014")}</span>
@@ -75,6 +81,7 @@
         <p><strong>Paiement</strong><br>${escape(job.paymentStatus || "Indisponible")}</p>
         ${notes}
         ${warningMarkup ? `<div class="ops-warning"><strong>\u00c0 v\u00e9rifier</strong><ul>${warningMarkup}</ul></div>` : ""}
+        ${verifyAction}
       </div>
     </details>`;
   }

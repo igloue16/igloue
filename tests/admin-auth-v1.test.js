@@ -18,7 +18,8 @@ function createSdkEnvironment() {
   let updateUserResult = null;
   const authListeners = new Set();
   let operationsBoardResult = null;
-  const calls = { createdWith: null, signIns: [], signOuts: [], updatedPasswords: [], tableQueries: [], rpcCalls: [], replacedUrl: null };
+  let functionResult = null;
+  const calls = { createdWith: null, signIns: [], signOuts: [], updatedPasswords: [], tableQueries: [], rpcCalls: [], functionInvokes: [], replacedUrl: null };
 
   const client = {
     auth: {
@@ -72,6 +73,12 @@ function createSdkEnvironment() {
     async rpc(name, parameters) {
       calls.rpcCalls.push({ name, parameters });
       return { data: operationsBoardResult, error: null };
+    },
+    functions: {
+      async invoke(name, options) {
+        calls.functionInvokes.push({ name, options });
+        return functionResult || { data: null, error: null };
+      }
     }
   };
 
@@ -100,6 +107,7 @@ function createSdkEnvironment() {
     },
     setMemberships(rows) { membershipRows = rows; },
     setOperationsBoardResult(value) { operationsBoardResult = value; },
+    setFunctionResult(value) { functionResult = value; },
     setSignInResult(result) { signInResult = result; },
     setUpdateUserResult(result) { updateUserResult = result; },
     async detectInviteCallback(params = { type: "invite", access_token: "callback-token-must-not-leak" }) {
@@ -202,11 +210,51 @@ async function settle() { await new Promise((resolve) => setImmediate(resolve));
   assert.equal((await env.auth.loadDailyOperationsBoard()).metadata.organisationName, "Other",
     "valid scoped board data is returned after backend response validation");
 
+  const handoverRequest = {
+    serviceJobId: "00000000-0000-4000-8000-00000000e851",
+    credentialType: "qr_token", credential: `hv1.${"A".repeat(43)}`,
+    requestId: "00000000-0000-4000-8000-00000000e861"
+  };
+  env.setFunctionResult({ data: {
+    ok: true, verification_id: "00000000-0000-4000-8000-00000000e862", verification_status: "verified",
+    service_job_id: handoverRequest.serviceJobId, operation: "delivery", reservation_reference: "AB12CD34",
+    schedule: { date: "2026-10-09", time_slot: "early", status: "assigned" },
+    equipment: [{ equipment_id: "unit-1", product_name: "Équipement test", serial_number: null }],
+    secret_extra: "must-not-escape"
+  }, error: null });
+  const handover = await env.auth.verifyCustomerHandover({ ...handoverRequest, organisationId: "untrusted-tenant" });
+  assert.equal(handover.ok, true, "authenticated staff verification accepts the allowlisted response");
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.functionInvokes.at(-1))), {
+    name: "verify-customer-handover", options: { body: handoverRequest }
+  }, "verification sends only the job-bound credential through the authenticated function client and ignores browser tenant IDs");
+  assert.equal(JSON.stringify(handover).includes("secret_extra"), false, "verification response is reduced to permitted display fields");
+  for (const httpStatus of [401, 403, 422, 503]) {
+    env.setFunctionResult({ data: null, error: { context: { status: httpStatus }, message: "sensitive server detail" } });
+    const denied = await env.auth.verifyCustomerHandover(handoverRequest);
+    assert.deepEqual(JSON.parse(JSON.stringify(denied)), { ok: false, status: httpStatus }, `HTTP ${httpStatus} is returned without backend details`);
+  }
+  env.setFunctionResult({ data: {
+    ok: true, verification_id: "00000000-0000-4000-8000-00000000e862", verification_status: "verified",
+    service_job_id: handoverRequest.serviceJobId, operation: "delivery", reservation_reference: "AB12CD34",
+    schedule: { date: "2026-10-09", time_slot: "early", status: "assigned" },
+    equipment: [{ equipment_id: "unit-1", product_name: "Équipement test", serial_number: "SER-1" }]
+  }, error: null });
+  const numericHandover = await env.auth.verifyCustomerHandover({ ...handoverRequest, credentialType: "numeric_code", credential: "12345678" });
+  assert.equal(numericHandover.ok, true, "numeric fallback uses the same authenticated verification endpoint");
+  assert.equal(env.calls.functionInvokes.at(-1).options.body.credentialType, "numeric_code");
+  env.setFunctionResult(null);
+  const beforeInvalidCall = env.calls.functionInvokes.length;
+  assert.deepEqual(JSON.parse(JSON.stringify(await env.auth.verifyCustomerHandover({ ...handoverRequest, credential: "bad" }))),
+    { ok: false, status: 400 }, "malformed credentials fail locally");
+  assert.equal(env.calls.functionInvokes.length, beforeInvalidCall, "malformed credentials are never sent");
+
   const signedOut = await env.auth.signOut();
   assert.equal(signedOut.ok, true, "sign-out succeeds");
   assert.equal(await env.auth.getSession(), null, "sign-out clears the session");
   assert.equal(env.auth.getActiveMemberships().length, 0, "sign-out clears local memberships");
   assert.equal(env.auth.getSelectedOrganisation(), null, "sign-out clears selected organisation");
+  assert.deepEqual(JSON.parse(JSON.stringify(await env.auth.verifyCustomerHandover(handoverRequest))),
+    { ok: false, status: 401 }, "verification helper refuses to call the Edge Function after sign-out");
 
   env.setSignInResult({ data: { user: null }, error: { message: "Invalid login credentials" } });
   const invalid = await env.auth.signIn("staff@example.com", "bad-password");

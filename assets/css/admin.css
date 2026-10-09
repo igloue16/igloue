@@ -142,6 +142,37 @@ body[data-admin-state="ready"] .admin-card { padding: clamp(20px, 3vw, 34px); }
 .ops-warning { grid-column: 1 / -1; padding: 12px; border: 1px solid #e6b6aa; border-radius: 9px; background: #fff5f1; color: #793827; }
 .ops-empty { padding: 22px; border: 1px dashed #b9cbd0; border-radius: 12px; text-align: center; color: #526b75; }
 
+.handover-open-button, .handover-primary, .handover-close {
+  min-height: 52px;
+  padding: 12px 18px;
+  border: 1px solid #173a48;
+  border-radius: 10px;
+  background: #173a48;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.handover-open-button { grid-column: 1 / -1; justify-self: start; margin-top: 6px; }
+.handover-panel { margin-top: 20px; padding: clamp(18px, 3vw, 30px); border: 2px solid #2a7180; border-radius: 16px; background: #fff; box-shadow: 0 14px 40px rgb(24 49 61 / 12%); color: #18313d; }
+.handover-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.handover-panel-header h2 { margin-top: 4px; }
+.handover-close { flex: 0 0 auto; border-color: #bacbd0; background: #fff; color: #173a48; }
+.handover-job-summary { margin: 0 0 14px; font-weight: 700; }
+.handover-status { min-height: 1.5em; padding: 12px 14px; border-radius: 10px; background: #eef5f6; color: #274c58; font-weight: 700; line-height: 1.5; }
+.handover-status[data-state="error"] { background: #fff0eb; color: #8d3421; }
+.handover-status[data-state="success"] { background: #eaf7ee; color: #246b44; }
+.handover-scan-area { display: grid; justify-items: start; gap: 8px; margin: 16px 0; }
+.handover-video { width: min(100%, 480px); aspect-ratio: 4 / 3; border-radius: 12px; background: #10202a; object-fit: cover; }
+.handover-hint { margin: 0; color: #526b75; font-size: .9rem; }
+.handover-code-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px 14px; max-width: 620px; padding-top: 16px; border-top: 1px solid #d8e3e5; }
+.handover-code-form label { grid-column: 1 / -1; color: #18313d; font-weight: 750; }
+.handover-code-form input { width: 100%; min-height: 56px; padding: 12px 16px; border: 2px solid #9db4bb; border-radius: 10px; font-size: 1.35rem; font-weight: 800; letter-spacing: .18em; }
+.handover-code-form input:focus, .handover-primary:focus-visible, .handover-open-button:focus-visible, .handover-close:focus-visible { outline: 3px solid #94c8d2; outline-offset: 3px; }
+.handover-result { margin-top: 18px; padding: 16px; border: 1px solid #aed8c1; border-radius: 12px; background: #eff9f2; color: #214c35; }
+.handover-result h3 { margin: 0 0 10px; font-size: 1.1rem; }
+.handover-result p { margin: 6px 0; }
+.handover-result ul { margin-bottom: 0; }
+
 @media (max-width: 480px) {
   .admin-shell { width: min(100% - 24px, 520px); padding-top: 18px; }
   .admin-header { padding-bottom: 24px; }
@@ -160,4 +191,8 @@ body[data-admin-state="ready"] .admin-card { padding: clamp(20px, 3vw, 34px); }
   .ops-job summary::after { grid-column: 2; }
   .ops-job-detail { grid-template-columns: 1fr; padding: 14px; }
   .ops-warning { grid-column: auto; }
+  .handover-code-form { grid-template-columns: 1fr; }
+  .handover-code-form label { grid-column: auto; }
+  .handover-code-form button, .handover-primary, .handover-open-button, .handover-close { width: 100%; }
+  .handover-panel-header { align-items: stretch; flex-direction: column; }
 }
