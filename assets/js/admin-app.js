@@ -345,7 +345,7 @@
     }
 
     render();
-    return Object.freeze({ init, destroy, getState, signOut: handleSignOut, chooseOrganisation: handleOrganisationChoice });
+    return Object.freeze({ init, destroy, getState, refreshOperationsBoard: loadOperationsBoard, signOut: handleSignOut, chooseOrganisation: handleOrganisationChoice });
   }
 
   // TODO(Security): before production, require and verify MFA assurance for owner/admin accounts.

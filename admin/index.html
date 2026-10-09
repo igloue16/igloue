@@ -78,18 +78,18 @@
         <div id="ops-jobs" class="ops-jobs"></div>
         <section id="handover-panel" class="handover-panel" role="region" aria-labelledby="handover-title" hidden>
           <header class="handover-panel-header">
-            <div><p class="admin-eyebrow">V&#233;rification s&#233;curis&#233;e</p><h2 id="handover-title">V&#233;rifier la livraison</h2></div>
+            <div><p class="admin-eyebrow">Remise s&#233;curis&#233;e</p><h2 id="handover-title">V&#233;rifier le client et remettre l&#8217;&#233;quipement</h2></div>
             <button id="handover-close" class="handover-close" type="button" aria-label="Fermer la v&#233;rification">Fermer</button>
           </header>
           <p id="handover-job-summary" class="handover-job-summary"></p>
-          <p id="handover-status" class="handover-status" role="status" aria-live="polite">Demandez au client de pr&#233;senter son code.</p>
+          <p id="handover-status" class="handover-status" role="status" aria-live="polite">Marquez votre arriv&#233;e, puis demandez au client de pr&#233;senter son code.</p>
           <div class="handover-scan-area">
             <video id="handover-video" class="handover-video" playsinline muted hidden aria-label="Aper&#231;u de la cam&#233;ra pour scanner le QR code"></video>
             <button id="handover-scan" class="handover-primary" type="button">Scanner le QR code</button>
-            <p class="handover-hint">La cam&#233;ra d&#233;marre uniquement apr&#232;s votre action. Aucune image n&#8217;est envoy&#233;e.</p>
+            <p class="handover-hint">La cam&#233;ra d&#233;marre uniquement apr&#232;s votre action. Les images restent dans le stockage priv&#233; de votre organisation.</p>
           </div>
           <form id="handover-code-form" class="handover-code-form" novalidate>
-            <label for="handover-code">Ou saisir le code &#224; 8 chiffres</label>
+            <label for="handover-code">Ou saisir le code client &#224; 8 chiffres</label>
             <input id="handover-code" name="handover-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" maxlength="8" aria-describedby="handover-status">
             <button id="handover-submit" class="handover-primary" type="submit">V&#233;rifier le code</button>
           </form>

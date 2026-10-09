@@ -298,6 +298,7 @@
         equipment.push({ equipment_id: item.equipment_id, product_name: item.product_name, serial_number: item.serial_number });
       }
       return { ok: true, data: {
+        request_id: value.requestId,
         reservation_reference: data.reservation_reference,
         schedule: { date: data.schedule.date, time_slot: data.schedule.time_slot, status: data.schedule.status },
         equipment
@@ -305,6 +306,50 @@
     } catch {
       return { ok: false, status: 0 };
     }
+  }
+
+  async function handoverRpc(name, args, allowedNames) {
+    if (!currentUser || !currentUser.emailConfirmed || !selectedOrganisation || !memberships.some((m) => m.id === selectedOrganisation.id)) return { ok: false, status: 401 };
+    if (!allowedNames.includes(name)) return { ok: false, status: 400 };
+    try {
+      const { data, error } = await getClient().rpc(name, { ...args, p_organisation_id: selectedOrganisation.id });
+      if (error) {
+        const status = Number(error.status || error.context && error.context.status);
+        return { ok: false, status: [401,403,400,404,409,422,503].includes(status) ? status : 0 };
+      }
+      return { ok: true, data };
+    } catch { return { ok: false, status: 0 }; }
+  }
+  async function getDeliveryHandover(serviceJobId) {
+    return handoverRpc("get_admin_delivery_handover_v1", { p_service_job_id: serviceJobId }, ["get_admin_delivery_handover_v1"]);
+  }
+  async function prepareDeliveryHandover(serviceJobId, verificationRequestId, idempotencyKey) {
+    return handoverRpc("prepare_admin_delivery_handover_v1", { p_service_job_id: serviceJobId, p_verification_request_id: verificationRequestId, p_idempotency_key: idempotencyKey }, ["prepare_admin_delivery_handover_v1"]);
+  }
+  async function verifyDeliveryEquipment(serviceJobId, machineCode) {
+    return handoverRpc("verify_admin_delivery_equipment_v1", { p_service_job_id: serviceJobId, p_machine_code: machineCode }, ["verify_admin_delivery_equipment_v1"]);
+  }
+  async function updateDeliveryInspection(serviceJobId, subjectId, condition, summaryNote, checklist) {
+    return handoverRpc("update_admin_delivery_inspection_v1", { p_service_job_id: serviceJobId, p_subject_id: subjectId, p_condition: condition, p_note: summaryNote, p_checklist: checklist }, ["update_admin_delivery_inspection_v1"]);
+  }
+  async function attachDeliveryEvidence(serviceJobId, fileId, fileKind, machineId = null, signedName = null, acknowledgesFindings = false) {
+    return handoverRpc("attach_admin_delivery_handover_evidence_v1", { p_service_job_id: serviceJobId, p_file_id: fileId, p_file_kind: fileKind, p_machine_id: machineId, p_signed_name: signedName, p_acknowledges_findings: acknowledgesFindings }, ["attach_admin_delivery_handover_evidence_v1"]);
+  }
+  async function confirmDeliveryHandover(serviceJobId, expectedVersion, idempotencyKey) {
+    return handoverRpc("confirm_admin_delivery_handover_v1", { p_service_job_id: serviceJobId, p_expected_version: expectedVersion, p_idempotency_key: idempotencyKey }, ["confirm_admin_delivery_handover_v1"]);
+  }
+  async function progressDelivery(serviceJobId, expectedVersion, target) {
+    const names = { en_route: "admin_start_delivery_v1", arrived: "admin_arrive_delivery_v1" };
+    return handoverRpc(names[target] || "", { p_service_job_id: serviceJobId, p_expected_version: expectedVersion }, Object.values(names));
+  }
+  async function uploadDeliveryEvidence({ file, organisationId, reservationId, inspectionId, kind, idempotencyKey }) {
+    if (!currentUser || !currentUser.emailConfirmed || !selectedOrganisation || selectedOrganisation.id !== organisationId || !(file instanceof Blob) || !["image/png", "image/jpeg"].includes(file.type)) return { ok: false, status: 401 };
+    try {
+      const headers = { "content-type": file.type, "x-file-action": "upload", "x-file-domain": "evidence", "x-file-kind": kind, "x-organisation-id": organisationId, "x-reservation-id": reservationId, "x-inspection-id": inspectionId, "x-file-name": kind === "signature" ? "customer-signature.png" : file.type === "image/png" ? "delivery-condition.png" : "delivery-condition.jpg", "x-file-idempotency-key": idempotencyKey };
+      const { data, error } = await getClient().functions.invoke("tenant-files", { body: file, headers });
+      if (error || !data || data.ok !== true || typeof data.fileId !== "string") return { ok: false, status: Number(error && (error.status || error.context && error.context.status)) || 0 };
+      return { ok: true, data: { fileId: data.fileId, sha256: typeof data.sha256 === "string" ? data.sha256 : null } };
+    } catch { return { ok: false, status: 0 }; }
   }
 
   function subscribe(listener) {
@@ -331,6 +376,14 @@
     selectOrganisation,
     loadDailyOperationsBoard,
     verifyCustomerHandover,
+    getDeliveryHandover,
+    prepareDeliveryHandover,
+    verifyDeliveryEquipment,
+    updateDeliveryInspection,
+    attachDeliveryEvidence,
+    confirmDeliveryHandover,
+    progressDelivery,
+    uploadDeliveryEvidence,
     getActiveMemberships: () => memberships.map((membership) => ({ ...membership })),
     getSelectedOrganisation: () => selectedOrganisation ? { ...selectedOrganisation } : null,
     subscribe

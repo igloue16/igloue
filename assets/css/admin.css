@@ -172,6 +172,22 @@ body[data-admin-state="ready"] .admin-card { padding: clamp(20px, 3vw, 34px); }
 .handover-result h3 { margin: 0 0 10px; font-size: 1.1rem; }
 .handover-result p { margin: 6px 0; }
 .handover-result ul { margin-bottom: 0; }
+.handover-result-workflow { display: grid; gap: 14px; }
+.handover-result-workflow h3, .handover-result-workflow h4 { margin: 0; }
+.handover-equipment-list { display: grid; gap: 14px; }
+.handover-equipment-card { display: grid; gap: 12px; padding: 16px; border: 1px solid #c9d9dd; border-radius: 12px; background: #f8fbfc; }
+.handover-field { display: grid; gap: 7px; color: #18313d; font-weight: 700; }
+.handover-input { width: 100%; min-height: 52px; padding: 11px 13px; border: 2px solid #9db4bb; border-radius: 10px; color: #18313d; background: #fff; font: inherit; }
+textarea.handover-input { min-height: 90px; resize: vertical; }
+.handover-secondary { min-height: 54px; padding: 12px 18px; border: 2px solid #8aaab3; border-radius: 10px; background: #fff; color: #173a48; font: inherit; font-weight: 800; cursor: pointer; }
+.handover-complete-note, .handover-confirmed { color: #246b44; font-weight: 800; }
+.handover-attention-note { padding: 12px; border-left: 4px solid #c56c38; background: #fff7ed; font-weight: 700; }
+.handover-acknowledgement { display: flex; align-items: center; gap: 12px; min-height: 48px; font-weight: 700; }
+.handover-acknowledgement input { width: 24px; height: 24px; flex: 0 0 auto; }
+.handover-signature-canvas { display: block; width: 100%; height: 180px; border: 2px dashed #7898a2; border-radius: 12px; background: #fff; touch-action: none; }
+.handover-confirm-button { min-height: 60px; padding: 14px 22px; border: 0; border-radius: 11px; background: #1d6e4b; color: #fff; font: inherit; font-weight: 850; cursor: pointer; }
+.handover-primary:disabled, .handover-secondary:disabled, .handover-confirm-button:disabled { opacity: .55; cursor: wait; }
+@media (min-width: 760px) { .handover-equipment-list { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
 
 @media (max-width: 480px) {
   .admin-shell { width: min(100% - 24px, 520px); padding-top: 18px; }
