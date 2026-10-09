@@ -260,6 +260,53 @@
     }
   }
 
+  async function verifyCustomerHandover(request) {
+    if (!currentUser || !currentUser.emailConfirmed) return { ok: false, status: 401 };
+    const value = request || {};
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validCredential = value.credentialType === "qr_token"
+      ? typeof value.credential === "string" && /^hv1\.[A-Za-z0-9_-]{43}$/.test(value.credential)
+      : value.credentialType === "numeric_code" && typeof value.credential === "string" && /^\d{8}$/.test(value.credential);
+    if (!uuid.test(String(value.serviceJobId || "")) || !uuid.test(String(value.requestId || "")) || !validCredential) {
+      return { ok: false, status: 400 };
+    }
+    try {
+      const { data, error } = await getClient().functions.invoke("verify-customer-handover", {
+        body: {
+          serviceJobId: value.serviceJobId,
+          credentialType: value.credentialType,
+          credential: value.credential,
+          requestId: value.requestId
+        }
+      });
+      if (error) {
+        const responseStatus = Number(error.status || error.context && error.context.status);
+        return { ok: false, status: [401, 403, 422, 400, 503].includes(responseStatus) ? responseStatus : 0 };
+      }
+      if (!data || data.ok !== true || data.verification_status !== "verified" ||
+          data.operation !== "delivery" || data.service_job_id !== value.serviceJobId ||
+          typeof data.verification_id !== "string" || typeof data.reservation_reference !== "string" ||
+          !/^[A-F0-9]{8}$/.test(data.reservation_reference) || !data.schedule ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(String(data.schedule.date || "")) ||
+          !(data.schedule.time_slot === null || typeof data.schedule.time_slot === "string") ||
+          typeof data.schedule.status !== "string" || !Array.isArray(data.equipment) ||
+          data.equipment.length < 1 || data.equipment.length > 20) return { ok: false, status: 503 };
+      const equipment = [];
+      for (const item of data.equipment) {
+        if (!item || typeof item.equipment_id !== "string" || typeof item.product_name !== "string" ||
+            !(item.serial_number === null || typeof item.serial_number === "string")) return { ok: false, status: 503 };
+        equipment.push({ equipment_id: item.equipment_id, product_name: item.product_name, serial_number: item.serial_number });
+      }
+      return { ok: true, data: {
+        reservation_reference: data.reservation_reference,
+        schedule: { date: data.schedule.date, time_slot: data.schedule.time_slot, status: data.schedule.status },
+        equipment
+      } };
+    } catch {
+      return { ok: false, status: 0 };
+    }
+  }
+
   function subscribe(listener) {
     if (typeof listener !== "function") return () => {};
     listeners.add(listener);
@@ -283,6 +330,7 @@
     completeInvitation,
     selectOrganisation,
     loadDailyOperationsBoard,
+    verifyCustomerHandover,
     getActiveMemberships: () => memberships.map((membership) => ({ ...membership })),
     getSelectedOrganisation: () => selectedOrganisation ? { ...selectedOrganisation } : null,
     subscribe

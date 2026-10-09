@@ -18,6 +18,8 @@
     const byId = (id) => document.getElementById(id);
     const show = (id, visible) => { const node = byId(id); if (node) node.hidden = !visible; };
     const setMessage = (message) => { if (byId("admin-status")) byId("admin-status").textContent = message; };
+    const handover = global.IGLOUE_HANDOVER_VERIFICATION &&
+      global.IGLOUE_HANDOVER_VERIFICATION.createController(auth, document);
 
     function render() {
       document.body.dataset.adminState = state.status;
@@ -81,6 +83,7 @@
       const requestRevision = ++boardRevision;
       const organisationId = state.selectedOrganisation && state.selectedOrganisation.id;
       if (state.status !== "ready" || !organisationId || typeof auth.loadDailyOperationsBoard !== "function") return;
+      handover && handover.close();
       state.board = null;
       state.boardMessage = "Chargement du planning…";
       render();
@@ -237,6 +240,7 @@
     async function handleSignOut() {
       ++revision;
       boardRevision += 1;
+      handover && handover.close();
       state.status = "signing_out";
       state.message = "Déconnexion…";
       state.memberships = [];
@@ -268,6 +272,7 @@
     }
 
     async function init() {
+      handover && handover.init();
       const form = byId("admin-login-form");
       form && form.addEventListener("submit", handleLogin);
       const inviteForm = byId("admin-invite-form");
@@ -295,6 +300,7 @@
         unsubscribe = auth.subscribe(({ event, session }) => {
           if (event === "SIGNED_OUT") {
             ++revision;
+            handover && handover.close();
             state.status = "signed_out";
             state.memberships = [];
             state.selectedOrganisation = null;

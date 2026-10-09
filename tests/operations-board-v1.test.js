@@ -16,7 +16,7 @@ const fixture = {
   summary: { deliveriesToday: 2, collectionsToday: 1, overdueJobs: 1, completedJobs: 0, attentionJobs: 1 },
   jobs: [
     {
-      type: "delivery", state: "overdue", status: "assigned", needsAttention: true,
+      type: "delivery", state: "overdue", status: "assigned", serviceJobId: "00000000-0000-4000-8000-00000000e851", needsAttention: true,
       customerName: "<img src=x onerror=alert(1)>", customerPhone: "06 12 34 56 78",
       reservationReference: "AB12CD34", scheduledDate: "2026-10-08", paymentStatus: "paid",
       window: { start: "08:00", end: "10:00", label: "Morning" },
@@ -44,6 +44,8 @@ assert.doesNotMatch(all.jobs, /<img src=x/);
 assert.match(all.jobs, /&lt;img src=x onerror=alert\(1\)&gt;/);
 assert.match(all.jobs, /href="tel:06 12 34 56 78"/);
 assert.equal((all.jobs.match(/<details\b/g) || []).length, 3, "unknown service types are excluded");
+assert.equal((all.jobs.match(/data-verify-delivery=/g) || []).length, 1, "only an eligible delivery with a service job ID gets the verification action");
+assert.match(all.jobs, /Vérifier la livraison/);
 assert.equal((board.render(fixture, "delivery").jobs.match(/<details\b/g) || []).length, 2);
 assert.equal((board.render(fixture, "collection").jobs.match(/<details\b/g) || []).length, 1);
 assert.equal((board.render(fixture, "attention").jobs.match(/<details\b/g) || []).length, 1);
@@ -51,6 +53,6 @@ assert.match(board.render({ ...fixture, jobs: [] }).jobs, /Aucune intervention/)
 assert.match(board.render(null).jobs, /indisponibles/);
 assert.match(html, /id="ops-filter"/);
 assert.match(html, /id="ops-date"/);
-assert.match(html, /operations-board\.js[\s\S]*admin-app\.js/);
+assert.match(html, /operations-board\.js[\s\S]*handover-verification\.js[\s\S]*admin-app\.js/);
 
 console.log("Operations board V1 renderer tests passed (filters, allowlisted rendering, and HTML escaping).");
