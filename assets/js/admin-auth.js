@@ -351,6 +351,15 @@
       return { ok: true, data: { fileId: data.fileId, sha256: typeof data.sha256 === "string" ? data.sha256 : null } };
     } catch { return { ok: false, status: 0 }; }
   }
+  async function downloadDeliveryEvidence(fileId) {
+    const validFileId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(fileId || ""));
+    if (!currentUser || !currentUser.emailConfirmed || !selectedOrganisation || !validFileId) return { ok: false, status: 401 };
+    try {
+      const { data, error } = await getClient().functions.invoke("tenant-files", { body: { action: "download", fileId } });
+      if (error || !data || data.ok !== true || typeof data.url !== "string") return { ok: false, status: Number(error && (error.status || error.context && error.context.status)) || 0 };
+      return { ok: true, data: { url: data.url, expiresInSeconds: Number(data.expiresInSeconds) || 60, mediaType: data.mediaType } };
+    } catch { return { ok: false, status: 0 }; }
+  }
 
   function subscribe(listener) {
     if (typeof listener !== "function") return () => {};
@@ -384,6 +393,7 @@
     confirmDeliveryHandover,
     progressDelivery,
     uploadDeliveryEvidence,
+    downloadDeliveryEvidence,
     getActiveMemberships: () => memberships.map((membership) => ({ ...membership })),
     getSelectedOrganisation: () => selectedOrganisation ? { ...selectedOrganisation } : null,
     subscribe

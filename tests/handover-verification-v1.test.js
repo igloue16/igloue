@@ -17,7 +17,7 @@ class Element {
   focus() { this.focused = true; }
   pause() {}
   async play() {}
-  querySelectorAll(selector) { const all = []; const visit = (node) => { for (const child of node.children || []) { if (selector === "[data-checklist-key]" && child.dataset?.checklistKey || selector === "[data-condition-for]" && child.dataset?.conditionFor || selector === "[data-machine-id]" && child.dataset?.machineId || selector === "textarea" && child.tagName === "textarea") all.push(child); visit(child); } }; visit(this); return all; }
+  querySelectorAll(selector) { const all = []; const visit = (node) => { for (const child of node.children || []) { const match = /^\[data-([a-z-]+)\]$/.exec(selector); const dataKey = match && match[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase()); if (match && child.dataset?.[dataKey] !== undefined || selector === ".handover-field-error" && child.className === "handover-field-error" || selector === "[data-machine-id]" && child.dataset?.machineId || selector === "textarea" && child.tagName === "textarea") all.push(child); visit(child); } }; visit(this); return all; }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   closest(selector) { let node = this; while (node) { if (selector === ".handover-equipment-card" && node.className === "handover-equipment-card") return node; node = node.parentElement; } return null; }
   getContext() { return { scale() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, clearRect() {}, drawImage() {} }; }
@@ -163,7 +163,8 @@ async function run() {
     async getDeliveryHandover() { return { ok: true, data: photoContext }; },
     async getSelectedOrganisation() { return { id: "tenant-1" }; },
     async uploadDeliveryEvidence(request) { photoCalls.upload.push(request); uploadAttempt += 1; return uploadAttempt === 1 ? { ok: false, status: 0 } : { ok: true, data: { fileId: "file-1" } }; },
-    async attachDeliveryEvidence() { photoCalls.attach += 1; return photoCalls.attach === 1 ? { ok: false, status: 503 } : { ok: true }; }
+    async attachDeliveryEvidence() { photoCalls.attach += 1; if (photoCalls.attach === 1) return { ok: false, status: 503 }; photoContext.inspection.subjects[0].photoEvidence = { fileId: "file-1", savedAt: "2026-10-10T10:00:00Z", linkedAt: "2026-10-10T10:00:00Z" }; photoContext.inspection.subjects[0].photoAttached = true; return { ok: true, data: { attached: true, fileId: "file-1" } }; },
+    async downloadDeliveryEvidence(fileId) { assert.equal(fileId, "file-1"); return { ok: true, data: { url: "https://signed.invalid/temporary" } }; }
   } });
   await photoUI.controller.open(job);
   const photoCard = find(photoUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
@@ -175,20 +176,92 @@ async function run() {
   assert.match(photoUI.nodes.get("handover-status").textContent, /vérifiez la connexion/i);
   photoButton.emit("click"); await tick();
   assert.equal(photoInput.value, "C:\\fakepath\\capture.jpg", "failed evidence association retains selection and file ID");
-  assert.match(photoUI.nodes.get("handover-status").textContent, /association reste à confirmer/i);
+  assert.match(photoUI.nodes.get("handover-status").textContent, /pas encore associée/i);
   photoButton.emit("click"); await tick();
   assert.equal(photoCalls.upload.length, 2, "retry after successful upload does not upload a duplicate object");
   assert.equal(photoCalls.upload[0].idempotencyKey, photoCalls.upload[1].idempotencyKey, "unknown upload outcome retries with the same idempotency key");
   assert.equal(photoCalls.attach, 2, "association retries using the previously returned file ID");
   assert.equal(photoInput.value, "", "selection clears only after successful association");
-  assert.equal(photoCard.children.some((node) => /Photo de l’équipement enregistrée/.test(node.textContent || "")), true);
+  assert.equal(photoCard.children.some((node) => node.className === "handover-photo-state" && find(node, (child) => child.tagName === "img" && child.src === "https://signed.invalid/temporary")), true, "saved thumbnail reloads through the authorized short-lived download path");
+  assert.match(photoUI.nodes.get("handover-status").textContent, /Photo enregistrée côté serveur/);
+  const persistedPhotoContext = handoverContext(false, true);
+  persistedPhotoContext.inspection.subjects[0].photoAttached = true;
+  persistedPhotoContext.inspection.subjects[0].photoEvidence = { fileId: "file-1", savedAt: "2026-10-10T10:00:00Z", linkedAt: "2026-10-10T10:00:00Z" };
+  const reloadedPhoto = setup({ auth: {
+    async getDeliveryHandover() { return { ok: true, data: persistedPhotoContext }; },
+    async downloadDeliveryEvidence() { return { ok: true, data: { url: "https://signed.invalid/reloaded" } }; }
+  } });
+  await reloadedPhoto.controller.open(job); await tick();
+  const reloadedCard = find(reloadedPhoto.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  assert.match(find(reloadedCard, (node) => node.className === "handover-photo-state").children[0].textContent, /Enregistré · 10\/10\/2026/);
+  assert.equal(find(reloadedCard, (node) => node.tagName === "img").src, "https://signed.invalid/reloaded", "saved photo and server timestamp return after a new page session");
+  photoContext.handover.signatureAttached = true; photoContext.handover.signedName = "Synthetic Customer";
+  photoContext.handover.signedAt = "2026-10-10T10:01:00Z";
+  photoContext.handover.signatureEvidence = { fileId: "signature-file", savedAt: "2026-10-10T10:01:00Z" };
+  const reloadedSignature = setup({ auth: { async getDeliveryHandover() { return { ok: true, data: photoContext }; } } });
+  await reloadedSignature.controller.open(job);
+  assert.match(reloadedSignature.nodes.get("handover-result").children.map((n) => n.textContent).join(" "), /Enregistré · signature de Synthetic Customer/);
+  assert.match(reloadedSignature.nodes.get("handover-result").children.map((n) => n.textContent).join(" "), /10\/10\/2026/);
+
+  const incompleteConfirmContext = handoverContext(false, true);
+  let incompleteConfirmCalls = 0;
+  const blockedConfirm = setup({ auth: {
+    async getDeliveryHandover() { return { ok: true, data: incompleteConfirmContext }; },
+    async confirmDeliveryHandover() { incompleteConfirmCalls += 1; return { ok: true, data: { status: "confirmed" } }; }
+  } });
+  await blockedConfirm.controller.open(job);
+  const blockedButton = find(blockedConfirm.nodes.get("handover-result"), (node) => node.tagName === "button" && node.textContent === "Confirmer la remise");
+  blockedButton.emit("click"); await tick();
+  assert.equal(incompleteConfirmCalls, 0, "incomplete server state is never submitted for confirmation");
+  assert.match(blockedConfirm.nodes.get("handover-status").textContent, /aucune confirmation n’a été envoyée/i);
+  assert.match(find(blockedConfirm.nodes.get("handover-result"), (node) => node.dataset.confirmValidation === "true").children[1].children.map((n) => n.textContent).join(" "), /checklist de livraison non configurée/);
+
+  const completeHandover = handoverContext(false, true);
+  Object.assign(completeHandover.inspection.subjects[0], {
+    condition: "good", equipmentVerified: true,
+    checklist: [{ key: "power", label: "Alimentation", result: "pass" }],
+    photoAttached: true, photoEvidence: { fileId: "photo-file", savedAt: "2026-10-10T10:00:00Z" }
+  });
+  completeHandover.handover.signatureAttached = true;
+  completeHandover.handover.signedName = "Synthetic Customer";
+  completeHandover.handover.signedAt = "2026-10-10T10:01:00Z";
+  completeHandover.handover.signatureEvidence = { fileId: "signature-file", savedAt: "2026-10-10T10:01:00Z" };
+  let confirmed = false; let confirmationCalls = 0;
+  const confirmedContext = { ...completeHandover, jobStatus: "completed", handover: { ...completeHandover.handover, status: "confirmed", confirmedAt: "2026-10-10T10:02:00Z" } };
+  const confirmedUI = setup({ auth: {
+    async getDeliveryHandover() { return { ok: true, data: confirmed ? confirmedContext : completeHandover }; },
+    async confirmDeliveryHandover() { confirmationCalls += 1; confirmed = true; return { ok: true, data: { status: "confirmed" } }; }
+  } });
+  await confirmedUI.controller.open(job);
+  const confirmButton = find(confirmedUI.nodes.get("handover-result"), (node) => node.tagName === "button" && node.textContent === "Confirmer la remise");
+  confirmButton.emit("click"); confirmButton.emit("click"); await tick(); await tick();
+  assert.equal(confirmationCalls, 1, "duplicate confirmation submits are suppressed");
+  assert.match(find(confirmedUI.nodes.get("handover-result"), (node) => node.className === "handover-completed-title").textContent, /Remise terminée/);
+  assert.match(confirmedUI.nodes.get("handover-result").children.map((n) => n.textContent).join(" "), /10\/10\/2026/);
+
+  let interruptedConfirmationCalls = 0;
+  const interruptedContext = handoverContext(false, true);
+  Object.assign(interruptedContext.inspection.subjects[0], { condition: "good", equipmentVerified: true, checklist: [{ key: "power", label: "Alimentation", result: "pass" }], photoEvidence: { fileId: "photo-file", savedAt: "2026-10-10T10:00:00Z" } });
+  interruptedContext.handover.signatureAttached = true; interruptedContext.handover.signatureEvidence = { fileId: "signature-file", savedAt: "2026-10-10T10:01:00Z" }; interruptedContext.handover.signedAt = "2026-10-10T10:01:00Z";
+  const interrupted = setup({ auth: {
+    async getDeliveryHandover() { return { ok: true, data: interruptedContext }; },
+    async confirmDeliveryHandover() { interruptedConfirmationCalls += 1; throw new Error("network interrupted"); }
+  } });
+  await interrupted.controller.open(job);
+  const interruptedResult = interrupted.nodes.get("handover-result");
+  const noteField = find(interruptedResult, (node) => node.tagName === "textarea"); noteField.value = "Note à conserver";
+  find(interruptedResult, (node) => node.tagName === "button" && node.textContent === "Confirmer la remise").emit("click"); await tick();
+  assert.equal(interruptedConfirmationCalls, 1);
+  assert.equal(find(interruptedResult, (node) => node.tagName === "textarea").value, "Note à conserver", "interrupted confirmation preserves unfinished values");
+  assert.equal(find(interruptedResult, (node) => node.className === "handover-completed-title"), null, "interrupted request never shows false completion");
+  assert.match(interrupted.nodes.get("handover-status").textContent, /réponse a été interrompue/i);
 
   assert.match(source, /getUserMedia\(/, "camera access is behind an explicit button event");
   assert.match(source, /uploadDeliveryEvidence/, "photos and signatures use the existing private storage client");
   assert.match(source, /confirmDeliveryHandover/, "completion uses the backend confirmation RPC");
   assert.match(source, /pointerdown/, "signature capture supports touch input");
   assert.match(html, /handover-verification\.js/);
-  assert.match(html, /phase2a3-mobile-fix-1/, "admin assets use a cache-busting release identifier for mobile clients");
+  assert.match(html, /phase2a3-handover-save-ux-1/, "admin assets use a cache-busting release identifier for this fix");
   assert.doesNotMatch(source + html, /localStorage|sessionStorage|console\.(?:log|warn|error)/);
   console.log("Online handover UI tests passed (eligibility, numeric/QR verification, resumable preparation, safe errors, camera cleanup, and credential clearing).");
 }

@@ -181,6 +181,12 @@ body[data-admin-state="ready"] .admin-card { padding: clamp(20px, 3vw, 34px); }
 textarea.handover-input { min-height: 90px; resize: vertical; }
 .handover-secondary { min-height: 54px; padding: 12px 18px; border: 2px solid #8aaab3; border-radius: 10px; background: #fff; color: #173a48; font: inherit; font-weight: 800; cursor: pointer; }
 .handover-complete-note, .handover-confirmed { color: #246b44; font-weight: 800; }
+.handover-field-error { margin: 0; color: #8d3421; font-weight: 750; }
+.handover-validation { padding: 14px; border: 1px solid #d99784; border-radius: 10px; background: #fff5f1; color: #793827; }
+.handover-validation ul { padding-left: 22px; }
+.handover-photo-thumbnail { display: block; width: min(100%, 360px); max-height: 280px; object-fit: contain; border: 1px solid #c9d9dd; border-radius: 10px; background: #f5f8f9; }
+.handover-result-completed { border: 2px solid #58a878; background: #eff9f2; }
+.handover-completed-title { color: #246b44; font-size: clamp(1.4rem, 5vw, 2rem); font-weight: 900; }
 .handover-attention-note { padding: 12px; border-left: 4px solid #c56c38; background: #fff7ed; font-weight: 700; }
 .handover-acknowledgement { display: flex; align-items: center; gap: 12px; min-height: 48px; font-weight: 700; }
 .handover-acknowledgement input { width: 24px; height: 24px; flex: 0 0 auto; }

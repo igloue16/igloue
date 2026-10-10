@@ -248,6 +248,17 @@ async function settle() { await new Promise((resolve) => setImmediate(resolve));
     { ok: false, status: 400 }, "malformed credentials fail locally");
   assert.equal(env.calls.functionInvokes.length, beforeInvalidCall, "malformed credentials are never sent");
 
+  const fileId = "00000000-0000-4000-8000-00000000e871";
+  env.setFunctionResult({ data: { ok: true, url: "https://signed.invalid/private-preview", expiresInSeconds: 60, mediaType: "image/jpeg" }, error: null });
+  const evidenceDownload = await env.auth.downloadDeliveryEvidence(fileId);
+  assert.equal(evidenceDownload.ok, true, "assigned staff can request evidence preview through the authenticated file endpoint");
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.functionInvokes.at(-1))), {
+    name: "tenant-files", options: { body: { action: "download", fileId } }
+  }, "evidence preview uses the existing tenant-files authorization route");
+  const callsBeforeBadFileId = env.calls.functionInvokes.length;
+  assert.deepEqual(JSON.parse(JSON.stringify(await env.auth.downloadDeliveryEvidence("not-a-uuid"))), { ok: false, status: 401 }, "invalid evidence IDs fail closed locally");
+  assert.equal(env.calls.functionInvokes.length, callsBeforeBadFileId, "invalid file IDs never reach the private storage endpoint");
+
   const signedOut = await env.auth.signOut();
   assert.equal(signedOut.ok, true, "sign-out succeeds");
   assert.equal(await env.auth.getSession(), null, "sign-out clears the session");

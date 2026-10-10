@@ -36,6 +36,7 @@
     let activeContext = null;
     let pendingSignatureFileId = null;
     let pendingSignatureKey = null;
+    const pendingActions = new Set();
     // Keep an upload attempt stable across a retry in this page. If the upload
     // succeeded but its response was lost, the same key lets tenant-files
     // return the original record instead of creating another object.
@@ -90,6 +91,48 @@
       select.value = value || "";
       return select;
     }
+    function formatServerTime(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) return "";
+      return new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" }).format(date);
+    }
+    function actionAvailable(key) { if (pendingActions.has(key)) return false; pendingActions.add(key); return true; }
+    function finishAction(key, control) { pendingActions.delete(key); if (control) control.disabled = false; }
+    function showFieldError(node, message) {
+      if (!node) return;
+      node.hidden = !message;
+      node.textContent = message || "";
+    }
+    function errorText(parent, className, message = "") {
+      const node = textNode(parent, "p", message, className);
+      node.hidden = !message;
+      node.setAttribute("role", "alert");
+      return node;
+    }
+    async function renderSavedPhoto(unit, state, image) {
+      const evidence = unit.photoEvidence;
+      if (!evidence || !evidence.fileId) return;
+      state.replaceChildren();
+      textNode(state, "p", evidence.savedAt
+        ? `✓ Enregistré · ${formatServerTime(evidence.savedAt)} (heure de Paris)`
+        : "✓ Enregistré · actualisation de l’heure serveur en attente.", "handover-complete-note");
+      image.hidden = true;
+      image.alt = "Photo de l’équipement enregistrée";
+      image.referrerPolicy = "no-referrer";
+      image.loading = "lazy";
+      image.className = "handover-photo-thumbnail";
+      try {
+        if (!auth || typeof auth.downloadDeliveryEvidence !== "function") throw new Error("download_unavailable");
+        const response = await auth.downloadDeliveryEvidence(evidence.fileId);
+        if (!response || !response.ok || !response.data || !response.data.url) throw new Error("download_unavailable");
+        image.src = response.data.url;
+        image.hidden = false;
+        state.append(image);
+      } catch {
+        textNode(state, "p", "Aperçu indisponible pour le moment. La photo reste enregistrée dans le dossier sécurisé.", "handover-hint");
+        button(state, "Recharger l’aperçu", () => void renderSavedPhoto(unit, state, image), "handover-secondary");
+      }
+    }
     function errorMessage(httpStatus) {
       if (httpStatus === 401) return "Votre session a expiré. Reconnectez-vous puis réessayez.";
       if (httpStatus === 403) return "Vous n’êtes pas autorisé à intervenir sur cette livraison.";
@@ -140,15 +183,26 @@
           field(card, item.label, checklist);
         });
         if (!(unit.checklist || []).length) textNode(card, "p", "Aucun point de contrôle n’est configuré pour cette organisation.", "handover-hint");
-        const photoStatus = unit.photoAttached ? "Photo de l’équipement enregistrée." : "Ajouter une photo de l’équipement.";
-        textNode(card, "p", photoStatus, unit.photoAttached ? "handover-complete-note" : "handover-hint");
-        if (!unit.photoAttached) {
+        const photoState = document.createElement("div"); photoState.className = "handover-photo-state"; card.append(photoState);
+        const photoImage = document.createElement("img"); photoImage.hidden = true;
+        const photoEvidence = unit.photoEvidence && unit.photoEvidence.fileId ? unit.photoEvidence : null;
+        if (photoEvidence) {
+          void renderSavedPhoto(unit, photoState, photoImage);
+        } else if (unit.photoAttached) {
+          textNode(photoState, "p", "Photo associée côté serveur; ses métadonnées sécurisées doivent être actualisées avant l’aperçu.", "handover-hint");
+        } else {
+          textNode(photoState, "p", "Ajouter une photo de l’équipement.", "handover-hint");
           const file = document.createElement("input"); file.type = "file"; file.accept = "image/*"; file.setAttribute("capture", "environment"); file.className = "handover-input";
-          field(card, "Photo de l’état", file);
+          const fileField = field(card, "Photo de l’état", file);
+          const photoError = errorText(card, "handover-field-error");
+          file.dataset.photoError = "true";
           file.addEventListener("change", () => pendingPhotoUploads.delete(file));
-          const uploadButton = button(card, "Enregistrer la photo", () => void uploadPhoto(unit, file, uploadButton), "handover-primary");
+          const uploadButton = button(card, "Enregistrer la photo", () => void uploadPhoto(unit, file, uploadButton, photoState, photoImage, photoError), "handover-primary");
         }
-        button(card, "Enregistrer le contrôle", () => void saveInspection(unit, condition, card), "handover-secondary");
+        const conditionError = errorText(card, "handover-field-error"); conditionError.dataset.conditionError = unit.subjectId;
+        const checklistError = errorText(card, "handover-field-error"); checklistError.dataset.checklistError = unit.subjectId;
+        const equipmentError = errorText(card, "handover-field-error"); equipmentError.dataset.equipmentError = unit.subjectId;
+        const saveInspectionButton = button(card, "Enregistrer le contrôle", () => void saveInspection(unit, condition, card, saveInspectionButton), "handover-secondary");
         list.append(card);
       });
       return list;
@@ -176,8 +230,11 @@
       textNode(result, "p", `Réservation ${context.reservationReference} · ${String(context.scheduledDate || "").split("-").reverse().join("/")} · ${context.timeSlot || "Horaire non renseigné"}`);
       textNode(result, "p", [context.address && context.address.line1, context.address && context.address.postcode, context.address && context.address.city].filter(Boolean).join(" · "));
       if (context.handover && context.handover.status === "confirmed") {
-        textNode(result, "p", "Cette remise est confirmée par le serveur.", "handover-confirmed");
-        button(result, "Actualiser le planning", () => void refreshBoard(), "handover-secondary");
+        if (context.handover.confirmedAt) renderCompletedScreen(context);
+        else {
+          textNode(result, "p", "Le serveur indique une remise confirmée, mais l’heure de confirmation n’est pas disponible. Actualisez avant de quitter.", "handover-hint");
+          button(result, "Vérifier à nouveau", () => void reconcileHandover(), "handover-secondary");
+        }
         return;
       }
       result.append(renderEquipment(context));
@@ -189,7 +246,8 @@
       if (findings) textNode(result, "p", "Le client doit lire et reconnaître les anomalies signalées avant de signer.", "handover-attention-note");
       if (!context.handover || !context.handover.signatureAttached) {
         const name = document.createElement("input"); name.type = "text"; name.maxLength = 160; name.autocomplete = "name"; name.className = "handover-input";
-        field(result, "Nom du client signataire", name);
+        const nameField = field(result, "Nom du client signataire", name);
+        const signatureError = errorText(result, "handover-field-error"); signatureError.dataset.signatureError = "true";
         const canvas = document.createElement("canvas"); canvas.className = "handover-signature-canvas"; canvas.setAttribute("aria-label", "Zone de signature du client");
         result.append(canvas);
         const signature = drawSignatureCanvas(canvas);
@@ -199,12 +257,48 @@
           acknowledgement = document.createElement("input"); acknowledgement.type = "checkbox";
           const label = document.createElement("label"); label.className = "handover-acknowledgement"; label.append(acknowledgement); textNode(label, "span", "Je confirme avoir lu les observations ci-dessus."); result.append(label);
         }
-        button(result, "Enregistrer la signature du client", () => void saveSignature(canvas, signature, name, acknowledgement, note));
+        const signatureButton = button(result, "Enregistrer la signature du client", () => void saveSignature(canvas, signature, name, acknowledgement, note, signatureButton, signatureError), "handover-primary");
       } else {
-        textNode(result, "p", `Signature enregistrée au nom de ${context.handover.signedName || "client"}.`, "handover-complete-note");
+        const evidence = context.handover.signatureEvidence;
+        const savedAt = evidence && evidence.savedAt;
+        textNode(result, "p", savedAt
+          ? `✓ Enregistré · signature de ${context.handover.signedName || "client"} · ${formatServerTime(savedAt)} (heure de Paris)`
+          : `Signature enregistrée au nom de ${context.handover.signedName || "client"}; actualisation de l’heure serveur nécessaire.`,
+        savedAt ? "handover-complete-note" : "handover-hint");
         if (context.handover.findingsAcknowledged) textNode(result, "p", "Les observations ont été reconnues par le client.");
       }
-      button(result, "Confirmer la remise", () => void confirm(context, note), "handover-confirm-button");
+      const validation = document.createElement("div"); validation.className = "handover-validation"; validation.hidden = true; validation.setAttribute("role", "alert"); validation.dataset.confirmValidation = "true"; result.append(validation);
+      const confirmButton = button(result, "Confirmer la remise", () => void confirm(context, note, confirmButton, validation), "handover-confirm-button");
+      button(result, "Vérifier le statut enregistré", () => void reconcileHandover(), "handover-secondary");
+    }
+
+    function renderCompletedScreen(context) {
+      result.replaceChildren(); result.hidden = false; result.className = "handover-result handover-result-completed";
+      textNode(result, "p", "✓ Remise terminée", "handover-completed-title");
+      textNode(result, "p", `Réservation ${context.reservationReference || "—"}`);
+      const equipment = (context.inspection && context.inspection.subjects || []).map((unit) => `${unit.productName || "Équipement"}${unit.serialNumber ? ` · ${unit.serialNumber}` : ""}`);
+      if (equipment.length) textNode(result, "p", `Équipement : ${equipment.join(", ")}`);
+      const completedAt = context.handover && context.handover.confirmedAt;
+      textNode(result, "p", completedAt ? `Confirmée par le serveur le ${formatServerTime(completedAt)} (heure de Paris).` : "Confirmation serveur reçue; l’horodatage sera actualisé au prochain chargement.", "handover-complete-note");
+      button(result, "Retour au planning", async () => { close(); await refreshBoard(); }, "handover-primary");
+    }
+
+    async function reconcileHandover() {
+      setStatus("Vérification de l’état enregistré côté serveur…", "loading");
+      try {
+        const fresh = await loadContext();
+        if (fresh.handover && fresh.handover.status === "confirmed" && fresh.handover.confirmedAt) {
+          renderCompletedScreen(fresh);
+          setStatus("Remise confirmée par le serveur.", "success");
+          await refreshBoard();
+          return true;
+        }
+        setStatus("Le serveur n’a pas confirmé la remise. Vos champs restent affichés; corrigez les points signalés puis réessayez.", "error");
+        return false;
+      } catch {
+        setStatus("Impossible de vérifier l’état serveur. Vos champs sont conservés; réessayez quand la connexion revient.", "error");
+        return false;
+      }
     }
 
     async function showExistingWorkflow() {
@@ -253,24 +347,38 @@
         await reloadWorkflow("Équipement reconnu.");
       } catch { setStatus("Impossible de vérifier cet équipement. Réessayez.", "error"); }
     }
-    async function saveInspection(unit, condition, card) {
-      if (!condition.value || condition.value === "not_tested") { setStatus("Contrôlez et choisissez l’état de chaque équipement.", "error"); return; }
+    async function saveInspection(unit, condition, card, saveButton) {
+      const actionKey = `inspection:${unit.subjectId}`;
+      if (!actionAvailable(actionKey)) return;
+      if (saveButton) saveButton.disabled = true;
+      const conditionError = [...card.querySelectorAll("[data-condition-error]")].find((node) => node.dataset.conditionError === unit.subjectId);
+      const checklistError = [...card.querySelectorAll("[data-checklist-error]")].find((node) => node.dataset.checklistError === unit.subjectId);
+      if (!condition.value || condition.value === "not_tested") {
+        showFieldError(conditionError, "Choisissez l’état constaté avant d’enregistrer.");
+        setStatus("Un état doit être renseigné pour chaque équipement.", "error"); finishAction(actionKey, saveButton); return;
+      }
+      showFieldError(conditionError, "");
       const checklist = [...card.querySelectorAll("[data-checklist-key]")].map((item) => ({ item_key: item.dataset.checklistKey, result: item.value, note: null }));
-      if (checklist.some((item) => item.result === "not_checked")) { setStatus("Terminez chaque point de contrôle affiché.", "error"); return; }
+      if (checklist.some((item) => item.result === "not_checked" || !item.result)) {
+        showFieldError(checklistError, "Terminez chaque point de contrôle affiché avant d’enregistrer.");
+        setStatus("Un ou plusieurs points de contrôle restent à renseigner.", "error"); finishAction(actionKey, saveButton); return;
+      }
+      showFieldError(checklistError, "");
+      if (saveButton) saveButton.textContent = "Enregistrement…";
+      setStatus("Enregistrement du contrôle côté serveur…", "loading");
       try {
         const saved = await auth.updateDeliveryInspection(activeJobId, unit.subjectId, condition.value,
           String(result.querySelector("textarea")?.value || "").trim() || null, checklist);
-        if (!saved || saved.ok !== true) { setStatus("Le contrôle n’a pas été enregistré. Vérifiez la connexion.", "error"); return; }
-        // Keep other unsaved equipment fields in the DOM. The next action
-        // obtains the authoritative workflow state again before confirmation.
+        if (!saved || saved.ok !== true) { setStatus("Échec de l’enregistrement du contrôle. Vos champs sont conservés; corrigez ou réessayez.", "error"); return; }
         unit.condition = condition.value;
         for (const item of unit.checklist || []) {
           const control = [...card.querySelectorAll("[data-checklist-key]")].find((node) => node.dataset.checklistKey === item.key);
           if (control) item.result = control.value;
         }
         if (activeContext && activeContext.inspection) activeContext.inspection.summaryNote = String(result.querySelector("textarea")?.value || "").trim();
-        setStatus("État et observations enregistrés.", "success");
-      } catch { setStatus("Le contrôle n’a pas été enregistré. Réessayez.", "error"); }
+        setStatus("✓ Enregistré côté serveur.", "success");
+      } catch { setStatus("Échec de l’enregistrement du contrôle. Vos champs sont conservés; vérifiez la connexion puis réessayez.", "error"); }
+      finally { if (saveButton) saveButton.textContent = "Enregistrer le contrôle"; finishAction(actionKey, saveButton); }
     }
     async function normalizePhoto(file) {
       const maxBytes = 9 * 1024 * 1024;
@@ -310,10 +418,15 @@
       if (statusCode === 422) return "La photo n’a pas été acceptée. Reprenez-la avec l’appareil photo puis réessayez.";
       return "La photo n’a pas pu être enregistrée. Vérifiez la connexion; vous pouvez réessayer sans perdre la sélection.";
     }
-    async function uploadPhoto(unit, input, uploadButton) {
+    async function uploadPhoto(unit, input, uploadButton, photoState, photoImage, photoError) {
+      const actionKey = `photo:${unit.subjectId}`;
+      if (!actionAvailable(actionKey)) return;
       const file = input.files && input.files[0];
-      if (!file) { setStatus("Prenez ou sélectionnez une photo de l’équipement.", "error"); return; }
+      if (!file) { setStatus("Prenez ou sélectionnez une photo de l’équipement.", "error"); finishAction(actionKey); return; }
       if (uploadButton) uploadButton.disabled = true;
+      if (uploadButton) uploadButton.textContent = "Enregistrement…";
+      showFieldError(photoError, "");
+      photoState.replaceChildren(); textNode(photoState, "p", "Enregistrement sécurisé de la photo…", "handover-hint");
       setStatus("Préparation et envoi sécurisé de la photo…", "loading");
       try {
         let pending = pendingPhotoUploads.get(input);
@@ -330,26 +443,49 @@
           pending.fileId = upload.data.fileId;
         }
         const linked = await auth.attachDeliveryEvidence(activeJobId, pending.fileId, "delivery_photo", unit.machineId);
-        if (!linked || linked.ok !== true) { setStatus(linked && linked.status === 403 ? "Vous n’êtes pas autorisé à associer cette photo." : "La photo est téléversée mais son association reste à confirmer. Réessayez; aucun nouveau fichier ne sera créé.", "error"); return; }
-        pendingPhotoUploads.delete(input); input.value = "";
+        if (!linked || linked.ok !== true || !linked.data || linked.data.attached !== true) {
+          const message = linked && linked.status === 403 ? "Vous n’êtes pas autorisé à associer cette photo." : "La photo n’est pas encore associée à la remise. Vos champs sont conservés; réessayez sans créer un nouveau fichier.";
+          showFieldError(photoError, message); setStatus(message, "error"); photoState.replaceChildren(); textNode(photoState, "p", "Échec — réessayez après vérification de la connexion.", "handover-field-error"); return;
+        }
+        // The association RPC is the persistence confirmation. Keep its file
+        // ID locally only until a fresh authorized read returns metadata.
+        unit.photoEvidence = { fileId: pending.fileId, savedAt: null };
         unit.photoAttached = true;
+        pendingPhotoUploads.delete(input); input.value = "";
         const card = input.closest && input.closest(".handover-equipment-card");
         if (card) {
-          const hint = [...card.children].find((node) => /photo de l’état|ajouter une photo/i.test(node.textContent || ""));
-          if (hint) { hint.textContent = "Photo de l’équipement enregistrée."; hint.className = "handover-complete-note"; }
           const wrapper = input.parentElement; if (wrapper) wrapper.hidden = true;
           if (uploadButton) uploadButton.hidden = true;
         }
-        setStatus("Photo enregistrée dans le dossier privé de la remise.", "success");
+        photoState.replaceChildren();
+        textNode(photoState, "p", "✓ Enregistré · synchronisation de l’heure serveur…", "handover-complete-note");
+        try {
+          const fresh = await loadContext();
+          const updated = (fresh.inspection && fresh.inspection.subjects || []).find((subject) => subject.subjectId === unit.subjectId);
+          if (updated && updated.photoEvidence && updated.photoEvidence.fileId === pending.fileId && updated.photoEvidence.savedAt) {
+            Object.assign(unit, updated);
+          }
+        } catch { /* RPC success already confirms the association; refresh fills the server timestamp later. */ }
+        await renderSavedPhoto(unit, photoState, photoImage);
+        setStatus("✓ Photo enregistrée côté serveur.", "success");
       } catch (error) {
-        setStatus(error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : "La photo n’a pas pu être enregistrée. Vérifiez la connexion puis réessayez.", "error");
-      } finally { if (uploadButton) uploadButton.disabled = false; }
+        const message = error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : "Échec de l’enregistrement de la photo. Votre sélection est conservée; vérifiez la connexion puis réessayez.";
+        showFieldError(photoError, message); setStatus(message, "error");
+        photoState.replaceChildren(); textNode(photoState, "p", "Échec — la sélection est conservée. Réessayez.", "handover-field-error");
+      } finally { if (uploadButton) { uploadButton.disabled = false; uploadButton.textContent = "Réessayer l’enregistrement de la photo"; } finishAction(actionKey); }
     }
-    async function saveSignature(canvas, signature, name, acknowledgement, note) {
-      if (!signature.hasInk() || !String(name.value || "").trim()) { setStatus("Saisissez le nom du client et recueillez sa signature.", "error"); return; }
+    async function saveSignature(canvas, signature, name, acknowledgement, note, saveButton, signatureError) {
+      const actionKey = "signature";
+      if (!actionAvailable(actionKey)) return;
+      if (saveButton) saveButton.disabled = true;
+      if (!signature.hasInk() || !String(name.value || "").trim()) {
+        showFieldError(signatureError, "Saisissez le nom du client et recueillez la signature avant l’enregistrement.");
+        setStatus("Le nom et la signature du client sont nécessaires.", "error"); finishAction(actionKey, saveButton); return;
+      }
+      showFieldError(signatureError, "");
       const checkboxes = result.querySelectorAll("[data-condition-for]");
       for (const select of checkboxes) {
-        if (!select.value) { setStatus("Enregistrez l’état de chaque équipement avant la signature.", "error"); return; }
+        if (!select.value) { setStatus("Enregistrez l’état de chaque équipement avant la signature.", "error"); finishAction(actionKey, saveButton); return; }
       }
       let latest;
       try {
@@ -357,38 +493,137 @@
         for (const unit of subjects) {
           const card = [...result.querySelectorAll("[data-machine-id]")].find((item) => item.dataset.machineId === unit.machineId);
           const condition = card && card.querySelector("[data-condition-for]");
-          if (!unit.equipmentVerified || !condition || !condition.value || !unit.photoAttached) { setStatus("Identifiez, contrôlez et photographiez chaque équipement avant la signature.", "error"); return; }
+          if (!unit.equipmentVerified || !condition || !condition.value || !unit.photoAttached) { setStatus("Identifiez, contrôlez et photographiez chaque équipement avant la signature.", "error"); finishAction(actionKey, saveButton); return; }
           const checklist = [...card.querySelectorAll("[data-checklist-key]")].map((item) => ({ item_key: item.dataset.checklistKey, result: item.value, note: null }));
           const saved = await auth.updateDeliveryInspection(activeJobId, unit.subjectId, condition.value, String(note.value || "").trim() || null, checklist);
-          if (!saved || !saved.ok) { setStatus("Enregistrez tous les contrôles avant la signature.", "error"); return; }
+          if (!saved || !saved.ok) { setStatus("Échec de l’enregistrement d’un contrôle. Les champs restent affichés; réessayez.", "error"); finishAction(actionKey, saveButton); return; }
         }
         latest = await loadContext();
-      } catch { setStatus("Les contrôles n’ont pas tous pu être actualisés. Vérifiez la connexion puis reprenez la remise.", "error"); return; }
+      } catch { setStatus("Échec de l’actualisation des contrôles. Vos champs et la signature restent affichés; vérifiez la connexion.", "error"); finishAction(actionKey, saveButton); return; }
       const hasFindings = latest.inspection.subjects.some((unit) => ["minor_issue", "damaged"].includes(unit.condition) || unit.checklist.some((item) => item.result === "issue"));
-      if (hasFindings && !(acknowledgement && acknowledgement.checked)) { renderWorkflow(latest); setStatus("Le client doit reconnaître les anomalies avant de signer.", "error"); return; }
+      if (hasFindings && !(acknowledgement && acknowledgement.checked)) { showFieldError(signatureError, "Le client doit reconnaître les anomalies avant de signer."); setStatus("Le client doit reconnaître les anomalies avant de signer.", "error"); finishAction(actionKey, saveButton); return; }
       const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!canvasBlob) { setStatus("La signature ne peut pas être préparée sur cet appareil.", "error"); return; }
-      const organisation = await auth.getSelectedOrganisation();
+      if (!canvasBlob) { showFieldError(signatureError, "La signature n’a pas pu être préparée sur cet appareil."); setStatus("La signature ne peut pas être préparée sur cet appareil.", "error"); finishAction(actionKey, saveButton); return; }
+      let organisation;
+      try { organisation = await auth.getSelectedOrganisation(); }
+      catch { showFieldError(signatureError, "Votre organisation n’est plus disponible. Reconnectez-vous; la signature affichée reste sur cet écran."); setStatus("Impossible de préparer l’enregistrement. Reconnectez-vous puis reprenez la signature.", "error"); finishAction(actionKey, saveButton); return; }
+      if (!organisation || !organisation.id) { showFieldError(signatureError, "Votre organisation n’est plus disponible. Reconnectez-vous; la signature affichée reste sur cet écran."); setStatus("Impossible de préparer l’enregistrement. Reconnectez-vous puis reprenez la signature.", "error"); finishAction(actionKey, saveButton); return; }
+      if (saveButton) saveButton.textContent = "Enregistrement…";
+      setStatus("Enregistrement sécurisé de la signature…", "loading");
       try {
         const upload = await auth.uploadDeliveryEvidence({ file: canvasBlob, organisationId: organisation.id, reservationId: activeContext.reservationId, inspectionId: activeContext.inspection.id, kind: "signature", idempotencyKey: pendingSignatureKey || (pendingSignatureKey = requestUuid(environment)) });
-        if (!upload || !upload.ok) { setStatus("La signature privée n’a pas pu être enregistrée.", "error"); return; }
+        if (!upload || !upload.ok || !upload.data || !upload.data.fileId) { showFieldError(signatureError, "Échec de l’envoi de la signature. Elle reste affichée; réessayez."); setStatus("Échec de l’enregistrement de la signature. Elle reste affichée; réessayez.", "error"); return; }
         pendingSignatureFileId = upload.data.fileId;
         const findings = activeContext.inspection.subjects.some((unit) => ["minor_issue", "damaged"].includes(unit.condition) || unit.checklist.some((item) => item.result === "issue"));
         const linked = await auth.attachDeliveryEvidence(activeJobId, pendingSignatureFileId, "signature", null, String(name.value).trim(), Boolean(acknowledgement && acknowledgement.checked));
-        if (!linked || !linked.ok) { setStatus(findings && !(acknowledgement && acknowledgement.checked) ? "Le client doit reconnaître les anomalies avant de signer." : "Signature téléversée mais liaison incomplète. Réessayez sans recommencer.", "error"); return; }
-        pendingSignatureFileId = null; pendingSignatureKey = null;
-        await reloadWorkflow("Signature du client enregistrée.");
-      } catch { setStatus("La signature n’a pas pu être associée à la remise. Réessayez.", "error"); }
+        if (!linked || !linked.ok || !linked.data || linked.data.attached !== true) { const message = findings && !(acknowledgement && acknowledgement.checked) ? "Le client doit reconnaître les anomalies avant de signer." : "Échec de l’association de la signature. Le tracé et le fichier restent disponibles pour réessayer."; showFieldError(signatureError, message); setStatus(message, "error"); return; }
+        // attachDeliveryEvidence is the durable server confirmation. A follow-up
+        // read supplies the canonical timestamp and restores the saved state.
+        if (saveButton) { saveButton.disabled = true; saveButton.textContent = "✓ Signature enregistrée"; }
+        setStatus("✓ Signature enregistrée côté serveur. Vérification de l’heure serveur…", "success");
+        try {
+          const fresh = await loadContext();
+          const evidence = fresh.handover && fresh.handover.signatureEvidence;
+          if (evidence && evidence.fileId === pendingSignatureFileId && evidence.savedAt && fresh.handover.signedAt) {
+            pendingSignatureFileId = null; pendingSignatureKey = null;
+            renderWorkflow(fresh);
+            setStatus(`✓ Signature enregistrée · ${formatServerTime(evidence.savedAt)} (heure de Paris).`, "success");
+          }
+        } catch { /* Preserve the canvas and field values; reconcile can read the saved state later. */ }
+      } catch { showFieldError(signatureError, "Échec de l’association de la signature. Le tracé est conservé; vérifiez la connexion puis réessayez."); setStatus("Échec de l’enregistrement de la signature. Le tracé et les champs restent affichés.", "error"); }
+      finally { if (saveButton && saveButton.textContent === "Enregistrement…") { saveButton.disabled = false; saveButton.textContent = "Réessayer l’enregistrement de la signature"; } finishAction(actionKey, saveButton && saveButton.textContent === "✓ Signature enregistrée" ? null : saveButton); }
     }
-    async function confirm(context, note) {
-      if (!context.handover || !UUID.test(String(context.handover.idempotencyKey || ""))) { setStatus("La remise doit être actualisée avant confirmation.", "error"); return; }
-      setStatus("Confirmation sécurisée en cours…", "loading");
+    function validateConfirmation(context, validation) {
+      const errors = [];
+      validation.replaceChildren();
+      validation.hidden = true;
+      if (!context || !context.handover || context.handover.status !== "in_progress") errors.push("La vérification du client ou la préparation de la remise manque. Reprenez la remise depuis le planning.");
+      if (context && (context.paymentStatus !== "paid" || !["confirmed", "ongoing"].includes(context.reservationStatus))) errors.push("La réservation n’est plus éligible à la remise. Contactez un responsable.");
+      const subjects = context && context.inspection && Array.isArray(context.inspection.subjects) ? context.inspection.subjects : [];
+      if (!subjects.length) errors.push("Aucun équipement n’est lié à cette inspection. La remise ne peut pas être confirmée.");
+      for (const unit of subjects) {
+        const card = [...result.querySelectorAll("[data-machine-id]")].find((node) => node.dataset.machineId === unit.machineId);
+        if (!unit.equipmentVerified) {
+          const message = "Scannez l’équipement réservé et enregistrez sa vérification.";
+          showFieldError(card && [...card.querySelectorAll("[data-equipment-error]")].find((node) => node.dataset.equipmentError === unit.subjectId), message);
+          errors.push(`${unit.productName || "Équipement"} : identifiant non vérifié.`);
+        }
+        if (!unit.condition || unit.condition === "not_tested") {
+          showFieldError(card && [...card.querySelectorAll("[data-condition-error]")].find((node) => node.dataset.conditionError === unit.subjectId), "Choisissez et enregistrez l’état constaté.");
+          errors.push(`${unit.productName || "Équipement"} : état constaté manquant.`);
+        }
+        const checklist = Array.isArray(unit.checklist) ? unit.checklist : [];
+        if (!checklist.length) {
+          showFieldError(card && [...card.querySelectorAll("[data-checklist-error]")].find((node) => node.dataset.checklistError === unit.subjectId), "Aucun point de contrôle n’est configuré. Demandez au responsable de configurer la checklist avant de terminer la remise.");
+          errors.push(`${unit.productName || "Équipement"} : checklist de livraison non configurée.`);
+        } else if (checklist.some((item) => !item.result || item.result === "not_checked")) {
+          showFieldError(card && [...card.querySelectorAll("[data-checklist-error]")].find((node) => node.dataset.checklistError === unit.subjectId), "Enregistrez chaque point de contrôle affiché.");
+          errors.push(`${unit.productName || "Équipement"} : points de contrôle incomplets.`);
+        }
+        if (!unit.photoEvidence || !unit.photoEvidence.fileId || !unit.photoEvidence.savedAt) {
+          const message = "La photo doit être associée et confirmée par le serveur avant la remise.";
+          showFieldError(card && [...card.querySelectorAll("[data-photo-error]")].find((node) => node.dataset.photoError === "true"), message);
+          errors.push(`${unit.productName || "Équipement"} : photo enregistrée manquante.`);
+        }
+      }
+      const handover = context && context.handover;
+      if (!handover || !handover.signatureEvidence || !handover.signatureEvidence.fileId || !handover.signatureEvidence.savedAt || !handover.signedAt) {
+        errors.push("La signature du client n’est pas enregistrée et confirmée par le serveur.");
+        const signatureError = [...result.querySelectorAll("[data-signature-error]")].find((node) => node.dataset.signatureError === "true");
+        showFieldError(signatureError, "Enregistrez la signature du client avant la confirmation.");
+      }
+      if (handover && context && subjects.some((unit) => ["minor_issue", "damaged"].includes(unit.condition) || (unit.checklist || []).some((item) => item.result === "issue")) && !handover.findingsAcknowledged) {
+        errors.push("Le client doit reconnaître les anomalies avant la confirmation.");
+      }
+      if (errors.length) {
+        validation.hidden = false;
+        textNode(validation, "strong", "À compléter avant de confirmer :");
+        const list = document.createElement("ul");
+        for (const message of errors) textNode(list, "li", message);
+        validation.append(list);
+        setStatus("La remise reste en cours. Complétez les éléments indiqués; aucune confirmation n’a été envoyée.", "error");
+        return false;
+      }
+      return true;
+    }
+
+    async function confirm(context, note, confirmButton, validation) {
+      const actionKey = "confirm";
+      if (!actionAvailable(actionKey)) return;
+      if (confirmButton) confirmButton.disabled = true;
+      setStatus("Vérification des éléments enregistrés côté serveur…", "loading");
       try {
-        const response = await auth.confirmDeliveryHandover(activeJobId, context.jobVersion, context.handover.idempotencyKey);
-        if (!response || !response.ok || !response.data || response.data.status !== "confirmed") { setStatus("La remise n’est pas confirmée. Vérifiez les contrôles, les photos et la signature.", "error"); await reloadWorkflow(); return; }
-        await reloadWorkflow("Remise confirmée et enregistrée par le serveur.");
-        await refreshBoard();
-      } catch { setStatus("La réponse est interrompue. Actualisez la remise pour vérifier son statut côté serveur.", "error"); }
+        const fresh = await loadContext();
+        if (!validateConfirmation(fresh, validation)) return;
+        if (!UUID.test(String(fresh.handover.idempotencyKey || ""))) { setStatus("La remise doit être actualisée avant confirmation.", "error"); return; }
+        if (confirmButton) confirmButton.textContent = "Confirmation en cours…";
+        setStatus("Confirmation sécurisée en cours…", "loading");
+        const response = await auth.confirmDeliveryHandover(activeJobId, fresh.jobVersion, fresh.handover.idempotencyKey);
+        if (!response || !response.ok || !response.data || response.data.status !== "confirmed") {
+          const message = response && response.status === 401 ? "Votre session a expiré. Reconnectez-vous; vos champs sont conservés."
+            : response && response.status === 403 ? "Vous n’êtes pas autorisé à confirmer cette remise. Contactez un responsable."
+              : response && [400, 409, 422].includes(response.status) ? "Le serveur refuse la confirmation. Vérifiez les champs signalés et actualisez l’état de la remise."
+                : "La confirmation n’a pas été reçue. Vos champs restent affichés; vérifiez la connexion puis contrôlez l’état serveur.";
+          setStatus(message, "error");
+          if (validation) { validation.hidden = false; textNode(validation, "p", message); }
+          return;
+        }
+        // Never display completion from a local click or a lost response. A
+        // fresh protected read must confirm the persisted terminal state.
+        const completed = await loadContext();
+        if (completed.handover && completed.handover.status === "confirmed" && completed.handover.confirmedAt) {
+          renderCompletedScreen(completed);
+          setStatus("Remise terminée et confirmée par le serveur.", "success");
+          await refreshBoard();
+        } else {
+          setStatus("Le serveur n’a pas encore confirmé la remise. Vos champs restent affichés; vérifiez à nouveau le statut.", "error");
+        }
+      } catch {
+        setStatus("La réponse a été interrompue. Aucune page de fin n’est affichée; vos champs restent conservés. Vérifiez le statut côté serveur avant toute nouvelle tentative.", "error");
+      } finally {
+        if (confirmButton) { confirmButton.disabled = false; confirmButton.textContent = "Confirmer la remise"; }
+        finishAction(actionKey);
+      }
     }
     async function reloadWorkflow(message = "") {
       const context = await loadContext(); renderWorkflow(context); if (message) setStatus(message, "success");
