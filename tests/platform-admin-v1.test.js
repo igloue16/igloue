@@ -252,3 +252,27 @@ test("support equipment copy uses generic equipment terminology", () => {
   assert.match(source, /Équipement \$\{m\.unit\}/);
   assert.doesNotMatch(source, /"Machines physiques"|"Répartition des unités affichées|"Aucune machine\."|"Aucune machine"/);
 });
+
+test("development diary is mounted as an authenticated platform RPC section", async () => {
+  const payload = { issues: [], tenants: [], total: 0, page: 1, page_size: 25 };
+  const loaded = load("test.igloue.fr", { data: payload, error: null });
+  assert.equal(await loaded.api.readDevelopmentDiary({ status: "open" }), payload);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.rpcCall)), {
+    name: "platform_development_diary_read_v1", args: { p_filter: { status: "open" } },
+  });
+  assert.match(html, /data-section="development_diary"/);
+  assert.match(html, /assets\/js\/platform-development-diary\.js/);
+  assert.match(html, /assets\/js\/platform-diary-xlsx\.js/);
+});
+
+test("diary API rejects permission failures and validates server issue references", async () => {
+  const denied = load("test.igloue.fr", { data: null, error: { code: "42501", message: "private details" } });
+  await assert.rejects(denied.api.readDevelopmentDiary(), /^Error: DENIED$/);
+  const loaded = load("test.igloue.fr", { data: null, error: null });
+  await assert.rejects(loaded.api.getDevelopmentDiaryIssue("not-a-reference"), /Référence de ticket invalide/);
+  assert.equal(loaded.rpcCalls.length, 0, "invalid references never reach the database RPC");
+  for (const rpc of ["platform_development_diary_read_v1", "platform_development_diary_get_v1", "platform_development_diary_save_v1", "platform_development_diary_comment_v1", "platform_development_diary_export_v1"]) {
+    assert.match(source, new RegExp(rpc));
+  }
+  assert.doesNotMatch(source, /\.from\s*\(/, "browser never reads diary tables directly");
+});

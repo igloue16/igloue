@@ -7,6 +7,31 @@
 .platform-app.support-active{grid-template-columns:minmax(0,1fr)}.support-banner{position:sticky;top:8px;z-index:5}
 @media(max-width:560px){.support-nav{margin-left:-2px;margin-right:-2px}.support-tab{padding:8px 10px;font-size:13px}}
 :root{--support-action-panel:#101f30}
+/* Platform development diary */
+.diary-dashboard,.diary-detail{display:grid;gap:16px}
+.diary-toolbar,.diary-pager,.diary-form-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.diary-filter-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#0f1d2d}
+.diary-field{display:grid;gap:6px;min-width:0;color:var(--text);font-size:13px;font-weight:700}
+.diary-field:has(textarea),.diary-field:has(.diary-tenant-select){grid-column:1/-1}
+.diary-input{box-sizing:border-box;width:100%;min-height:42px;border:1px solid var(--line);border-radius:9px;background:#0b1725;color:var(--text);padding:9px 10px;font:inherit;font-weight:450}
+.diary-input:focus{outline:3px solid #4b9bc755;border-color:#62a9d6}
+.diary-input[multiple]{min-height:112px}.diary-input textarea{resize:vertical}
+.diary-field textarea{resize:vertical;min-height:72px}
+.diary-help{display:block;color:var(--muted);font-size:12px;font-weight:450;line-height:1.45}
+.diary-issue-list{display:grid;gap:8px}
+.diary-issue-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;border:1px solid var(--line);border-radius:11px;background:#101f30;color:var(--text);padding:13px;cursor:pointer}
+.diary-issue-row:hover,.diary-issue-row:focus-visible{border-color:#62a9d6;background:#152a40;outline:none}
+.diary-issue-main{display:grid;gap:4px;min-width:0}.diary-issue-ref{color:var(--blue)}.diary-issue-title{font-weight:750;overflow-wrap:anywhere}
+.diary-issue-tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.diary-count{color:var(--muted);font-size:13px}
+.diary-ticket-form{display:grid;gap:14px}.diary-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.diary-form-grid .diary-field:has(textarea),.diary-form-grid .diary-field:has(.diary-tenant-select){grid-column:1/-1}
+.diary-subpanel{display:grid;gap:10px;margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#0f1d2d}
+.diary-subpanel h3{margin:0;font-size:17px}.diary-timeline-entry,.diary-attachment{display:grid;gap:5px;padding:10px 0;border-bottom:1px solid #28384a;overflow-wrap:anywhere}
+.diary-timeline-entry time{justify-self:start}.diary-timeline-detail{margin:0;color:var(--muted);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.diary-attachment .row-meta{overflow-wrap:anywhere}.diary-comment-form,.diary-upload-form{display:grid;gap:10px}.diary-action-message{min-height:20px;color:var(--green);font-weight:700}.diary-action-message.error{color:var(--red)}
+.diary-download-link{color:var(--blue);font-weight:700;overflow-wrap:anywhere}.diary-toolbar button,.diary-pager button,.diary-ticket-form button,.diary-comment-form button,.diary-upload-form button{min-height:42px}
+@media(max-width:760px){.diary-filter-form{grid-template-columns:repeat(2,minmax(0,1fr))}.diary-form-grid{grid-template-columns:1fr}.diary-issue-row{align-items:flex-start;flex-direction:column}.diary-issue-tags{justify-content:flex-start}}
+@media(max-width:480px){.diary-filter-form{grid-template-columns:1fr}.diary-toolbar>*{width:100%}.diary-pager{align-items:stretch;flex-direction:column}.diary-pager button{width:100%}.diary-issue-row{padding:14px}.diary-detail{padding:12px}}
 .support-retry-form{display:grid;gap:10px;width:min(100%,520px);padding:14px;margin-top:12px;border:1px solid #456686;border-radius:12px;background:var(--support-action-panel)}
 .support-retry-form label{display:grid;gap:7px}
 .support-retry-form textarea{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:10px;background:#0b1725;color:var(--text);padding:11px;font:inherit}

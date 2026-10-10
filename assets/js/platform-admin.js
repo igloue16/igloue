@@ -9,6 +9,7 @@
     roles: "Rôles et permissions",
     audit: "Audit plateforme",
     approvals: "Demandes de gouvernance",
+    development_diary: "Journal de développement",
   };
   const labels = {
     active: "ACTIF",
@@ -63,6 +64,9 @@
     pendingSupportTenant: null,
     supportView: "summary",
     supportReference: null,
+    diaryFilter: { search: "", tenant_slug: "all", status: "all", category: "all", severity: "all", sort_by: "activity", sort_direction: "desc", page: 1, page_size: 25 },
+    diaryIssueRef: null,
+    diaryNewTicket: false,
   };
   function el(id) {
     return global.document && global.document.getElementById(id);
@@ -242,6 +246,75 @@
     }
     return data;
   }
+  async function diaryRpc(name, args, fallback) {
+    const { data, error } = await getClient().rpc(name, args);
+    if (error) {
+      if (String(error.code || "") === "42501") throw new Error("DENIED");
+      throw new Error(fallback);
+    }
+    return data;
+  }
+  async function readDevelopmentDiary(filter = app.diaryFilter) {
+    const data = await diaryRpc("platform_development_diary_read_v1", { p_filter: filter }, "Lecture du journal indisponible.");
+    if (!data || !Array.isArray(data.issues) || !Array.isArray(data.tenants) || !Number.isInteger(data.total)) throw new Error("Réponse du journal invalide.");
+    return data;
+  }
+  async function getDevelopmentDiaryIssue(reference) {
+    const ref = String(reference || "").trim().toUpperCase();
+    if (!/^BUG-[0-9]{4,}$/.test(ref)) throw new Error("Référence de ticket invalide.");
+    const data = await diaryRpc("platform_development_diary_get_v1", { p_issue_ref: ref }, "Lecture du ticket indisponible.");
+    if (!data || data.reference !== ref || !Array.isArray(data.activity) || !Array.isArray(data.comments) || !Array.isArray(data.attachments)) throw new Error("Réponse du ticket invalide.");
+    return data;
+  }
+  async function saveDevelopmentDiaryIssue(reference, payload) {
+    const ref = reference ? String(reference).trim().toUpperCase() : null;
+    const result = await diaryRpc("platform_development_diary_save_v1", { p_issue_ref: ref, p_payload: payload }, "Enregistrement du ticket impossible. Vérifiez les champs puis réessayez.");
+    if (!result || !/^BUG-[0-9]{4,}$/.test(result.reference || "")) throw new Error("Le ticket n’a pas été confirmé par le serveur.");
+    return result;
+  }
+  async function addDevelopmentDiaryComment(reference, body) {
+    if (typeof body !== "string" || body.trim().length < 1 || body.length > 8000) throw new Error("Le commentaire est requis et limité à 8 000 caractères.");
+    return await diaryRpc("platform_development_diary_comment_v1", { p_issue_ref: reference, p_body: body.trim() }, "Ajout du commentaire impossible.");
+  }
+  async function exportDevelopmentDiary(filter = app.diaryFilter) {
+    const result = await diaryRpc("platform_development_diary_export_v1", { p_filter: { ...filter, page: 1, page_size: 50 } }, "Export refusé ou indisponible.");
+    if (!result || !result.worksheets || !Number.isInteger(result.total) || !global.IgPlatformDiaryXlsx) throw new Error("Export Excel invalide.");
+    return global.IgPlatformDiaryXlsx.createWorkbook(result);
+  }
+  async function uploadDevelopmentDiaryAttachment(reference, file) {
+    if (!file || typeof file.size !== "number" || file.size < 1 || file.size > 10 * 1024 * 1024) throw new Error("Le fichier doit peser moins de 10 Mo.");
+    const form = new FormData();
+    form.set("action", "upload"); form.set("issueRef", reference); form.set("idempotencyKey", global.crypto.randomUUID()); form.set("file", file);
+    const { data, error } = await getClient().functions.invoke("platform-development-diary-files", { body: form });
+    if (error || !data || data.ok !== true || !data.attachmentId) throw new Error(data && data.error && data.error.code === "ATTACHMENT_CLEANUP_REQUIRED"
+      ? "Échec de l’envoi. Le fichier n’est pas joint; référencez ce ticket au support technique avant de réessayer."
+      : "Échec de l’envoi du fichier. Vérifiez le format (PNG, JPEG ou PDF), la taille et votre connexion, puis réessayez.");
+    return data;
+  }
+  async function getDevelopmentDiaryAttachmentUrl(attachmentId) {
+    if (typeof attachmentId !== "string" || !/^[0-9a-f-]{36}$/i.test(attachmentId)) throw new Error("Fichier indisponible.");
+    const { data, error } = await getClient().functions.invoke("platform-development-diary-files", { body: { action: "download", attachmentId } });
+    if (error || !data || data.ok !== true || typeof data.url !== "string" || data.expiresInSeconds !== 60) throw new Error("Fichier indisponible ou accès refusé.");
+    return data.url;
+  }
+  function openDevelopmentDiaryIssue(reference) {
+    app.diaryIssueRef = String(reference || "").trim().toUpperCase(); app.diaryNewTicket = false;
+    return loadSection("development_diary");
+  }
+  function startDevelopmentDiaryIssue() {
+    app.diaryIssueRef = null; app.diaryNewTicket = true;
+    return loadSection("development_diary");
+  }
+  function closeDevelopmentDiaryIssue() {
+    app.diaryIssueRef = null; app.diaryNewTicket = false;
+    return loadSection("development_diary");
+  }
+  function setDevelopmentDiaryFilter(filter) {
+    app.diaryFilter = { ...app.diaryFilter, ...filter };
+    return loadSection("development_diary");
+  }
+  function getDevelopmentDiaryFilter() { return { ...app.diaryFilter }; }
+  function isNewDevelopmentDiaryIssue() { return app.diaryNewTicket; }
   function storedSupportSession() {
     try {
       return global.sessionStorage && global.sessionStorage.getItem(SUPPORT_SESSION_KEY);
@@ -953,6 +1026,7 @@
     roles: renderRoles,
     audit: renderAudit,
     approvals: renderApprovals,
+    development_diary: (data) => global.IgPlatformDiary.render(el("platform-content"), data, api),
   };
   async function loadSection(section, slug = null) {
     if (app.supportSessionId) return loadSupportSession(app.supportSessionId);
@@ -964,7 +1038,9 @@
     setFeedback("Chargement…");
     try {
       await verifyIdentity();
-      const result = section === "health" ? await readOperationalHealth() : await read(section, slug);
+      const result = section === "health" ? await readOperationalHealth() : section === "development_diary"
+        ? app.diaryIssueRef ? await getDevelopmentDiaryIssue(app.diaryIssueRef) : await readDevelopmentDiary(app.diaryFilter)
+        : await read(section, slug);
       app.authorized = true;
       clearContent();
       await (renderers[section] || renderOverview)(result);
@@ -1115,6 +1191,20 @@
     retrySupportOutboxEvent,
     supportOutboxRetryAvailable,
     revokeSupportSession,
+    readDevelopmentDiary,
+    getDevelopmentDiaryIssue,
+    saveDevelopmentDiaryIssue,
+    addDevelopmentDiaryComment,
+    exportDevelopmentDiary,
+    uploadDevelopmentDiaryAttachment,
+    getDevelopmentDiaryAttachmentUrl,
+    openDevelopmentDiaryIssue,
+    startDevelopmentDiaryIssue,
+    closeDevelopmentDiaryIssue,
+    setDevelopmentDiaryFilter,
+    diaryFilter: getDevelopmentDiaryFilter,
+    isNewDevelopmentDiaryIssue,
+    setFeedback,
     loadSupportSession,
     loadSupportWorkspace,
     loadSection,
