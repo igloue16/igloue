@@ -36,6 +36,10 @@
     let activeContext = null;
     let pendingSignatureFileId = null;
     let pendingSignatureKey = null;
+    // Keep an upload attempt stable across a retry in this page. If the upload
+    // succeeded but its response was lost, the same key lets tenant-files
+    // return the original record instead of creating another object.
+    const pendingPhotoUploads = new WeakMap();
 
     function setStatus(message, kind = "info") {
       if (!status) return;
@@ -135,12 +139,14 @@
           checklist.dataset.subjectId = unit.subjectId;
           field(card, item.label, checklist);
         });
+        if (!(unit.checklist || []).length) textNode(card, "p", "Aucun point de contrôle n’est configuré pour cette organisation.", "handover-hint");
         const photoStatus = unit.photoAttached ? "Photo de l’équipement enregistrée." : "Ajouter une photo de l’équipement.";
         textNode(card, "p", photoStatus, unit.photoAttached ? "handover-complete-note" : "handover-hint");
         if (!unit.photoAttached) {
-          const file = document.createElement("input"); file.type = "file"; file.accept = "image/jpeg,image/png"; file.setAttribute("capture", "environment"); file.className = "handover-input";
+          const file = document.createElement("input"); file.type = "file"; file.accept = "image/*"; file.setAttribute("capture", "environment"); file.className = "handover-input";
           field(card, "Photo de l’état", file);
-          button(card, "Enregistrer la photo", () => void uploadPhoto(unit, file));
+          file.addEventListener("change", () => pendingPhotoUploads.delete(file));
+          const uploadButton = button(card, "Enregistrer la photo", () => void uploadPhoto(unit, file, uploadButton), "handover-primary");
         }
         button(card, "Enregistrer le contrôle", () => void saveInspection(unit, condition, card), "handover-secondary");
         list.append(card);
@@ -208,7 +214,12 @@
         if (context.handover && ["in_progress", "confirmed"].includes(context.handover.status)) {
           renderWorkflow(context); setStatus(context.handover.status === "confirmed" ? "Remise confirmée." : "Reprise de la remise enregistrée.", "success"); return true;
         }
-      } catch { /* new handover still requires fresh customer verification */ }
+      } catch {
+        // A failed fetch is not proof that no handover exists. Fail closed so
+        // staff cannot be misled into treating a resumed job as a new one.
+        setStatus("La remise enregistrée n’a pas pu être chargée. Vérifiez la connexion puis réessayez.", "error");
+        return null;
+      }
       return false;
     }
 
@@ -250,20 +261,89 @@
         const saved = await auth.updateDeliveryInspection(activeJobId, unit.subjectId, condition.value,
           String(result.querySelector("textarea")?.value || "").trim() || null, checklist);
         if (!saved || saved.ok !== true) { setStatus("Le contrôle n’a pas été enregistré. Vérifiez la connexion.", "error"); return; }
-        await reloadWorkflow("État et observations enregistrés.");
+        // Keep other unsaved equipment fields in the DOM. The next action
+        // obtains the authoritative workflow state again before confirmation.
+        unit.condition = condition.value;
+        for (const item of unit.checklist || []) {
+          const control = [...card.querySelectorAll("[data-checklist-key]")].find((node) => node.dataset.checklistKey === item.key);
+          if (control) item.result = control.value;
+        }
+        if (activeContext && activeContext.inspection) activeContext.inspection.summaryNote = String(result.querySelector("textarea")?.value || "").trim();
+        setStatus("État et observations enregistrés.", "success");
       } catch { setStatus("Le contrôle n’a pas été enregistré. Réessayez.", "error"); }
     }
-    async function uploadPhoto(unit, input) {
-      const file = input.files && input.files[0];
-      if (!file || !["image/jpeg", "image/png"].includes(file.type) || file.size > 10 * 1024 * 1024) { setStatus("Choisissez une photo JPG ou PNG de 10 Mo maximum.", "error"); return; }
+    async function normalizePhoto(file) {
+      const maxBytes = 9 * 1024 * 1024;
+      const sourceType = String(file && file.type || "").toLowerCase();
+      const supportedPhotoTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "image/heic", "image/heif"]);
+      if (!file || !supportedPhotoTypes.has(sourceType)) throw new Error("photo_type");
+      if (file.size > 40 * 1024 * 1024) throw new Error("photo_size");
+      if (["image/jpeg", "image/png"].includes(sourceType) && file.size <= maxBytes) return file;
+      const decode = environment.createImageBitmap || global.createImageBitmap;
+      if (typeof decode !== "function") {
+        if (["image/jpeg", "image/png"].includes(sourceType) && file.size <= 10 * 1024 * 1024) return file;
+        throw new Error("photo_conversion_unavailable");
+      }
+      let bitmap;
+      try { bitmap = await decode(file); } catch { throw new Error("photo_decode"); }
       try {
-        const upload = await auth.uploadDeliveryEvidence({ file, organisationId: (await auth.getSelectedOrganisation()).id, reservationId: activeContext.reservationId, inspectionId: activeContext.inspection.id, kind: "delivery_photo", idempotencyKey: requestUuid(environment) });
-        input.value = "";
-        if (!upload || upload.ok !== true) { setStatus("La photo privée n’a pas été téléversée.", "error"); return; }
-        const linked = await auth.attachDeliveryEvidence(activeJobId, upload.data.fileId, "delivery_photo", unit.machineId);
-        if (!linked || linked.ok !== true) { setStatus("Photo téléversée mais liaison incomplète. Le contrôle reste à reprendre.", "error"); return; }
-        await reloadWorkflow("Photo enregistrée dans le dossier privé de la remise.");
-      } catch { input.value = ""; setStatus("La photo n’a pas pu être enregistrée. Réessayez.", "error"); }
+        const maxEdge = 2048;
+        const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("photo_conversion_unavailable");
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        for (const quality of [0.88, 0.76, 0.64, 0.52]) {
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+          if (blob && blob.type === "image/jpeg" && blob.size <= maxBytes) return blob;
+        }
+        throw new Error("photo_size");
+      } finally { if (typeof bitmap.close === "function") bitmap.close(); }
+    }
+    function photoErrorMessage(statusCode) {
+      if (statusCode === 401) return "Votre session a expiré. Reconnectez-vous puis réessayez la photo.";
+      if (statusCode === 403) return "Vous n’êtes pas autorisé à ajouter une photo à cette remise.";
+      if (statusCode === 413) return "Cette photo reste trop volumineuse. Prenez une photo moins détaillée puis réessayez.";
+      if (statusCode === 415) return "Format non pris en charge. Prenez une photo JPG ou PNG.";
+      if (statusCode === 422) return "La photo n’a pas été acceptée. Reprenez-la avec l’appareil photo puis réessayez.";
+      return "La photo n’a pas pu être enregistrée. Vérifiez la connexion; vous pouvez réessayer sans perdre la sélection.";
+    }
+    async function uploadPhoto(unit, input, uploadButton) {
+      const file = input.files && input.files[0];
+      if (!file) { setStatus("Prenez ou sélectionnez une photo de l’équipement.", "error"); return; }
+      if (uploadButton) uploadButton.disabled = true;
+      setStatus("Préparation et envoi sécurisé de la photo…", "loading");
+      try {
+        let pending = pendingPhotoUploads.get(input);
+        if (!pending || pending.file !== file) {
+          pending = { file, normalized: null, idempotencyKey: requestUuid(environment), fileId: null };
+          if (!UUID.test(pending.idempotencyKey)) throw new Error("request_id_unavailable");
+          pendingPhotoUploads.set(input, pending);
+        }
+        if (!pending.normalized) pending.normalized = await normalizePhoto(file);
+        if (!pending.fileId) {
+          const organisation = await auth.getSelectedOrganisation();
+          const upload = await auth.uploadDeliveryEvidence({ file: pending.normalized, organisationId: organisation.id, reservationId: activeContext.reservationId, inspectionId: activeContext.inspection.id, kind: "delivery_photo", idempotencyKey: pending.idempotencyKey });
+          if (!upload || upload.ok !== true || !upload.data || !upload.data.fileId) { setStatus(photoErrorMessage(upload && upload.status), "error"); return; }
+          pending.fileId = upload.data.fileId;
+        }
+        const linked = await auth.attachDeliveryEvidence(activeJobId, pending.fileId, "delivery_photo", unit.machineId);
+        if (!linked || linked.ok !== true) { setStatus(linked && linked.status === 403 ? "Vous n’êtes pas autorisé à associer cette photo." : "La photo est téléversée mais son association reste à confirmer. Réessayez; aucun nouveau fichier ne sera créé.", "error"); return; }
+        pendingPhotoUploads.delete(input); input.value = "";
+        unit.photoAttached = true;
+        const card = input.closest && input.closest(".handover-equipment-card");
+        if (card) {
+          const hint = [...card.children].find((node) => /photo de l’état|ajouter une photo/i.test(node.textContent || ""));
+          if (hint) { hint.textContent = "Photo de l’équipement enregistrée."; hint.className = "handover-complete-note"; }
+          const wrapper = input.parentElement; if (wrapper) wrapper.hidden = true;
+          if (uploadButton) uploadButton.hidden = true;
+        }
+        setStatus("Photo enregistrée dans le dossier privé de la remise.", "success");
+      } catch (error) {
+        setStatus(error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : "La photo n’a pas pu être enregistrée. Vérifiez la connexion puis réessayez.", "error");
+      } finally { if (uploadButton) uploadButton.disabled = false; }
     }
     async function saveSignature(canvas, signature, name, acknowledgement, note) {
       if (!signature.hasInk() || !String(name.value || "").trim()) { setStatus("Saisissez le nom du client et recueillez sa signature.", "error"); return; }
@@ -271,16 +351,19 @@
       for (const select of checkboxes) {
         if (!select.value) { setStatus("Enregistrez l’état de chaque équipement avant la signature.", "error"); return; }
       }
-      const subjects = activeContext.inspection.subjects;
-      for (const unit of subjects) {
-        const card = [...result.querySelectorAll("[data-machine-id]")].find((item) => item.dataset.machineId === unit.machineId);
-        const condition = card && card.querySelector("[data-condition-for]");
-        if (!unit.equipmentVerified || !condition || !condition.value || !unit.photoAttached) { setStatus("Identifiez, contrôlez et photographiez chaque équipement avant la signature.", "error"); return; }
-        const checklist = [...card.querySelectorAll("[data-checklist-key]")].map((item) => ({ item_key: item.dataset.checklistKey, result: item.value, note: null }));
-        const saved = await auth.updateDeliveryInspection(activeJobId, unit.subjectId, condition.value, String(note.value || "").trim() || null, checklist);
-        if (!saved || !saved.ok) { setStatus("Enregistrez tous les contrôles avant la signature.", "error"); return; }
-      }
-      const latest = await loadContext();
+      let latest;
+      try {
+        const subjects = activeContext.inspection.subjects;
+        for (const unit of subjects) {
+          const card = [...result.querySelectorAll("[data-machine-id]")].find((item) => item.dataset.machineId === unit.machineId);
+          const condition = card && card.querySelector("[data-condition-for]");
+          if (!unit.equipmentVerified || !condition || !condition.value || !unit.photoAttached) { setStatus("Identifiez, contrôlez et photographiez chaque équipement avant la signature.", "error"); return; }
+          const checklist = [...card.querySelectorAll("[data-checklist-key]")].map((item) => ({ item_key: item.dataset.checklistKey, result: item.value, note: null }));
+          const saved = await auth.updateDeliveryInspection(activeJobId, unit.subjectId, condition.value, String(note.value || "").trim() || null, checklist);
+          if (!saved || !saved.ok) { setStatus("Enregistrez tous les contrôles avant la signature.", "error"); return; }
+        }
+        latest = await loadContext();
+      } catch { setStatus("Les contrôles n’ont pas tous pu être actualisés. Vérifiez la connexion puis reprenez la remise.", "error"); return; }
       const hasFindings = latest.inspection.subjects.some((unit) => ["minor_issue", "damaged"].includes(unit.condition) || unit.checklist.some((item) => item.result === "issue"));
       if (hasFindings && !(acknowledgement && acknowledgement.checked)) { renderWorkflow(latest); setStatus("Le client doit reconnaître les anomalies avant de signer.", "error"); return; }
       const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
@@ -333,7 +416,8 @@
       panel.hidden = false;
       const summary = byId("handover-job-summary");
       if (summary) summary.textContent = `Réservation ${job.reservationReference || "—"} · ${String(job.scheduledDate || "").split("-").reverse().join("/")}`;
-      if (await showExistingWorkflow()) return true;
+      const existing = await showExistingWorkflow();
+      if (existing === true || existing === null) return true;
       setStatus("Demandez au client de présenter son QR code ou son code à 8 chiffres.", "info");
       codeInput && codeInput.focus && codeInput.focus();
       return true;
@@ -396,7 +480,7 @@
       const codeForm = byId("handover-code-form"); codeForm && codeForm.addEventListener("submit", onCodeSubmit);
       global.addEventListener && global.addEventListener("pagehide", close);
     }
-    return Object.freeze({ init, open, close, verify, canVerifyDelivery });
+    return Object.freeze({ init, open, close, verify, canVerifyDelivery, normalizePhoto });
   }
 
   global.IGLOUE_HANDOVER_VERIFICATION = Object.freeze({ createController, canVerifyDelivery });
