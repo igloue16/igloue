@@ -361,6 +361,25 @@ async function settle() { await new Promise((resolve) => setImmediate(resolve));
   await initPromise;
   assert.equal(app.getState().status, "ready", "one verified organisation unlocks the admin shell");
   assert.equal(doc.getElementById("admin-authorized").hidden, false, "authorized shell renders after membership verification");
+
+  let authStateListener; let refreshUserReads = 0; let refreshMembershipReads = 0;
+  const refreshDoc = createFakeDocument();
+  const refreshApp = createAppContext().createController({
+    subscribe(listener) { authStateListener = listener; return () => {}; },
+    getSession: async () => ({ access_token: "refreshed-session" }),
+    getInvitationStatus: () => "none",
+    getCurrentUser: async () => { refreshUserReads += 1; return { id: "user-a", emailConfirmed: true }; },
+    loadActiveMemberships: async () => { refreshMembershipReads += 1; return [{ id: "org-a", slug: "igloue", name: "IGLOUE" }]; },
+    selectOrganisation: (id) => id === "org-a" ? { id, name: "IGLOUE" } : null
+  }, refreshDoc);
+  await refreshApp.init();
+  authStateListener({ event: "TOKEN_REFRESHED", session: { access_token: "new-refreshed-session" } });
+  await settle();
+  assert.equal(refreshApp.getState().status, "ready", "token refresh keeps the authorized admin shell visible");
+  assert.equal(refreshDoc.getElementById("admin-authorized").hidden, false, "token refresh does not hide the operations board");
+  assert.equal(refreshUserReads, 1, "token refresh does not repeat identity bootstrap");
+  assert.equal(refreshMembershipReads, 1, "token refresh does not reset tenant membership selection");
+
   await app.signOut();
   assert.equal(app.getState().status, "signed_out", "sign-out returns app to signed-out state");
   assert.equal(app.getState().memberships.length, 0, "sign-out clears app membership state");

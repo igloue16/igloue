@@ -80,19 +80,22 @@
     }
 
     async function loadOperationsBoard(scheduledDate = null) {
+      if (handover && !handover.confirmNavigationAway()) return false;
+      const resumeDate = scheduledDate || handover && typeof handover.pendingResumeDate === "function" && handover.pendingResumeDate();
       const requestRevision = ++boardRevision;
       const organisationId = state.selectedOrganisation && state.selectedOrganisation.id;
       if (state.status !== "ready" || !organisationId || typeof auth.loadDailyOperationsBoard !== "function") return;
-      handover && handover.close();
+      handover && handover.close({ preserveResume: true });
       state.board = null;
       state.boardMessage = "Chargement du planning…";
       render();
       try {
-        const board = await auth.loadDailyOperationsBoard(scheduledDate);
+        const board = await auth.loadDailyOperationsBoard(resumeDate || null);
         if (requestRevision !== boardRevision || state.status !== "ready" ||
             !state.selectedOrganisation || state.selectedOrganisation.id !== organisationId) return;
         state.board = board;
         state.boardMessage = "";
+        if (handover && typeof handover.resumePendingFromBoard === "function") await handover.resumePendingFromBoard(board);
       } catch {
         if (requestRevision !== boardRevision) return;
         state.board = null;
@@ -309,7 +312,13 @@
             boardRevision += 1;
             state.message = "Vous êtes déconnecté.";
             render();
-          } else if (["INITIAL_SESSION", "SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) {
+          } else if (event === "TOKEN_REFRESHED") {
+            // Supabase refreshes the access token in place. Re-running the
+            // full membership bootstrap here hid the admin shell and closed
+            // an active handover during Android camera/gallery interruptions.
+            // Protected RPCs still authorize every operation server-side.
+            return;
+          } else if (["INITIAL_SESSION", "SIGNED_IN", "USER_UPDATED"].includes(event)) {
             queueMicrotask(() => processSession(session));
           }
         });

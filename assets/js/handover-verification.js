@@ -4,6 +4,7 @@
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const QR_TOKEN = /^hv1\.[A-Za-z0-9_-]{43}$/;
   const ACTIVE_JOB_STATUSES = new Set(["arrived", "handover_in_progress"]);
+  const RESUME_STORAGE_KEY = "igloue.handover.resume.v1";
 
   function requestUuid(environment = {}) {
     if (typeof environment.randomUUID === "function") return environment.randomUUID();
@@ -33,7 +34,9 @@
     let scanning = false;
     let scanTarget = null;
     let activeJobId = null;
+    let activeJobDate = null;
     let activeContext = null;
+    let openingJobId = null;
     let pendingSignatureFileId = null;
     let pendingSignatureKey = null;
     const pendingActions = new Set();
@@ -41,6 +44,81 @@
     // succeeded but its response was lost, the same key lets tenant-files
     // return the original record instead of creating another object.
     const pendingPhotoUploads = new WeakMap();
+
+    function readResumeMarker() {
+      try {
+        const raw = global.sessionStorage && global.sessionStorage.getItem(RESUME_STORAGE_KEY);
+        const marker = raw && JSON.parse(raw);
+        if (!marker || !UUID.test(String(marker.serviceJobId || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(marker.scheduledDate || ""))) return null;
+        return { serviceJobId: marker.serviceJobId, scheduledDate: marker.scheduledDate, unsaved: marker.unsaved === true };
+      } catch { return null; }
+    }
+    function clearResumeMarker() {
+      try { global.sessionStorage && global.sessionStorage.removeItem(RESUME_STORAGE_KEY); } catch { /* Storage can be unavailable in restricted browser contexts. */ }
+    }
+    function hasUnsavedValues() {
+      if (!activeContext || !activeContext.inspection || !result) return false;
+      const subjects = activeContext.inspection.subjects || [];
+      const note = result.querySelector("textarea");
+      if (note && String(note.value || "").trim() !== String(activeContext.inspection.summaryNote || "").trim()) return true;
+      for (const control of result.querySelectorAll("[data-condition-for]")) {
+        const subject = subjects.find((item) => item.subjectId === control.dataset.conditionFor);
+        if (subject && String(control.value || "") !== String(subject.condition || "")) return true;
+      }
+      for (const control of result.querySelectorAll("[data-checklist-key]")) {
+        const subject = subjects.find((item) => item.subjectId === control.dataset.subjectId);
+        const item = subject && (subject.checklist || []).find((entry) => entry.key === control.dataset.checklistKey);
+        if (item && String(control.value || "") !== String(item.result || "")) return true;
+      }
+      const signerName = result.querySelector("[data-signer-name]");
+      if (signerName && String(signerName.value || "").trim()) return true;
+      const signature = result.querySelector("[data-signature-canvas]");
+      if (signature && signature.dataset.signatureDraft === "true") return true;
+      return [...result.querySelectorAll("[data-photo-input]")].some((input) => Boolean(input.files && input.files.length && input.dataset.photoSaved !== "true"));
+    }
+    function syncResumeMarker() {
+      if (!activeJobId || !activeJobDate || !activeContext || !activeContext.handover || activeContext.handover.status !== "in_progress") return;
+      try {
+        global.sessionStorage && global.sessionStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify({
+          serviceJobId: activeJobId, scheduledDate: activeJobDate, unsaved: hasUnsavedValues()
+        }));
+      } catch { /* Backend resume remains available manually if storage is disabled. */ }
+    }
+    function photoRetryStorageKey(subjectId) { return `igloue.handover.photo-retry.v1.${activeJobId}.${subjectId}`; }
+    function readPhotoRetry(subjectId) {
+      try {
+        const raw = global.sessionStorage && global.sessionStorage.getItem(photoRetryStorageKey(subjectId));
+        const value = raw && JSON.parse(raw);
+        return value && UUID.test(String(value.idempotencyKey || "")) && /^[0-9a-f]{64}$/i.test(String(value.fingerprint || "")) ? value : null;
+      } catch { return null; }
+    }
+    function writePhotoRetry(subjectId, value) {
+      try { global.sessionStorage && global.sessionStorage.setItem(photoRetryStorageKey(subjectId), JSON.stringify(value)); } catch { /* In-page retry remains available when browser storage is blocked. */ }
+    }
+    function clearPhotoRetry(subjectId) {
+      try { global.sessionStorage && global.sessionStorage.removeItem(photoRetryStorageKey(subjectId)); } catch { /* Best-effort local retry metadata cleanup. */ }
+    }
+    async function photoFingerprint(file) {
+      const cryptoApi = environment.crypto || global.crypto;
+      if (!file || typeof file.arrayBuffer !== "function" || !cryptoApi || !cryptoApi.subtle || typeof cryptoApi.subtle.digest !== "function") throw new Error("photo_fingerprint_unavailable");
+      const digest = await cryptoApi.subtle.digest("SHA-256", await file.arrayBuffer());
+      return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+    }
+    function noteDraftChange() { syncResumeMarker(); }
+    function onPageHide() {
+      syncResumeMarker();
+      // Android camera/gallery intents can background or suspend the document.
+      // Release camera resources and one-time customer input, but keep the
+      // active job and rendered draft intact; pagehide is not an explicit close.
+      stopCamera(); clearCredentials();
+    }
+    function onBeforeUnload(event) {
+      if (!hasUnsavedValues()) return;
+      syncResumeMarker();
+      event.preventDefault();
+      event.returnValue = "";
+      return "";
+    }
 
     function setStatus(message, kind = "info") {
       if (!status) return;
@@ -187,16 +265,17 @@
         const photoImage = document.createElement("img"); photoImage.hidden = true;
         const photoEvidence = unit.photoEvidence && unit.photoEvidence.fileId ? unit.photoEvidence : null;
         if (photoEvidence) {
+          clearPhotoRetry(unit.subjectId);
           void renderSavedPhoto(unit, photoState, photoImage);
         } else if (unit.photoAttached) {
           textNode(photoState, "p", "Photo associée côté serveur; ses métadonnées sécurisées doivent être actualisées avant l’aperçu.", "handover-hint");
         } else {
           textNode(photoState, "p", "Ajouter une photo de l’équipement.", "handover-hint");
-          const file = document.createElement("input"); file.type = "file"; file.accept = "image/*"; file.setAttribute("capture", "environment"); file.className = "handover-input";
+          const file = document.createElement("input"); file.type = "file"; file.accept = "image/*"; file.setAttribute("capture", "environment"); file.className = "handover-input"; file.dataset.photoInput = "true";
           const fileField = field(card, "Photo de l’état", file);
           const photoError = errorText(card, "handover-field-error");
           file.dataset.photoError = "true";
-          file.addEventListener("change", () => pendingPhotoUploads.delete(file));
+          file.addEventListener("change", () => { pendingPhotoUploads.delete(file); file.dataset.photoSaved = "false"; noteDraftChange(); });
           const uploadButton = button(card, "Enregistrer la photo", () => void uploadPhoto(unit, file, uploadButton, photoState, photoImage, photoError), "handover-primary");
         }
         const conditionError = errorText(card, "handover-field-error"); conditionError.dataset.conditionError = unit.subjectId;
@@ -216,11 +295,11 @@
       ctx.scale(ratio, ratio); ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.strokeStyle = "#173a48";
       let drawing = false; let drew = false;
       const point = (event) => { const r = canvas.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top }; };
-      canvas.addEventListener("pointerdown", (event) => { drawing = true; drew = true; canvas.setPointerCapture && canvas.setPointerCapture(event.pointerId); const p = point(event); ctx.beginPath(); ctx.moveTo(p.x,p.y); });
+      canvas.addEventListener("pointerdown", (event) => { drawing = true; drew = true; canvas.dataset.signatureDraft = "true"; canvas.setPointerCapture && canvas.setPointerCapture(event.pointerId); const p = point(event); ctx.beginPath(); ctx.moveTo(p.x,p.y); });
       canvas.addEventListener("pointermove", (event) => { if (!drawing) return; const p = point(event); ctx.lineTo(p.x,p.y); ctx.stroke(); });
       const end = () => { drawing = false; };
       canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end); canvas.addEventListener("pointerleave", end);
-      return { hasInk: () => drew, clear: () => { ctx.clearRect(0,0,width,180); drew=false; } };
+      return { hasInk: () => drew, clear: () => { ctx.clearRect(0,0,width,180); drew=false; canvas.dataset.signatureDraft = "false"; } };
     }
 
     function renderWorkflow(context) {
@@ -230,6 +309,7 @@
       textNode(result, "p", `Réservation ${context.reservationReference} · ${String(context.scheduledDate || "").split("-").reverse().join("/")} · ${context.timeSlot || "Horaire non renseigné"}`);
       textNode(result, "p", [context.address && context.address.line1, context.address && context.address.postcode, context.address && context.address.city].filter(Boolean).join(" · "));
       if (context.handover && context.handover.status === "confirmed") {
+        clearResumeMarker();
         if (context.handover.confirmedAt) renderCompletedScreen(context);
         else {
           textNode(result, "p", "Le serveur indique une remise confirmée, mais l’heure de confirmation n’est pas disponible. Actualisez avant de quitter.", "handover-hint");
@@ -245,10 +325,10 @@
       const findings = conditions.some((unit) => ["minor_issue", "damaged"].includes(unit.condition) || (unit.checklist || []).some((item) => item.result === "issue"));
       if (findings) textNode(result, "p", "Le client doit lire et reconnaître les anomalies signalées avant de signer.", "handover-attention-note");
       if (!context.handover || !context.handover.signatureAttached) {
-        const name = document.createElement("input"); name.type = "text"; name.maxLength = 160; name.autocomplete = "name"; name.className = "handover-input";
+        const name = document.createElement("input"); name.type = "text"; name.maxLength = 160; name.autocomplete = "name"; name.className = "handover-input"; name.dataset.signerName = "true";
         const nameField = field(result, "Nom du client signataire", name);
         const signatureError = errorText(result, "handover-field-error"); signatureError.dataset.signatureError = "true";
-        const canvas = document.createElement("canvas"); canvas.className = "handover-signature-canvas"; canvas.setAttribute("aria-label", "Zone de signature du client");
+        const canvas = document.createElement("canvas"); canvas.className = "handover-signature-canvas"; canvas.dataset.signatureCanvas = "true"; canvas.setAttribute("aria-label", "Zone de signature du client");
         result.append(canvas);
         const signature = drawSignatureCanvas(canvas);
         button(result, "Effacer la signature", () => signature.clear(), "handover-secondary");
@@ -270,6 +350,7 @@
       const validation = document.createElement("div"); validation.className = "handover-validation"; validation.hidden = true; validation.setAttribute("role", "alert"); validation.dataset.confirmValidation = "true"; result.append(validation);
       const confirmButton = button(result, "Confirmer la remise", () => void confirm(context, note, confirmButton, validation), "handover-confirm-button");
       button(result, "Vérifier le statut enregistré", () => void reconcileHandover(), "handover-secondary");
+      syncResumeMarker();
     }
 
     function renderCompletedScreen(context) {
@@ -376,6 +457,7 @@
           if (control) item.result = control.value;
         }
         if (activeContext && activeContext.inspection) activeContext.inspection.summaryNote = String(result.querySelector("textarea")?.value || "").trim();
+        syncResumeMarker();
         setStatus("✓ Enregistré côté serveur.", "success");
       } catch { setStatus("Échec de l’enregistrement du contrôle. Vos champs sont conservés; vérifiez la connexion puis réessayez.", "error"); }
       finally { if (saveButton) saveButton.textContent = "Enregistrer le contrôle"; finishAction(actionKey, saveButton); }
@@ -431,9 +513,14 @@
       try {
         let pending = pendingPhotoUploads.get(input);
         if (!pending || pending.file !== file) {
-          pending = { file, normalized: null, idempotencyKey: requestUuid(environment), fileId: null };
+          const fingerprint = await photoFingerprint(file);
+          const priorAttempt = readPhotoRetry(unit.subjectId);
+          if (priorAttempt && priorAttempt.fingerprint !== fingerprint) throw new Error("photo_retry_mismatch");
+          const idempotencyKey = priorAttempt ? priorAttempt.idempotencyKey : requestUuid(environment);
+          pending = { file, fingerprint, normalized: null, idempotencyKey, fileId: null };
           if (!UUID.test(pending.idempotencyKey)) throw new Error("request_id_unavailable");
           pendingPhotoUploads.set(input, pending);
+          writePhotoRetry(unit.subjectId, { fingerprint, idempotencyKey });
         }
         if (!pending.normalized) pending.normalized = await normalizePhoto(file);
         if (!pending.fileId) {
@@ -451,7 +538,7 @@
         // ID locally only until a fresh authorized read returns metadata.
         unit.photoEvidence = { fileId: pending.fileId, savedAt: null };
         unit.photoAttached = true;
-        pendingPhotoUploads.delete(input); input.value = "";
+        pendingPhotoUploads.delete(input); clearPhotoRetry(unit.subjectId); input.dataset.photoSaved = "true"; input.value = "";
         const card = input.closest && input.closest(".handover-equipment-card");
         if (card) {
           const wrapper = input.parentElement; if (wrapper) wrapper.hidden = true;
@@ -467,9 +554,10 @@
           }
         } catch { /* RPC success already confirms the association; refresh fills the server timestamp later. */ }
         await renderSavedPhoto(unit, photoState, photoImage);
+        syncResumeMarker();
         setStatus("✓ Photo enregistrée côté serveur.", "success");
       } catch (error) {
-        const message = error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : "Échec de l’enregistrement de la photo. Votre sélection est conservée; vérifiez la connexion puis réessayez.";
+        const message = error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : error && error.message === "photo_fingerprint_unavailable" ? "L’envoi sécurisé n’est pas disponible sur cet appareil. Rechargez la page ou choisissez une photo JPG ou PNG." : error && error.message === "photo_retry_mismatch" ? "Une tentative précédente n’a pas été confirmée. Resélectionnez la même photo pour reprendre son envoi avant d’en choisir une autre." : "Échec de l’enregistrement de la photo. Votre sélection est conservée; vérifiez la connexion puis réessayez.";
         showFieldError(photoError, message); setStatus(message, "error");
         photoState.replaceChildren(); textNode(photoState, "p", "Échec — la sélection est conservée. Réessayez.", "handover-field-error");
       } finally { if (uploadButton) { uploadButton.disabled = false; uploadButton.textContent = "Réessayer l’enregistrement de la photo"; } finishAction(actionKey); }
@@ -646,22 +734,62 @@
       if (!job || !job.serviceJobId || job.type !== "delivery") return false;
       const permittedStatus = ACTIVE_JOB_STATUSES.has(job.status);
       if (!permittedStatus) return false;
-      stopCamera(); clearCredentials(); clearResult(); activeJobId = job.serviceJobId; activeContext = null;
-      pendingSignatureFileId = null; pendingSignatureKey = null;
-      panel.hidden = false;
-      const summary = byId("handover-job-summary");
-      if (summary) summary.textContent = `Réservation ${job.reservationReference || "—"} · ${String(job.scheduledDate || "").split("-").reverse().join("/")}`;
-      const existing = await showExistingWorkflow();
-      if (existing === true || existing === null) return true;
-      setStatus("Demandez au client de présenter son QR code ou son code à 8 chiffres.", "info");
-      codeInput && codeInput.focus && codeInput.focus();
-      return true;
+      // Rapid repeated taps on mobile should not fan out duplicate protected
+      // reads or let a slower response replace a different job's panel.
+      if (openingJobId) return openingJobId === job.serviceJobId;
+      openingJobId = job.serviceJobId;
+      try {
+        stopCamera(); clearCredentials(); clearResult(); activeJobId = job.serviceJobId; activeJobDate = job.scheduledDate; activeContext = null;
+        pendingSignatureFileId = null; pendingSignatureKey = null;
+        panel.hidden = false;
+        // The panel follows the full operations list. On mobile, without this
+        // scroll a successful resume can look like an inert button because the
+        // opened panel and its status sit below the fold.
+        if (panel && typeof panel.scrollIntoView === "function") {
+          panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        const summary = byId("handover-job-summary");
+        if (summary) summary.textContent = `Réservation ${job.reservationReference || "—"} · ${String(job.scheduledDate || "").split("-").reverse().join("/")}`;
+        const existing = await showExistingWorkflow();
+        if (existing === true || existing === null) return true;
+        setStatus("Demandez au client de présenter son QR code ou son code à 8 chiffres.", "info");
+        codeInput && codeInput.focus && codeInput.focus();
+        return true;
+      } finally {
+        openingJobId = null;
+      }
     }
-    function close() {
+    function close(options = {}) {
       stopCamera(); clearCredentials(); clearResult(); activeJobId = null; activeContext = null;
+      activeJobDate = null;
       pendingSignatureFileId = null; pendingSignatureKey = null;
+      if (options.preserveResume !== true) clearResumeMarker();
       if (panel) panel.hidden = true;
       setStatus("Demandez au client de présenter son code.", "info");
+    }
+    async function resumePendingFromBoard(board) {
+      const marker = readResumeMarker();
+      if (!marker || !board || !board.metadata || board.metadata.selectedDate !== marker.scheduledDate) return false;
+      const job = Array.isArray(board.jobs) && board.jobs.find((item) => item && item.serviceJobId === marker.serviceJobId);
+      if (!job) return false;
+      if (!canVerifyDelivery(job)) { clearResumeMarker(); return false; }
+      const opened = await open(job);
+      if (opened && activeContext && activeContext.handover && activeContext.handover.status === "in_progress" && marker.unsaved) {
+        setStatus("La page a été interrompue. Les données enregistrées ont été rechargées; les modifications non enregistrées peuvent avoir été perdues. Vérifiez les champs avant de continuer.", "error");
+      }
+      return opened;
+    }
+    function pendingResumeDate() {
+      const marker = readResumeMarker();
+      return marker ? marker.scheduledDate : null;
+    }
+    function confirmNavigationAway() {
+      if (!hasUnsavedValues()) return true;
+      return typeof global.confirm === "function" && global.confirm("Des modifications ne sont pas enregistrées. Si vous quittez maintenant, les champs enregistrés côté serveur pourront être rechargés, mais les autres devront être ressaisis. Continuer ?");
+    }
+    function requestClose() {
+      if (!confirmNavigationAway()) return false;
+      close(); return true;
     }
     async function scanLoop(detector) {
       if (!scanning || !video || !stream) return;
@@ -710,12 +838,14 @@
     }
     function init() {
       jobs && jobs.addEventListener("click", onJobsClick);
-      const closeButton = byId("handover-close"); closeButton && closeButton.addEventListener("click", close);
+      result && ["input", "change", "pointerdown"].forEach((eventName) => result.addEventListener(eventName, noteDraftChange));
+      const closeButton = byId("handover-close"); closeButton && closeButton.addEventListener("click", requestClose);
       scanButton && scanButton.addEventListener("click", () => void startScan());
       const codeForm = byId("handover-code-form"); codeForm && codeForm.addEventListener("submit", onCodeSubmit);
-      global.addEventListener && global.addEventListener("pagehide", close);
+      global.addEventListener && global.addEventListener("pagehide", onPageHide);
+      global.addEventListener && global.addEventListener("beforeunload", onBeforeUnload);
     }
-    return Object.freeze({ init, open, close, verify, canVerifyDelivery, normalizePhoto });
+    return Object.freeze({ init, open, close, verify, canVerifyDelivery, normalizePhoto, resumePendingFromBoard, pendingResumeDate, hasUnsavedValues, confirmNavigationAway });
   }
 
   global.IGLOUE_HANDOVER_VERIFICATION = Object.freeze({ createController, canVerifyDelivery });

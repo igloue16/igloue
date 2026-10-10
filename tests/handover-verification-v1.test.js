@@ -23,6 +23,7 @@ class Element {
   getContext() { return { scale() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, clearRect() {}, drawImage() {} }; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 560, height: 180 }; }
   setPointerCapture() {}
+  scrollIntoView(options) { this.scrollOptions = options; }
   toBlob(callback, type = "image/png") { callback({ type, size: 100 }); }
 }
 
@@ -36,17 +37,24 @@ const handoverContext = (confirmed = false, inProgress = false) => ({
   handover: confirmed ? { id: "handover-1", status: "confirmed", idempotencyKey, signedName: "Synthetic Customer", signatureAttached: true } : inProgress ? { id: "handover-1", status: "in_progress", idempotencyKey, signatureAttached: false } : null
 });
 
-function setup({ auth = {}, mediaDevices, BarcodeDetector, randomUUID = () => requestId, environment = {} } = {}) {
+function createSessionStorage() {
+  const entries = new Map();
+  return { getItem: (key) => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, String(value)), removeItem: (key) => entries.delete(key), entries };
+}
+const testPhotoCrypto = { subtle: { async digest() { return Uint8Array.from({ length: 32 }, (_, index) => index + 1).buffer; } } };
+
+function setup({ auth = {}, mediaDevices, BarcodeDetector, randomUUID = () => requestId, environment = {}, sessionStorage = createSessionStorage() } = {}) {
   const ids = ["ops-jobs", "handover-panel", "handover-status", "handover-code", "handover-video", "handover-result", "handover-scan", "handover-submit", "handover-job-summary", "handover-close", "handover-code-form"];
   const nodes = new Map(ids.map((id) => [id, new Element()]));
   const doc = { getElementById: (id) => nodes.get(id) || null, createElement: (tag) => new Element(tag) };
+  const windowListeners = new Map();
   const context = vm.createContext({ setTimeout, clearTimeout, Promise, Uint8Array });
   context.window = context; context.navigator = mediaDevices ? { mediaDevices } : {};
-  context.crypto = { randomUUID }; context.BarcodeDetector = BarcodeDetector; context.devicePixelRatio = 1; context.addEventListener = () => {};
+  context.crypto = { randomUUID }; context.BarcodeDetector = BarcodeDetector; context.devicePixelRatio = 1; context.addEventListener = (name, callback) => windowListeners.set(name, callback); context.sessionStorage = sessionStorage; context.confirm = () => true;
   vm.runInContext(source, context, { filename: "handover-verification.js" });
   const controller = context.IGLOUE_HANDOVER_VERIFICATION.createController(auth, doc, { randomUUID, ...environment });
   controller.init();
-  return { controller, nodes, context };
+  return { controller, nodes, context, windowListeners, sessionStorage };
 }
 
 const job = { type: "delivery", serviceJobId, status: "arrived", state: "due_now", reservationReference: "AB12CD34", scheduledDate: "2026-10-09" };
@@ -126,6 +134,75 @@ async function run() {
   assert.match(resumeFailure.nodes.get("handover-status").textContent, /remise enregistrée n’a pas pu être chargée/i);
   assert.equal(verifyAfterLoadFailure, false, "failed resume lookup never falls through to fresh customer verification");
 
+  const resumedContext = handoverContext(false, true);
+  const resumedSubject = resumedContext.inspection.subjects[0];
+  resumedSubject.condition = "good";
+  resumedSubject.checklist = [{ key: "cable", label: "Cable", result: "pass" }];
+  resumedSubject.photoAttached = true;
+  resumedSubject.photoEvidence = { fileId: "saved-photo", savedAt: "2026-10-10T10:00:00Z" };
+  resumedContext.inspection.summaryNote = "Saved inspection note";
+  resumedContext.handover.signatureAttached = true;
+  resumedContext.handover.signedName = "Synthetic Customer";
+  resumedContext.handover.signedAt = "2026-10-10T10:01:00Z";
+  resumedContext.handover.signatureEvidence = { fileId: "saved-signature", savedAt: "2026-10-10T10:01:00Z" };
+  let resumeReads = 0; let resumeVerifications = 0; let restoredPhotoId = null;
+  let releaseResume;
+  const resumeReadGate = new Promise((resolve) => { releaseResume = resolve; });
+  const resume = setup({ auth: {
+    async getDeliveryHandover() { resumeReads += 1; await resumeReadGate; return { ok: true, data: resumedContext }; },
+    async verifyCustomerHandover() { resumeVerifications += 1; return verified; },
+    async downloadDeliveryEvidence(id) { restoredPhotoId = id; return { ok: true, data: { url: "https://signed.invalid/saved-photo" } }; }
+  } });
+  const resumingJob = { ...job, status: "handover_in_progress" };
+  const firstResume = resume.controller.open(resumingJob);
+  const duplicateResume = resume.controller.open(resumingJob);
+  assert.equal(await duplicateResume, true, "a rapid second tap is safely absorbed while resume loads");
+  assert.equal(resumeReads, 1, "rapid taps do not duplicate the protected resume request");
+  releaseResume(); await firstResume; await tick();
+  assert.equal(resume.nodes.get("handover-panel").scrollOptions.behavior, "smooth", "mobile resume scrolls smoothly");
+  assert.equal(resume.nodes.get("handover-panel").scrollOptions.block, "start", "mobile resume aligns the panel at the top");
+  assert.equal(resumeReads, 1, "resume performs one protected read");
+  assert.equal(resumeVerifications, 0, "resume does not repeat successful customer verification");
+  assert.equal(find(resume.nodes.get("handover-result"), (node) => node.tagName === "select" && node.dataset.conditionFor === "subject-1").value, "good", "saved equipment condition is restored");
+  assert.equal(find(resume.nodes.get("handover-result"), (node) => node.tagName === "select" && node.dataset.checklistKey === "cable").value, "pass", "saved checklist result is restored");
+  assert.equal(find(resume.nodes.get("handover-result"), (node) => node.tagName === "textarea").value, "Saved inspection note", "saved inspection note is restored");
+  assert.equal(restoredPhotoId, "saved-photo", "saved photo is fetched through protected evidence access");
+  assert.ok(find(resume.nodes.get("handover-result"), (node) => node.tagName === "img" && node.src === "https://signed.invalid/saved-photo"), "saved photo thumbnail is restored");
+  assert.match(resume.nodes.get("handover-result").children.map((node) => node.textContent).join(" "), /Synthetic Customer/, "saved signature state is restored");
+
+  const interruptedStorage = createSessionStorage();
+  const interruptedResume = setup({ sessionStorage: interruptedStorage, auth: { async getDeliveryHandover() { return { ok: true, data: resumedContext }; } } });
+  await interruptedResume.controller.open(resumingJob);
+  const interruptedNote = find(interruptedResume.nodes.get("handover-result"), (node) => node.tagName === "textarea");
+  interruptedNote.value = "Unsaved mobile note";
+  interruptedResume.nodes.get("handover-result").emit("input");
+  let unloadPrevented = false;
+  interruptedResume.windowListeners.get("beforeunload")({ preventDefault() { unloadPrevented = true; }, returnValue: null });
+  assert.equal(unloadPrevented, true, "a reload with unsaved inspection changes asks for confirmation");
+  interruptedResume.windowListeners.get("pagehide")();
+  assert.equal(interruptedResume.nodes.get("handover-panel").hidden, false, "camera/gallery pagehide does not close the handover panel");
+  assert.equal(find(interruptedResume.nodes.get("handover-result"), (node) => node.tagName === "textarea").value, "Unsaved mobile note", "camera/gallery interruption preserves rendered values");
+  const interruptedMarker = JSON.parse(interruptedStorage.getItem("igloue.handover.resume.v1"));
+  assert.equal(interruptedMarker.serviceJobId, serviceJobId);
+  assert.equal(interruptedMarker.unsaved, true, "only the interruption warning flag and job/date identifiers are retained");
+  assert.equal(JSON.stringify(interruptedMarker).includes("Unsaved mobile note"), false, "draft text is never persisted in browser storage");
+
+  const afterReload = setup({ sessionStorage: interruptedStorage, auth: { async getDeliveryHandover() { return { ok: true, data: resumedContext }; } } });
+  assert.equal(afterReload.controller.pendingResumeDate(), resumingJob.scheduledDate, "reload restores the board date from the non-secret resume marker");
+  await afterReload.controller.resumePendingFromBoard({ metadata: { selectedDate: resumingJob.scheduledDate }, jobs: [resumingJob] });
+  assert.equal(afterReload.nodes.get("handover-panel").hidden, false, "reload resumes the backend-authorized in-progress handover");
+  assert.equal(find(afterReload.nodes.get("handover-result"), (node) => node.tagName === "textarea").value, "Saved inspection note", "reload restores server-saved inspection values");
+  assert.match(afterReload.nodes.get("handover-status").textContent, /modifications non enregistrées peuvent avoir été perdues/i, "reload clearly warns that unsaved local edits may need re-entry");
+
+  let delegatedRead = 0;
+  const delegated = setup({ auth: { async getDeliveryHandover() { delegatedRead += 1; return { ok: true, data: handoverContext(false, true) }; } } });
+  delegated.context.IGLOUE_ADMIN_APP_CONTROLLER = { getState: () => ({ board: { jobs: [resumingJob] } }) };
+  const resumeButton = { dataset: { verifyDelivery: serviceJobId } };
+  delegated.nodes.get("ops-jobs").emit("click", { target: { closest(selector) { return selector === "[data-verify-delivery]" ? resumeButton : null; } } });
+  await tick();
+  assert.equal(delegatedRead, 1, "tapping the delegated resume action reaches the protected read");
+  assert.equal(delegated.nodes.get("handover-panel").hidden, false, "delegated resume opens the panel");
+
   const originalSubject = handoverContext(false, true).inspection.subjects[0];
   originalSubject.checklist = [{ key: "cable", label: "Câble", result: "not_checked" }, { key: "accessory", label: "Accessoire", result: "not_checked" }];
   const inspectContext = handoverContext(false, true); inspectContext.inspection.subjects[0] = originalSubject;
@@ -159,7 +236,7 @@ async function run() {
   const photoContext = handoverContext(false, true);
   const photoCalls = { upload: [], attach: 0 };
   let uploadAttempt = 0;
-  const photoUI = setup({ auth: {
+  const photoUI = setup({ environment: { crypto: testPhotoCrypto }, auth: {
     async getDeliveryHandover() { return { ok: true, data: photoContext }; },
     async getSelectedOrganisation() { return { id: "tenant-1" }; },
     async uploadDeliveryEvidence(request) { photoCalls.upload.push(request); uploadAttempt += 1; return uploadAttempt === 1 ? { ok: false, status: 0 } : { ok: true, data: { fileId: "file-1" } }; },
@@ -170,7 +247,7 @@ async function run() {
   const photoCard = find(photoUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
   const photoInput = find(photoCard, (node) => node.type === "file");
   const photoButton = find(photoCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo");
-  photoInput.files = [{ type: "image/jpeg", size: 100, name: "capture.jpg" }]; photoInput.value = "C:\\fakepath\\capture.jpg";
+  photoInput.files = [{ type: "image/jpeg", size: 100, name: "capture.jpg", async arrayBuffer() { return Uint8Array.of(1,2,3).buffer; } }]; photoInput.value = "C:\\fakepath\\capture.jpg";
   photoButton.emit("click"); await tick();
   assert.equal(photoInput.value, "C:\\fakepath\\capture.jpg", "failed upload retains selected file for retry");
   assert.match(photoUI.nodes.get("handover-status").textContent, /vérifiez la connexion/i);
@@ -182,6 +259,7 @@ async function run() {
   assert.equal(photoCalls.upload[0].idempotencyKey, photoCalls.upload[1].idempotencyKey, "unknown upload outcome retries with the same idempotency key");
   assert.equal(photoCalls.attach, 2, "association retries using the previously returned file ID");
   assert.equal(photoInput.value, "", "selection clears only after successful association");
+  assert.equal(photoButton.type, "button", "photo save cannot submit the numeric-code form accidentally");
   assert.equal(photoCard.children.some((node) => node.className === "handover-photo-state" && find(node, (child) => child.tagName === "img" && child.src === "https://signed.invalid/temporary")), true, "saved thumbnail reloads through the authorized short-lived download path");
   assert.match(photoUI.nodes.get("handover-status").textContent, /Photo enregistrée côté serveur/);
   const persistedPhotoContext = handoverContext(false, true);
@@ -195,6 +273,43 @@ async function run() {
   const reloadedCard = find(reloadedPhoto.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
   assert.match(find(reloadedCard, (node) => node.className === "handover-photo-state").children[0].textContent, /Enregistré · 10\/10\/2026/);
   assert.equal(find(reloadedCard, (node) => node.tagName === "img").src, "https://signed.invalid/reloaded", "saved photo and server timestamp return after a new page session");
+
+  const interruptedUploadStorage = createSessionStorage();
+  const interruptedUploadContext = handoverContext(false, true);
+  const interruptedUploadKeys = [];
+  const interruptedUploadAuth = {
+    async getDeliveryHandover() { return { ok: true, data: interruptedUploadContext }; },
+    async getSelectedOrganisation() { return { id: "tenant-1" }; },
+    async uploadDeliveryEvidence(request) { interruptedUploadKeys.push(request.idempotencyKey); return { ok: false, status: 0 }; },
+    async attachDeliveryEvidence() { throw new Error("must not attach after failed upload"); }
+  };
+  const interruptedUploadUI = setup({ sessionStorage: interruptedUploadStorage, environment: { crypto: testPhotoCrypto }, auth: interruptedUploadAuth });
+  await interruptedUploadUI.controller.open(job);
+  let uploadCard = find(interruptedUploadUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  let uploadInput = find(uploadCard, (node) => node.type === "file");
+  uploadInput.files = [{ type: "image/jpeg", size: 100, async arrayBuffer() { return Uint8Array.of(9,8,7).buffer; } }]; uploadInput.value = "capture.jpg";
+  uploadInput.emit("change");
+  find(uploadCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  interruptedUploadUI.windowListeners.get("pagehide")();
+  const retryAuth = {
+    async getDeliveryHandover() { return { ok: true, data: interruptedUploadContext }; },
+    async getSelectedOrganisation() { return { id: "tenant-1" }; },
+    async uploadDeliveryEvidence(request) { interruptedUploadKeys.push(request.idempotencyKey); return { ok: true, data: { fileId: "retry-file" } }; },
+    async attachDeliveryEvidence(_jobId, fileId) { interruptedUploadContext.inspection.subjects[0].photoEvidence = { fileId, savedAt: "2026-10-10T10:00:00Z" }; interruptedUploadContext.inspection.subjects[0].photoAttached = true; return { ok: true, data: { attached: true, fileId } }; },
+    async downloadDeliveryEvidence() { return { ok: true, data: { url: "https://signed.invalid/retry" } }; }
+  };
+  const retryAfterReload = setup({ sessionStorage: interruptedUploadStorage, randomUUID: () => "00000000-0000-4000-8000-00000000e863", environment: { crypto: testPhotoCrypto }, auth: retryAuth });
+  await retryAfterReload.controller.resumePendingFromBoard({ metadata: { selectedDate: job.scheduledDate }, jobs: [{ ...job, status: "handover_in_progress" }] });
+  uploadCard = find(retryAfterReload.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  uploadInput = find(uploadCard, (node) => node.type === "file");
+  uploadInput.files = [{ type: "image/jpeg", size: 100, async arrayBuffer() { return Uint8Array.of(9,8,7).buffer; } }]; uploadInput.value = "capture.jpg";
+  uploadInput.emit("change");
+  find(uploadCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(interruptedUploadKeys.length, 2, "failed upload can be retried after an Android page interruption");
+  assert.equal(interruptedUploadKeys[0], interruptedUploadKeys[1], "same photo reuses its session-scoped idempotency key after reload");
+  assert.equal(interruptedUploadContext.inspection.subjects[0].photoEvidence.fileId, "retry-file", "retry associates one backend file record with the restored handover");
   photoContext.handover.signatureAttached = true; photoContext.handover.signedName = "Synthetic Customer";
   photoContext.handover.signedAt = "2026-10-10T10:01:00Z";
   photoContext.handover.signatureEvidence = { fileId: "signature-file", savedAt: "2026-10-10T10:01:00Z" };
@@ -262,7 +377,8 @@ async function run() {
   assert.match(source, /pointerdown/, "signature capture supports touch input");
   assert.match(html, /handover-verification\.js/);
   assert.match(html, /phase2a3-handover-save-ux-1/, "admin assets use a cache-busting release identifier for this fix");
-  assert.doesNotMatch(source + html, /localStorage|sessionStorage|console\.(?:log|warn|error)/);
+  assert.doesNotMatch(source + html, /localStorage|console\.(?:log|warn|error)/, "credentials are not persisted to localStorage or logged");
+  assert.doesNotMatch(source, /sessionStorage\.setItem\([^,]+,\s*(?:credential|token|password)/i, "session storage writes are limited to resume and photo retry metadata");
   console.log("Online handover UI tests passed (eligibility, numeric/QR verification, resumable preparation, safe errors, camera cleanup, and credential clearing).");
 }
 
