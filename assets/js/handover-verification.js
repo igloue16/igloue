@@ -534,13 +534,20 @@
       if (statusCode === 413) return "Cette photo reste trop volumineuse. Prenez une photo moins détaillée puis réessayez.";
       if (statusCode === 415) return "Format non pris en charge. Prenez une photo JPG ou PNG.";
       if (statusCode === 422) return "La photo n’a pas été acceptée. Reprenez-la avec l’appareil photo puis réessayez.";
-      return "La photo n’a pas pu être enregistrée. Vérifiez la connexion; vous pouvez réessayer sans perdre la sélection.";
+      if (statusCode >= 500) return "Le service de stockage rencontre un problème. Votre sélection est conservée; réessayez dans un instant.";
+      if (statusCode === 0) return "La connexion au service de stockage a échoué. Vérifiez le réseau; votre sélection est conservée pour réessayer.";
+      return "La photo n’a pas pu être enregistrée. Votre sélection est conservée; réessayez.";
     }
     async function uploadPhoto(unit, input, uploadButton, photoState, photoImage, photoError) {
       const actionKey = `photo:${unit.subjectId}`;
       if (!actionAvailable(actionKey)) return;
       const file = input.files && input.files[0];
       if (!file) { setStatus("Prenez ou sélectionnez une photo de l’équipement.", "error"); finishAction(actionKey); return; }
+      if (!unit.equipmentVerified) {
+        const message = "Vérifiez d’abord l’équipement associé à cette remise avant d’enregistrer sa photo.";
+        showFieldError(photoError, message); photoState.replaceChildren(); textNode(photoState, "p", message, "handover-field-error");
+        setStatus(message, "error"); finishAction(actionKey); return;
+      }
       if (uploadButton) uploadButton.disabled = true;
       if (uploadButton) uploadButton.textContent = "Enregistrement…";
       showFieldError(photoError, "");
@@ -567,8 +574,15 @@
         }
         const linked = await auth.attachDeliveryEvidence(activeJobId, pending.fileId, "delivery_photo", unit.machineId);
         if (!linked || linked.ok !== true || !linked.data || linked.data.attached !== true) {
-          const message = linked && linked.status === 403 ? "Vous n’êtes pas autorisé à associer cette photo." : "La photo n’est pas encore associée à la remise. Vos champs sont conservés; réessayez sans créer un nouveau fichier.";
-          showFieldError(photoError, message); setStatus(message, "error"); photoState.replaceChildren(); textNode(photoState, "p", "Échec — réessayez après vérification de la connexion.", "handover-field-error"); return;
+          const message = linked && linked.reason === "equipment_verification_required" ? "Vérifiez d’abord l’équipement associé à cette remise, puis réessayez. La photo déjà envoyée sera réutilisée." :
+            linked && linked.status === 401 ? "Votre session a expiré. Reconnectez-vous puis reprenez cette remise." :
+            linked && linked.status === 403 ? "Vous n’êtes pas autorisé à associer une photo à cette remise." :
+            linked && linked.status === 422 ? "La photo ou les informations de contrôle ne sont pas valides. Vérifiez les champs puis réessayez." :
+            linked && linked.status === 409 ? "Cette photo est déjà traitée ou la remise a changé. Actualisez la remise avant de réessayer." :
+            linked && linked.status >= 500 ? "Le serveur n’a pas pu associer la photo. Elle reste sélectionnée; réessayez dans un instant." :
+            linked && linked.status === 0 ? "La connexion au serveur a échoué pendant l’association. La photo envoyée sera réutilisée lors du nouvel essai." :
+            "La photo n’est pas encore associée à la remise. Vos champs sont conservés; réessayez sans créer un nouveau fichier.";
+          showFieldError(photoError, message); setStatus(message, "error"); photoState.replaceChildren(); textNode(photoState, "p", message, "handover-field-error"); return;
         }
         // The association RPC is the persistence confirmation. Keep its file
         // ID locally only until a fresh authorized read returns metadata.

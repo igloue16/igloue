@@ -18,6 +18,7 @@ function createSdkEnvironment() {
   let updateUserResult = null;
   const authListeners = new Set();
   let operationsBoardResult = null;
+  let rpcResult = null;
   let functionResult = null;
   const calls = { createdWith: null, signIns: [], signOuts: [], updatedPasswords: [], tableQueries: [], rpcCalls: [], functionInvokes: [], replacedUrl: null };
 
@@ -72,7 +73,7 @@ function createSdkEnvironment() {
     },
     async rpc(name, parameters) {
       calls.rpcCalls.push({ name, parameters });
-      return { data: operationsBoardResult, error: null };
+      return rpcResult || { data: operationsBoardResult, error: null };
     },
     functions: {
       async invoke(name, options) {
@@ -107,6 +108,7 @@ function createSdkEnvironment() {
     },
     setMemberships(rows) { membershipRows = rows; },
     setOperationsBoardResult(value) { operationsBoardResult = value; },
+    setRpcResult(value) { rpcResult = value; },
     setFunctionResult(value) { functionResult = value; },
     setSignInResult(result) { signInResult = result; },
     setUpdateUserResult(result) { updateUserResult = result; },
@@ -197,6 +199,20 @@ async function settle() { await new Promise((resolve) => setImmediate(resolve));
   assert.equal((await env.auth.loadActiveMemberships()).length, 2, "multiple active memberships are retained");
   assert.equal(env.auth.getSelectedOrganisation(), null, "multiple memberships require an explicit choice");
   assert.equal(env.auth.selectOrganisation("org-b").id, "org-b", "selection is limited to a verified membership");
+
+  env.setRpcResult({ data: null, error: { code: "42501", message: "verified equipment required for photo", details: "sensitive database details" } });
+  const equipmentPrecondition = await env.auth.attachDeliveryEvidence("job-a", "file-a", "delivery_photo", "machine-a");
+  assert.deepEqual(JSON.parse(JSON.stringify(equipmentPrecondition)), { ok: false, status: 403, reason: "equipment_verification_required" },
+    "known equipment precondition is classified from the PostgREST SQLSTATE without returning database text");
+  assert.equal(JSON.stringify(equipmentPrecondition).includes("sensitive database details"), false, "RPC details never reach the UI");
+  env.setRpcResult({ data: null, error: { code: "42501", message: "permission denied for relation tenant_file_records" } });
+  const authorizationDenial = await env.auth.attachDeliveryEvidence("job-a", "file-a", "delivery_photo", "machine-a");
+  assert.deepEqual(JSON.parse(JSON.stringify(authorizationDenial)), { ok: false, status: 403, reason: "authorization_denied" },
+    "other SQLSTATE 42501 errors remain generic authorization denials");
+  env.setRpcResult({ data: null, error: { code: "XX000", message: "sensitive backend detail" } });
+  assert.deepEqual(JSON.parse(JSON.stringify(await env.auth.attachDeliveryEvidence("job-a", "file-a", "delivery_photo", "machine-a"))), { ok: false, status: 0 },
+    "unexpected RPC errors remain safe and distinguishable from authorization denials");
+  env.setRpcResult(null);
 
   env.setOperationsBoardResult({ metadata: { organisationName: "Wrong tenant", timezone: "Europe/Paris", localToday: "2026-10-08", selectedDate: "2026-10-08" },
     summary: { deliveriesToday: 0, collectionsToday: 0, overdueJobs: 0, completedJobs: 0, attentionJobs: 0 }, jobs: [] });

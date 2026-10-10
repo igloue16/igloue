@@ -259,6 +259,7 @@ async function run() {
 
   let memoryUploadCalls = 0;
   const memoryPhotoContext = handoverContext(false, true);
+  memoryPhotoContext.inspection.subjects[0].equipmentVerified = true;
   const memoryPhotoUI = setup({ environment: { crypto: testPhotoCrypto, async createImageBitmap() { throw memoryError; } }, auth: {
     async getDeliveryHandover() { return { ok: true, data: memoryPhotoContext }; },
     async getSelectedOrganisation() { return { id: "tenant-1" }; },
@@ -274,14 +275,30 @@ async function run() {
   assert.equal(memoryPhotoInput.value, "capture.heic", "memory failure preserves the selected photo for a safe retry");
   assert.match(memoryPhotoUI.nodes.get("handover-status").textContent, /manque de m\u00e9moire/i, "memory failure is explained in French without raw browser details");
 
+  const unverifiedPhotoContext = handoverContext(false, true);
+  let unverifiedPhotoUploads = 0;
+  const unverifiedPhotoUI = setup({ environment: { crypto: testPhotoCrypto }, auth: {
+    async getDeliveryHandover() { return { ok: true, data: unverifiedPhotoContext }; },
+    async uploadDeliveryEvidence() { unverifiedPhotoUploads += 1; return { ok: true, data: { fileId: "must-not-upload" } }; }
+  } });
+  await unverifiedPhotoUI.controller.open(job);
+  const unverifiedCard = find(unverifiedPhotoUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  const unverifiedInput = find(unverifiedCard, (node) => node.type === "file");
+  unverifiedInput.files = [syntheticPhotoFile("image/jpeg", 100)]; unverifiedInput.value = "capture.jpg";
+  find(unverifiedCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click"); await tick();
+  assert.equal(unverifiedPhotoUploads, 0, "photo upload is blocked until assigned equipment is verified");
+  assert.equal(unverifiedInput.value, "capture.jpg", "equipment precondition preserves the selected photo");
+  assert.match(unverifiedPhotoUI.nodes.get("handover-status").textContent, /Vérifiez d’abord l’équipement/i);
+
   const photoContext = handoverContext(false, true);
+  photoContext.inspection.subjects[0].equipmentVerified = true;
   const photoCalls = { upload: [], attach: 0 };
   let uploadAttempt = 0;
   const photoUI = setup({ environment: { crypto: testPhotoCrypto }, auth: {
     async getDeliveryHandover() { return { ok: true, data: photoContext }; },
     async getSelectedOrganisation() { return { id: "tenant-1" }; },
     async uploadDeliveryEvidence(request) { photoCalls.upload.push(request); uploadAttempt += 1; return uploadAttempt === 1 ? { ok: false, status: 0 } : { ok: true, data: { fileId: "file-1" } }; },
-    async attachDeliveryEvidence() { photoCalls.attach += 1; if (photoCalls.attach === 1) return { ok: false, status: 503 }; photoContext.inspection.subjects[0].photoEvidence = { fileId: "file-1", savedAt: "2026-10-10T10:00:00Z", linkedAt: "2026-10-10T10:00:00Z" }; photoContext.inspection.subjects[0].photoAttached = true; return { ok: true, data: { attached: true, fileId: "file-1" } }; },
+    async attachDeliveryEvidence() { photoCalls.attach += 1; if (photoCalls.attach === 1) return { ok: false, status: 403, reason: "equipment_verification_required" }; photoContext.inspection.subjects[0].photoEvidence = { fileId: "file-1", savedAt: "2026-10-10T10:00:00Z", linkedAt: "2026-10-10T10:00:00Z" }; photoContext.inspection.subjects[0].photoAttached = true; return { ok: true, data: { attached: true, fileId: "file-1" } }; },
     async downloadDeliveryEvidence(fileId) { assert.equal(fileId, "file-1"); return { ok: true, data: { url: "https://signed.invalid/temporary" } }; }
   } });
   await photoUI.controller.open(job);
@@ -291,10 +308,10 @@ async function run() {
   photoInput.files = [syntheticPhotoFile("image/jpeg", 100)]; photoInput.value = "C:\\fakepath\\capture.jpg";
   photoButton.emit("click"); await tick();
   assert.equal(photoInput.value, "C:\\fakepath\\capture.jpg", "failed upload retains selected file for retry");
-  assert.match(photoUI.nodes.get("handover-status").textContent, /vérifiez la connexion/i);
+  assert.match(photoUI.nodes.get("handover-status").textContent, /vérifiez le réseau/i);
   photoButton.emit("click"); await tick();
   assert.equal(photoInput.value, "C:\\fakepath\\capture.jpg", "failed evidence association retains selection and file ID");
-  assert.match(photoUI.nodes.get("handover-status").textContent, /pas encore associée/i);
+  assert.match(photoUI.nodes.get("handover-status").textContent, /Vérifiez d’abord l’équipement/i);
   photoButton.emit("click"); await tick();
   assert.equal(photoCalls.upload.length, 2, "retry after successful upload does not upload a duplicate object");
   assert.equal(photoCalls.upload[0].idempotencyKey, photoCalls.upload[1].idempotencyKey, "unknown upload outcome retries with the same idempotency key");
@@ -317,6 +334,7 @@ async function run() {
 
   const interruptedUploadStorage = createSessionStorage();
   const interruptedUploadContext = handoverContext(false, true);
+  interruptedUploadContext.inspection.subjects[0].equipmentVerified = true;
   const interruptedUploadKeys = [];
   const interruptedUploadAuth = {
     async getDeliveryHandover() { return { ok: true, data: interruptedUploadContext }; },

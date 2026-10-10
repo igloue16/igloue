@@ -314,8 +314,15 @@
     try {
       const { data, error } = await getClient().rpc(name, { ...args, p_organisation_id: selectedOrganisation.id });
       if (error) {
-        const status = Number(error.status || error.context && error.context.status);
-        return { ok: false, status: [401,403,400,404,409,422,503].includes(status) ? status : 0 };
+        const httpStatus = Number(error.status || error.context && error.context.status);
+        const code = String(error.code || "");
+        const status = [401,403,400,404,409,422,503].includes(httpStatus) ? httpStatus :
+          code === "42501" ? 403 : ["22023", "22P02", "23514"].includes(code) ? 422 :
+          ["23505", "55000"].includes(code) ? 409 : 0;
+        const reason = code === "42501" && error.message === "verified equipment required for photo"
+          ? "equipment_verification_required"
+          : code === "42501" ? "authorization_denied" : status === 422 ? "validation_rejected" : status === 409 ? "conflict" : null;
+        return { ok: false, status, ...(reason ? { reason } : {}) };
       }
       return { ok: true, data };
     } catch { return { ok: false, status: 0 }; }
