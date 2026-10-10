@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { webcrypto } = require("node:crypto");
 
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "assets/js/handover-verification.js"), "utf8");
@@ -41,25 +42,34 @@ function createSessionStorage() {
   const entries = new Map();
   return { getItem: (key) => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, String(value)), removeItem: (key) => entries.delete(key), entries };
 }
-const testPhotoCrypto = { subtle: { async digest() { return Uint8Array.from({ length: 32 }, (_, index) => index + 1).buffer; } } };
+function syntheticPhotoFile(type, size, bytes = [1, 2, 3]) {
+  return {
+    type, size, name: "synthetic-photo.jpg",
+    slice(start, end) { return { async arrayBuffer() { const chunk = new Uint8Array(Math.max(0, end - start)); chunk.fill(bytes[start % bytes.length]); return chunk.buffer; } }; }
+  };
+}
+const fingerprintInputs = [];
+const testPhotoCrypto = { subtle: { async digest(_algorithm, input) { fingerprintInputs.push(input.byteLength); return Uint8Array.from({ length: 32 }, (_, index) => index + 1).buffer; } } };
 
 function setup({ auth = {}, mediaDevices, BarcodeDetector, randomUUID = () => requestId, environment = {}, sessionStorage = createSessionStorage() } = {}) {
   const ids = ["ops-jobs", "handover-panel", "handover-status", "handover-code", "handover-video", "handover-result", "handover-scan", "handover-submit", "handover-job-summary", "handover-close", "handover-code-form"];
   const nodes = new Map(ids.map((id) => [id, new Element()]));
-  const doc = { getElementById: (id) => nodes.get(id) || null, createElement: (tag) => new Element(tag) };
+  const createdElements = [];
+  const doc = { getElementById: (id) => nodes.get(id) || null, createElement: (tag) => { const element = new Element(tag); createdElements.push(element); return element; } };
   const windowListeners = new Map();
-  const context = vm.createContext({ setTimeout, clearTimeout, Promise, Uint8Array });
+  const context = vm.createContext({ setTimeout, clearTimeout, Promise, Uint8Array, TextEncoder, DataView });
   context.window = context; context.navigator = mediaDevices ? { mediaDevices } : {};
   context.crypto = { randomUUID }; context.BarcodeDetector = BarcodeDetector; context.devicePixelRatio = 1; context.addEventListener = (name, callback) => windowListeners.set(name, callback); context.sessionStorage = sessionStorage; context.confirm = () => true;
   vm.runInContext(source, context, { filename: "handover-verification.js" });
   const controller = context.IGLOUE_HANDOVER_VERIFICATION.createController(auth, doc, { randomUUID, ...environment });
   controller.init();
-  return { controller, nodes, context, windowListeners, sessionStorage };
+  return { controller, nodes, context, windowListeners, sessionStorage, createdElements };
 }
 
 const job = { type: "delivery", serviceJobId, status: "arrived", state: "due_now", reservationReference: "AB12CD34", scheduledDate: "2026-10-09" };
 const verified = { ok: true, data: { request_id: requestId, reservation_reference: "AB12CD34", schedule: { date: "2026-10-09", time_slot: "08:00–10:00", status: "arrived" }, equipment: [{ product_name: "Air unit", serial_number: "SER-1" }] } };
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+async function waitFor(predicate) { for (let attempt = 0; attempt < 200; attempt += 1) { if (predicate()) return; await new Promise((resolve) => setTimeout(resolve, 5)); } throw new Error("test_wait_timed_out"); }
 const find = (node, predicate) => { if (predicate(node)) return node; for (const child of node.children || []) { const found = find(child, predicate); if (found) return found; } return null; };
 
 async function run() {
@@ -222,16 +232,47 @@ async function run() {
   assert.equal(inspectionLoads, 1, "saving one subject does not tear down and reload the whole inspection form");
   assert.equal(controls[1].value, "pass", "other inspection fields remain usable after save");
 
-  const mobileFile = { type: "image/heic", size: 15 * 1024 * 1024 };
-  let bitmapClosed = false;
-  const photoConversion = setup({ environment: { async createImageBitmap() { return { width: 4032, height: 3024, close() { bitmapClosed = true; } }; } } });
+  const mobileFile = syntheticPhotoFile("image/heic", 15 * 1024 * 1024);
+  let bitmapClosed = false; let decodeOptions;
+  const photoConversion = setup({ environment: { async createImageBitmap(_file, options) { decodeOptions = options; return { width: 1280, height: 960, close() { bitmapClosed = true; } }; } } });
   const converted = await photoConversion.controller.normalizePhoto(mobileFile);
   assert.equal(converted.type, "image/jpeg", "mobile HEIC capture is normalized to server-accepted JPEG");
   assert.ok(converted.size <= 9 * 1024 * 1024, "converted image stays below private storage limit");
+  assert.equal(decodeOptions.resizeWidth, 1280, "large camera images are downsampled by the decoder before canvas allocation");
+  assert.equal(decodeOptions.resizeQuality, "high");
   assert.equal(bitmapClosed, true, "decoded camera image resources are released");
+  assert.equal(photoConversion.createdElements.find((element) => element.tagName === "canvas").width, 0, "canvas backing memory is released after conversion");
   await assert.rejects(() => photoConversion.controller.normalizePhoto({ type: "application/pdf", size: 10 }), /photo_type/);
   const noDecoder = setup();
   await assert.rejects(() => noDecoder.controller.normalizePhoto({ type: "image/heic", size: 15 }), /photo_conversion_unavailable/);
+
+  let jpegDecodeCalls = 0;
+  const directJpeg = syntheticPhotoFile("image/jpeg", 2 * 1024 * 1024);
+  const directJpegUI = setup({ environment: { async createImageBitmap() { jpegDecodeCalls += 1; throw new Error("should not decode compatible JPEG"); } } });
+  assert.equal(await directJpegUI.controller.normalizePhoto(directJpeg), directJpeg, "compatible JPEG uploads without image decode or canvas conversion");
+  assert.equal(jpegDecodeCalls, 0);
+
+  const memoryError = new Error("private platform detail"); memoryError.name = "OutOfMemoryError";
+  const memoryFailureUI = setup({ environment: { async createImageBitmap() { throw memoryError; } } });
+  await assert.rejects(() => memoryFailureUI.controller.normalizePhoto(syntheticPhotoFile("image/heic", 12 * 1024 * 1024)), /photo_memory_pressure/);
+  assert.doesNotMatch(memoryError.message, /low memory/i, "underlying platform details are not displayed");
+
+  let memoryUploadCalls = 0;
+  const memoryPhotoContext = handoverContext(false, true);
+  const memoryPhotoUI = setup({ environment: { crypto: testPhotoCrypto, async createImageBitmap() { throw memoryError; } }, auth: {
+    async getDeliveryHandover() { return { ok: true, data: memoryPhotoContext }; },
+    async getSelectedOrganisation() { return { id: "tenant-1" }; },
+    async uploadDeliveryEvidence() { memoryUploadCalls += 1; return { ok: true, data: { fileId: "unexpected" } }; }
+  } });
+  await memoryPhotoUI.controller.open(job);
+  const memoryPhotoCard = find(memoryPhotoUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  const memoryPhotoInput = find(memoryPhotoCard, (node) => node.type === "file");
+  memoryPhotoInput.files = [syntheticPhotoFile("image/heic", 12 * 1024 * 1024)]; memoryPhotoInput.value = "capture.heic";
+  find(memoryPhotoCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(memoryUploadCalls, 0, "a failed memory conversion never starts an upload");
+  assert.equal(memoryPhotoInput.value, "capture.heic", "memory failure preserves the selected photo for a safe retry");
+  assert.match(memoryPhotoUI.nodes.get("handover-status").textContent, /manque de m\u00e9moire/i, "memory failure is explained in French without raw browser details");
 
   const photoContext = handoverContext(false, true);
   const photoCalls = { upload: [], attach: 0 };
@@ -247,7 +288,7 @@ async function run() {
   const photoCard = find(photoUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
   const photoInput = find(photoCard, (node) => node.type === "file");
   const photoButton = find(photoCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo");
-  photoInput.files = [{ type: "image/jpeg", size: 100, name: "capture.jpg", async arrayBuffer() { return Uint8Array.of(1,2,3).buffer; } }]; photoInput.value = "C:\\fakepath\\capture.jpg";
+  photoInput.files = [syntheticPhotoFile("image/jpeg", 100)]; photoInput.value = "C:\\fakepath\\capture.jpg";
   photoButton.emit("click"); await tick();
   assert.equal(photoInput.value, "C:\\fakepath\\capture.jpg", "failed upload retains selected file for retry");
   assert.match(photoUI.nodes.get("handover-status").textContent, /vérifiez la connexion/i);
@@ -287,7 +328,7 @@ async function run() {
   await interruptedUploadUI.controller.open(job);
   let uploadCard = find(interruptedUploadUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
   let uploadInput = find(uploadCard, (node) => node.type === "file");
-  uploadInput.files = [{ type: "image/jpeg", size: 100, async arrayBuffer() { return Uint8Array.of(9,8,7).buffer; } }]; uploadInput.value = "capture.jpg";
+  uploadInput.files = [syntheticPhotoFile("image/jpeg", 100, [9,8,7])]; uploadInput.value = "capture.jpg";
   uploadInput.emit("change");
   find(uploadCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -303,13 +344,60 @@ async function run() {
   await retryAfterReload.controller.resumePendingFromBoard({ metadata: { selectedDate: job.scheduledDate }, jobs: [{ ...job, status: "handover_in_progress" }] });
   uploadCard = find(retryAfterReload.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
   uploadInput = find(uploadCard, (node) => node.type === "file");
-  uploadInput.files = [{ type: "image/jpeg", size: 100, async arrayBuffer() { return Uint8Array.of(9,8,7).buffer; } }]; uploadInput.value = "capture.jpg";
+  uploadInput.files = [syntheticPhotoFile("image/jpeg", 100, [9,8,7])]; uploadInput.value = "capture.jpg";
   uploadInput.emit("change");
   find(uploadCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(interruptedUploadKeys.length, 2, "failed upload can be retried after an Android page interruption");
   assert.equal(interruptedUploadKeys[0], interruptedUploadKeys[1], "same photo reuses its session-scoped idempotency key after reload");
   assert.equal(interruptedUploadContext.inspection.subjects[0].photoEvidence.fileId, "retry-file", "retry associates one backend file record with the restored handover");
+
+  assert.ok(fingerprintInputs.every((byteLength) => byteLength <= 512 * 1024 + 64), "photo retry hashing never materializes a full image buffer");
+  const mismatchStorage = createSessionStorage();
+  let mismatchUploadCalls = 0;
+  let signalFirstMismatchUpload;
+  const firstMismatchUpload = new Promise((resolve) => { signalFirstMismatchUpload = resolve; });
+  const mismatchAuth = {
+    async getDeliveryHandover() { return { ok: true, data: handoverContext(false, true) }; },
+    async getSelectedOrganisation() { return { id: "tenant-1" }; },
+    async uploadDeliveryEvidence() { mismatchUploadCalls += 1; signalFirstMismatchUpload(); return { ok: false, status: 0 }; }
+  };
+  const mismatchFirst = setup({ sessionStorage: mismatchStorage, environment: { crypto: webcrypto }, auth: mismatchAuth });
+  await mismatchFirst.controller.open(job);
+  let mismatchCard = find(mismatchFirst.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  let mismatchInput = find(mismatchCard, (node) => node.type === "file");
+  mismatchInput.files = [syntheticPhotoFile("image/jpeg", 700 * 1024, [1])];
+  find(mismatchCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
+  await firstMismatchUpload;
+  const firstMismatchUploadCount = mismatchUploadCalls;
+  const mismatchRetry = setup({ sessionStorage: mismatchStorage, environment: { crypto: webcrypto }, auth: mismatchAuth });
+  await mismatchRetry.controller.open(job);
+  mismatchCard = find(mismatchRetry.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  mismatchInput = find(mismatchCard, (node) => node.type === "file");
+  mismatchInput.files = [syntheticPhotoFile("image/jpeg", 700 * 1024, [2])]; mismatchInput.value = "different.jpg";
+  find(mismatchCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
+  await waitFor(() => /resélectionnez la même photo/i.test(mismatchRetry.nodes.get("handover-status").textContent));
+  assert.equal(mismatchUploadCalls, firstMismatchUploadCount, "different same-size photo cannot reuse an ambiguous retry idempotency key");
+  assert.equal(mismatchInput.value, "different.jpg", "retry mismatch preserves the selected photo for the user to resolve safely");
+  let continueProcessing; let processingStarted;
+  const startedProcessing = new Promise((resolve) => { processingStarted = resolve; });
+  const processingGate = new Promise((resolve) => { continueProcessing = resolve; });
+  let processingUploadCalls = 0;
+  const processingUI = setup({ environment: { crypto: testPhotoCrypto, async createImageBitmap() { processingStarted(); await processingGate; return { width: 800, height: 600, close() {} }; } }, auth: {
+    async getDeliveryHandover() { return { ok: true, data: handoverContext(false, true) }; },
+    async getSelectedOrganisation() { return { id: "tenant-1" }; },
+    async uploadDeliveryEvidence() { processingUploadCalls += 1; return { ok: false, status: 0 }; }
+  } });
+  await processingUI.controller.open(job);
+  const processingCard = find(processingUI.nodes.get("handover-result"), (node) => node.className === "handover-equipment-card");
+  const processingInput = find(processingCard, (node) => node.type === "file");
+  processingInput.files = [syntheticPhotoFile("image/heic", 12 * 1024 * 1024)];
+  find(processingCard, (node) => node.tagName === "button" && node.textContent === "Enregistrer la photo").emit("click");
+  await startedProcessing;
+  processingUI.windowListeners.get("pagehide")();
+  assert.equal(processingUI.nodes.get("handover-panel").hidden, false, "camera/gallery interruption during image processing does not discard the active handover");
+  continueProcessing(); await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(processingUploadCalls, 1, "resumed processing continues through the normal authenticated upload path");
   photoContext.handover.signatureAttached = true; photoContext.handover.signedName = "Synthetic Customer";
   photoContext.handover.signedAt = "2026-10-10T10:01:00Z";
   photoContext.handover.signatureEvidence = { fileId: "signature-file", savedAt: "2026-10-10T10:01:00Z" };

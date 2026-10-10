@@ -100,8 +100,27 @@
     }
     async function photoFingerprint(file) {
       const cryptoApi = environment.crypto || global.crypto;
-      if (!file || typeof file.arrayBuffer !== "function" || !cryptoApi || !cryptoApi.subtle || typeof cryptoApi.subtle.digest !== "function") throw new Error("photo_fingerprint_unavailable");
-      const digest = await cryptoApi.subtle.digest("SHA-256", await file.arrayBuffer());
+      if (!file || typeof file.slice !== "function" || typeof file.size !== "number" || !cryptoApi || !cryptoApi.subtle || typeof cryptoApi.subtle.digest !== "function") throw new Error("photo_fingerprint_unavailable");
+      // Hash fixed-size chunks and then hash their ordered digests plus file
+      // metadata. This keeps retry identity cryptographic without allocating
+      // a second full-size ArrayBuffer for a camera image.
+      const chunkSize = 512 * 1024;
+      const chunkDigests = [];
+      for (let offset = 0; offset < file.size; offset += chunkSize) {
+        const chunk = file.slice(offset, Math.min(file.size, offset + chunkSize));
+        if (!chunk || typeof chunk.arrayBuffer !== "function") throw new Error("photo_fingerprint_unavailable");
+        chunkDigests.push(new Uint8Array(await cryptoApi.subtle.digest("SHA-256", await chunk.arrayBuffer())));
+      }
+      const typeBytes = new TextEncoder().encode(String(file.type || "").toLowerCase());
+      const framed = new Uint8Array(12 + typeBytes.length + chunkDigests.reduce((total, digest) => total + digest.length, 0));
+      const view = new DataView(framed.buffer);
+      view.setUint32(0, file.size >>> 0, false);
+      view.setUint32(4, Math.floor(file.size / 0x100000000), false);
+      view.setUint32(8, typeBytes.length, false);
+      framed.set(typeBytes, 12);
+      let cursor = 12 + typeBytes.length;
+      for (const digest of chunkDigests) { framed.set(digest, cursor); cursor += digest.length; }
+      const digest = await cryptoApi.subtle.digest("SHA-256", framed);
       return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
     }
     function noteDraftChange() { syncResumeMarker(); }
@@ -475,22 +494,39 @@
         throw new Error("photo_conversion_unavailable");
       }
       let bitmap;
-      try { bitmap = await decode(file); } catch { throw new Error("photo_decode"); }
       try {
-        const maxEdge = 2048;
+        // Ask the browser decoder to downsample before allocating a full-size
+        // RGBA bitmap. Do not fall back to a full-resolution decode on failure.
+        bitmap = await decode(file, { resizeWidth: 1280, resizeQuality: "high" });
+      } catch (error) { throw new Error(isMemoryFailure(error) ? "photo_memory_pressure" : "photo_decode"); }
+      let canvas;
+      try {
+        const maxEdge = 1600;
         const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-        const canvas = document.createElement("canvas");
+        canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(bitmap.width * scale));
         canvas.height = Math.max(1, Math.round(bitmap.height * scale));
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("photo_conversion_unavailable");
         ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         for (const quality of [0.88, 0.76, 0.64, 0.52]) {
-          const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+          const blob = await new Promise((resolve, reject) => {
+            try { canvas.toBlob(resolve, "image/jpeg", quality); } catch (error) { reject(error); }
+          });
           if (blob && blob.type === "image/jpeg" && blob.size <= maxBytes) return blob;
         }
         throw new Error("photo_size");
-      } finally { if (typeof bitmap.close === "function") bitmap.close(); }
+      } catch (error) {
+        if (isMemoryFailure(error)) throw new Error("photo_memory_pressure");
+        throw error;
+      } finally {
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
+        if (typeof bitmap.close === "function") bitmap.close();
+      }
+    }
+    function isMemoryFailure(error) {
+      const name = String(error && error.name || "");
+      return ["QuotaExceededError", "OutOfMemoryError", "NS_ERROR_OUT_OF_MEMORY"].includes(name);
     }
     function photoErrorMessage(statusCode) {
       if (statusCode === 401) return "Votre session a expiré. Reconnectez-vous puis réessayez la photo.";
@@ -557,7 +593,7 @@
         syncResumeMarker();
         setStatus("✓ Photo enregistrée côté serveur.", "success");
       } catch (error) {
-        const message = error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : error && error.message === "photo_fingerprint_unavailable" ? "L’envoi sécurisé n’est pas disponible sur cet appareil. Rechargez la page ou choisissez une photo JPG ou PNG." : error && error.message === "photo_retry_mismatch" ? "Une tentative précédente n’a pas été confirmée. Resélectionnez la même photo pour reprendre son envoi avant d’en choisir une autre." : "Échec de l’enregistrement de la photo. Votre sélection est conservée; vérifiez la connexion puis réessayez.";
+        const message = error && error.message === "photo_type" ? "Choisissez une image. Les autres fichiers ne sont pas acceptés." : error && error.message === "photo_decode" ? "Ce format photo ne peut pas être converti sur cet appareil. Choisissez JPG ou PNG." : error && error.message === "photo_memory_pressure" ? "Le téléphone manque de mémoire pour traiter cette photo. Fermez la caméra, choisissez une photo moins détaillée, puis réessayez." : error && error.message === "photo_size" ? "La photo est trop volumineuse. Prenez une photo moins détaillée puis réessayez." : error && error.message === "photo_conversion_unavailable" ? "La conversion de cette photo n’est pas disponible. Choisissez un JPG ou PNG de moins de 9 Mo." : error && error.message === "photo_fingerprint_unavailable" ? "L’envoi sécurisé n’est pas disponible sur cet appareil. Rechargez la page ou choisissez une photo JPG ou PNG." : error && error.message === "photo_retry_mismatch" ? "Une tentative précédente n’a pas été confirmée. Resélectionnez la même photo pour reprendre son envoi avant d’en choisir une autre." : "Échec de l’enregistrement de la photo. Votre sélection est conservée; vérifiez la connexion puis réessayez.";
         showFieldError(photoError, message); setStatus(message, "error");
         photoState.replaceChildren(); textNode(photoState, "p", "Échec — la sélection est conservée. Réessayez.", "handover-field-error");
       } finally { if (uploadButton) { uploadButton.disabled = false; uploadButton.textContent = "Réessayer l’enregistrement de la photo"; } finishAction(actionKey); }
