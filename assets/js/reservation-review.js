@@ -179,6 +179,13 @@ function routeReservationReviewIssue(issue) {
 
 function prepareReservationReview() {
   let draft = buildReservationDraft();
+  if (draft.requirements.opening.extendedExhaustRequired &&
+      !reservationSupportsExtendedExhaust(getProductById(draft.product.selectedProductId))) {
+    setExtendedExhaustSelection(false);
+  } else {
+    setExtendedExhaustSelection(Boolean(draft.requirements.opening.extendedExhaustRequired));
+  }
+  draft = buildReservationDraft();
   const completeness = validateNormalizedReservationDraft(
     draft,
     IGLOUE_PRICING.minimumRentalNights
@@ -216,6 +223,7 @@ function prepareReservationReview() {
   if (draft.delivery.expressSelected && !expressEligibility.eligible) {
     assistantState.sameDayExpressSelected = false;
     calculateCurrentPricing();
+    setExtendedExhaustSelection(Boolean(draft.requirements.opening.extendedExhaustRequired));
     draft = buildReservationDraft();
     notice =
       "La livraison Express n'est plus disponible. Le tarif a été mis à jour.";
@@ -230,6 +238,20 @@ function prepareReservationReview() {
       authoritative: false
     }
   };
+}
+
+function reservationSupportsExtendedExhaust(product) {
+  return Boolean(product && ["essential", "mobile-duo"].includes(product.id));
+}
+
+function setExtendedExhaustSelection(selected) {
+  const price = selected ? IGLOUE_PRICING.addOns.extendedExhaust.price : 0;
+  const currentPrice = assistantState.pricing && Number(assistantState.pricing.extendedExhaustPrice) || 0;
+  if (assistantState.pricing) {
+    assistantState.pricing.extendedExhaustPrice = price;
+    assistantState.pricing.total = Math.round((assistantState.pricing.total + price - currentPrice + Number.EPSILON) * 100) / 100;
+  }
+  assistantState.extendedExhaustRequired = selected;
 }
 
 function buildReservationRequestPayload(draft) {
@@ -255,7 +277,8 @@ function buildReservationRequestPayload(draft) {
       deliverySlotId: draft.delivery.slotId,
       collectionSlotId: draft.collection.slotId,
       setupMode: draft.delivery.setupMode,
-      expressSelected: draft.delivery.expressSelected
+      expressSelected: draft.delivery.expressSelected,
+      extendedExhaustSelected: Boolean(draft.requirements.opening.extendedExhaustRequired)
     }
   };
 }
@@ -317,6 +340,10 @@ function buildReservationReviewPriceRows(draft) {
       label: "Livraison Express aujourd'hui",
       value: pricing.sameDayExpressPrice
     });
+  }
+
+  if (draft.requirements.opening.extendedExhaustRequired && pricing.extendedExhaustPrice > 0) {
+    rows.push({ label: "Rallonge d'évacuation", value: pricing.extendedExhaustPrice });
   }
 
   return rows.map((row) => `
@@ -449,6 +476,12 @@ function showReservationReview(addToHistory = true) {
               </div>
               <strong>${setup ? setup.label : "À préciser"}</strong>
               <p>${openingLabel}</p>
+              ${reservationSupportsExtendedExhaust(product) ? `
+                <label class="reservation-review-addon">
+                  <input type="checkbox" data-extended-exhaust ${draft.requirements.opening.extendedExhaustRequired ? "checked" : ""}>
+                  <span>Ajouter une rallonge d'évacuation (${formatPrice(IGLOUE_PRICING.addOns.extendedExhaust.price)})</span>
+                </label>
+              ` : ""}
             </section>
 
             <section class="reservation-review-section reservation-review-customer">
@@ -534,6 +567,14 @@ function showReservationReview(addToHistory = true) {
   );
 
   connectBackControl(assistant);
+
+  const extendedExhaust = assistant.querySelector("[data-extended-exhaust]");
+  if (extendedExhaust) {
+    extendedExhaust.addEventListener("change", () => {
+      setExtendedExhaustSelection(extendedExhaust.checked);
+      showReservationReview(false);
+    });
+  }
 
   assistant.querySelectorAll("[data-review-edit]").forEach((button) => {
     button.addEventListener("click", () => {

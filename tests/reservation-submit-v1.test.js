@@ -20,7 +20,7 @@ vm.runInContext(`
     { id: "0830-1030", displayLabel: "08:30–10:30" },
     { id: "1630-1830", displayLabel: "16:30–18:30" }
   ];
-  const IGLOUE_PRICING = { minimumRentalNights: 3 };
+  const IGLOUE_PRICING = { minimumRentalNights: 3, addOns: { extendedExhaust: { price: 9 } } };
   const IGLOUE_PRODUCTS = [{ id: "essential", name: "IGLOUE Essential", weeklyPrice: 59 }];
   const assistantLocale = "fr-FR";
   const assistantCopy = {

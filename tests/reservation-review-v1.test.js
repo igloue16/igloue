@@ -20,7 +20,7 @@ vm.runInContext(`
     { id: "0830-1030", displayLabel: "08:30–10:30" },
     { id: "1030-1230", displayLabel: "10:30–12:30" }
   ];
-  const IGLOUE_PRICING = { minimumRentalNights: 3 };
+  const IGLOUE_PRICING = { minimumRentalNights: 3, addOns: { extendedExhaust: { price: 9 } } };
   const IGLOUE_PRODUCTS = [
     { id: "essential", name: "IGLOUE Essential", weeklyPrice: 59 }
   ];
@@ -80,7 +80,7 @@ vm.runInContext(`
     requirements: {
       manualAssessmentRequired: false,
       room: { type: "bedroom", area: 20, conditions: [] },
-      opening: { type: "casement", roofWindowBottomHeightRange: null }
+      opening: { type: "casement", roofWindowBottomHeightRange: null, extendedExhaustRequired: false }
     },
     rental: {
       deliveryDate: "2026-09-10",
@@ -91,7 +91,7 @@ vm.runInContext(`
       date: "2026-09-10",
       slotId: "0830-1030",
       expressSelected: true,
-      setupMode: "delivery-only"
+      setupMode: "delivery-only",
     },
     collection: {
       date: "2026-09-15",
@@ -106,9 +106,13 @@ vm.runInContext(`
       caution: { amount: 250 }
     }
   };
+  assistantState.pricing = globalThis.currentDraft.pricing;
 
   function buildReservationDraft() {
-    return JSON.parse(JSON.stringify(globalThis.currentDraft));
+    const draft = JSON.parse(JSON.stringify(globalThis.currentDraft));
+    draft.requirements.opening.extendedExhaustRequired = assistantState.extendedExhaustRequired;
+    draft.pricing = JSON.parse(JSON.stringify(assistantState.pricing));
+    return draft;
   }
 
   function getProductById(productId) {
@@ -126,8 +130,11 @@ vm.runInContext(`
   function calculateCurrentPricing() {
     globalThis.currentDraft.delivery.expressSelected = false;
     globalThis.currentDraft.pricing.sameDayExpressPrice = 0;
-    globalThis.currentDraft.pricing.total = 71.14;
+    globalThis.currentDraft.pricing.extendedExhaustPrice = assistantState.extendedExhaustRequired ? 9 : 0;
+    globalThis.currentDraft.requirements.opening.extendedExhaustRequired = assistantState.extendedExhaustRequired;
+    globalThis.currentDraft.pricing.total = 71.14 + globalThis.currentDraft.pricing.extendedExhaustPrice;
   }
+  assistantState.extendedExhaustRequired = false;
 
   function calculateAvailability() {
     return Promise.resolve(assistantState.availability);
@@ -214,12 +221,15 @@ let renderedReview = "";
 let customerEditTriggered = false;
 const reviewButtons = [];
 const reviewSubmit = { addEventListener() {} };
+const extendedExhaustCheckbox = { checked: false, addEventListener(type, handler) { if (type === "change") this.change = handler; } };
 const reviewAssistant = {
   querySelectorAll(selector) {
     return selector === "[data-review-edit]" ? reviewButtons : [];
   },
   querySelector(selector) {
-    return selector === "[data-review-submit]" ? reviewSubmit : null;
+    if (selector === "[data-review-submit]") return reviewSubmit;
+    if (selector === "[data-extended-exhaust]") return extendedExhaustCheckbox;
+    return null;
   }
 };
 
@@ -252,6 +262,15 @@ vm.runInContext(`
   };
 `, context);
 evaluate("showReservationReview(false)");
+assert.match(renderedReview, /data-extended-exhaust/, "review exposes the compatible optional add-on");
+extendedExhaustCheckbox.checked = true;
+extendedExhaustCheckbox.change();
+assert.equal(evaluate("assistantState.extendedExhaustRequired"), true, "customer selection is retained");
+assert.equal(evaluate("buildReservationRequestPayload(buildReservationDraft()).service.extendedExhaustSelected"), true, "customer selection reaches the reservation request");
+assert.match(renderedReview, /Rallonge d'évacuation/, "selected add-on is itemized in the review price");
+assert.equal(evaluate("buildReservationDraft().pricing.total"), 80.14, "selected add-on updates the preview total exactly once");
+extendedExhaustCheckbox.checked = false;
+extendedExhaustCheckbox.change();
 assert.match(renderedReview, /Ada O&#039;Connor/, "I: customer name is escaped and displayed");
 assert.match(renderedReview, /ada@example\.com/, "I: customer email is displayed");
 assert.match(renderedReview, /1 rue des Lilas/, "I: delivery address is displayed");

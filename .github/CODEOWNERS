@@ -1,0 +1,6 @@
+# Require an accountable repository owner to approve changes to the release boundary.
+/.github/workflows/ @igloue16
+/.github/CODEOWNERS @igloue16
+/release/ @igloue16
+/scripts/build-storefront-release.mjs @igloue16
+/tests/storefront-release.test.js @igloue16

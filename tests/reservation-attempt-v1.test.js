@@ -20,7 +20,7 @@ const base = {
   productId: "essential",
   deliveryAddress: { line1: "1 Rue Test", line2: null, postcode: "16000", city: "Angouleme" },
   rental: { startDate: "2027-07-12", endDate: "2027-07-19" },
-  service: { deliverySlotId: "0830-1030", collectionSlotId: "1630-1830", setupMode: "none", expressSelected: false }
+  service: { deliverySlotId: "0830-1030", collectionSlotId: "1630-1830", setupMode: "none", expressSelected: false, extendedExhaustSelected: false }
 };
 
 const prepare = (value = base) => vm.runInContext(
@@ -50,7 +50,7 @@ function changed(path, value) {
 
   reset();
   const orderedA = JSON.parse(JSON.stringify(base));
-  const orderedB = JSON.parse(`{"service":{"expressSelected":false,"setupMode":"none","collectionSlotId":"1630-1830","deliverySlotId":"0830-1030"},"rental":{"endDate":"2027-07-19","startDate":"2027-07-12"},"deliveryAddress":{"city":"Angouleme","postcode":"16000","line2":null,"line1":"1 Rue Test"},"productId":"essential","customer":{"phone":null,"email":"ada@example.com","lastName":"Loue","firstName":"Ada"}}`);
+  const orderedB = JSON.parse(`{"service":{"extendedExhaustSelected":false,"expressSelected":false,"setupMode":"none","collectionSlotId":"1630-1830","deliverySlotId":"0830-1030"},"rental":{"endDate":"2027-07-19","startDate":"2027-07-12"},"deliveryAddress":{"city":"Angouleme","postcode":"16000","line2":null,"line1":"1 Rue Test"},"productId":"essential","customer":{"phone":null,"email":"ada@example.com","lastName":"Loue","firstName":"Ada"}}`);
   const orderedKey = prepare(orderedA);
   const uuidBeforeOrderRepeat = uuidCalls;
   assert.equal(prepare(orderedB), orderedKey);
@@ -68,6 +68,7 @@ function changed(path, value) {
   assert.equal(prepare({ ...base, service: { ...base.service, expressSelected: "true" } }), null);
   assert.equal(uuidCalls, uuidBeforeInvalidType);
   assert.equal(prepare({ ...base, service: { ...base.service, expressSelected: true } }), validBooleanKey);
+  assert.notEqual(prepare({ ...base, service: { ...base.service, extendedExhaustSelected: true } }), validBooleanKey, "add-on changes identify a distinct submission attempt");
 
   reset();
   const immutableSnapshot = JSON.parse(JSON.stringify(base));

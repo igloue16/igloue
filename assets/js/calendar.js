@@ -626,6 +626,22 @@ function createIgloueCalendar({
   render();
 
   return {
+    selectRange(startValue, endValue) {
+      const nextStart = calendarValueToDate(startValue);
+      const nextEnd = calendarValueToDate(endValue);
+      if (!nextStart || !nextEnd || nextEnd <= nextStart ||
+        !isSelectable(nextStart) || !isSelectable(nextEnd) ||
+        getCalendarNightCount(nextStart, nextEnd) < minimumNights) return false;
+
+      selectedStart = nextStart;
+      selectedEnd = nextEnd;
+      editingEndpoint = null;
+      emitChange();
+      emitFeedback("");
+      render(calendarDateToValue(nextStart));
+      return true;
+    },
+
     clear() {
       clearSelection();
     },

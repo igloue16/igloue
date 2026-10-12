@@ -371,5 +371,52 @@ vm.runInContext(`
 `, context);
 assert.equal(vm.runInContext("getAlternativeCandidates().length", context), 0, "unsuitable adjacent products are filtered without searching farther");
 
-console.log("Assistant availability DOM flow passed (34 assertions).");
+const slotQuoteRequests = [];
+context.IGLOUE_SERVICE_SLOT_CLIENT = {
+  loadAvailability(selection) {
+    slotQuoteRequests.push(selection);
+    const hasSlot = selection.serviceType === "collection" || selection.date === "2027-07-11";
+    const windows = hasSlot ? [{ id: selection.serviceType === "delivery" ? "alt-morning" : "1630-1830",
+      label: selection.serviceType === "delivery" ? "08:30–10:30" : "16:30–18:30", startTime: "08:30", endTime: "10:30",
+      timeZone: "Europe/Paris", remainingCapacity: 1, available: true }] : [];
+    context.IGLOUE_SERVICE_WINDOW_CACHE.setAvailableSlots(selection, windows);
+    return Promise.resolve({ windows, alternatives: selection.serviceType === "delivery" && selection.date === "2027-07-12" ? {
+      earlier: { date: "2027-07-11", timeZone: "Europe/Paris", windows: [{ id: "alt-morning", label: "08:30–10:30",
+        startTime: "08:30", endTime: "10:30", timeZone: "Europe/Paris", remainingCapacity: 1, available: true }],
+        pricing: { proposedRental: 59, rentalImpact: 0, deliveryCharge: 29, collectionCharge: 0, setupCharge: 0,
+          extendedExhaustCharge: 9, expressCharge: 0, schedulingSurcharge: 0, total: 97, delta: 0, depositChargedNow: false } },
+      later: null
+    } : null });
+  },
+  loadAvailableSlots(selection) { return this.loadAvailability(selection).then((result) => result.windows); }
+};
+vm.runInContext(`
+  assistantState.startDate = "2027-07-12";
+  assistantState.endDate = "2027-07-19";
+  assistantState.roomArea = 12;
+  assistantState.roomConditions = [];
+  assistantState.openingType = "casement";
+  assistantState.extendedExhaustRequired = true;
+  assistantState.setupMode = "none";
+  assistantState.recommendedProduct = getProductById("essential");
+  assistantState.idealProduct = assistantState.recommendedProduct;
+  showDatesStage(false);
+`, context);
+await new Promise((resolve) => setImmediate(resolve));
+const originalQuote = slotQuoteRequests.find((selection) => selection.date === "2027-07-12");
+assert.equal(originalQuote.quoteContext.extendedExhaustSelected, true, "normal slot quote includes selected exhaust add-on");
+context.calculateRecommendation = () => Promise.resolve();
+const chooseAltDate = assistantRoot.querySelector("[data-alternative-slot]");
+assert.ok(chooseAltDate, "nearest alternate date and slot are offered");
+const alternateQuoteHtml = assistantRoot.querySelector("[data-side=\"earlier\"]").innerHTML;
+assert.match(alternateQuoteHtml, /Rallonge d’évacuation/, "alternate quote displays the exhaust line item");
+assert.match(alternateQuoteHtml, /97,00\s*€/u, "alternate quote displays the server calculated total");
+chooseAltDate.click();
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(vm.runInContext("assistantState.startDate", context), "2027-07-11", "alternate selection updates the calendar range");
+const switchedQuote = slotQuoteRequests.find((selection) => selection.date === "2027-07-11");
+assert.equal(switchedQuote.quoteContext.extendedExhaustSelected, true, `alternative date recheck retains selected exhaust add-on: ${JSON.stringify(slotQuoteRequests.filter((selection) => selection.date === "2027-07-11"))}`);
+assert.equal(vm.runInContext("assistantState.deliverySlotId", context), "alt-morning", "slot selection survives the availability recheck");
+
+console.log("Assistant availability DOM flow passed, including extended-exhaust alternate-date switching.");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
