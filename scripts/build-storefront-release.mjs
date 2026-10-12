@@ -89,9 +89,7 @@ const target = path.resolve(requestedPath);
 if (mode === "verify") {
   await verifyDirectory(target);
 } else {
-  if (target === root || (target !== path.parse(root).root && !target.startsWith(`${root}${path.sep}`) && !target.startsWith(`${path.resolve(process.env.RUNNER_TEMP ?? path.dirname(target))}${path.sep}`))) {
-    fail("build output must be outside the source tree or within the repository");
-  }
+  if (target === root) fail("build output cannot be the repository root");
   try {
     await mkdir(target, { recursive: false });
   } catch {
