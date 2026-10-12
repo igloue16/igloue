@@ -2428,6 +2428,30 @@
   gap: 4px;
 }
 
+.assistant-slot-alternatives:not([hidden]) {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.assistant-slot-alternative-side {
+  padding: 7px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+}
+
+.assistant-slot-alternative-side h4,
+.assistant-slot-alternative-side p {
+  margin: 0 0 5px;
+  color: var(--text);
+  font-size: 0.58rem;
+  line-height: 1.35;
+}
+
+.assistant-slot-alternative-side .assistant-slot-option {
+  width: 100%;
+}
+
 .assistant-slot-option {
   min-width: 0;
   min-height: 27px;

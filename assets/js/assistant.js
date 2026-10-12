@@ -2595,8 +2595,10 @@ function showDatesStage(
     const p = side.pricing;
     const delta = Number(p.delta);
     const deltaText = delta === 0 ? "Prix inchangé" : `${delta > 0 ? "+" : "−"}${euro(Math.abs(delta))}`;
+    const exhaustLine = Number(p.extendedExhaustCharge) > 0
+      ? ` · Rallonge d’évacuation : ${euro(p.extendedExhaustCharge)}` : "";
     container.innerHTML = `<h4>Créneau ${serviceType === "delivery" ? "de livraison" : "de reprise"} disponible ${side.direction === "earlier" ? "le plus proche avant" : "le plus proche après"} — ${escapeServiceSlotText(formatDate(side.date))}</h4>
-      <p>Location : ${euro(p.proposedRental)} (${p.rentalImpact === 0 ? "impact inchangé" : `${p.rentalImpact > 0 ? "+" : "−"}${euro(Math.abs(p.rentalImpact))}`}) · Livraison : ${euro(p.deliveryCharge)} · Reprise : ${euro(p.collectionCharge)} · Options : ${euro(p.setupCharge)} · Express : ${euro(p.expressCharge)} · Supplément horaire : ${euro(p.schedulingSurcharge)}</p>
+      <p>Location : ${euro(p.proposedRental)} (${p.rentalImpact === 0 ? "impact inchangé" : `${p.rentalImpact > 0 ? "+" : "−"}${euro(Math.abs(p.rentalImpact))}`}) · Livraison : ${euro(p.deliveryCharge)} · Reprise : ${euro(p.collectionCharge)} · Options : ${euro(p.setupCharge)}${exhaustLine} · Express : ${euro(p.expressCharge)} · Supplément horaire : ${euro(p.schedulingSurcharge)}</p>
       <p>Total : <strong>${euro(p.total)}</strong> · Écart avec le choix actuel : <strong>${deltaText}</strong> · TVA : non configurée${p.depositChargedNow === false ? " · Dépôt non débité à cette étape" : ""}</p>
       ${side.windows.map((slot) => `<button class="assistant-slot-option" type="button" data-alternative-date="${escapeServiceSlotText(side.date)}" data-alternative-type="${serviceType}" data-alternative-slot="${escapeServiceSlotText(slot.id)}">${escapeServiceSlotText(slot.label)} — choisir ce créneau</button>`).join("")}`;
     container.querySelectorAll("[data-alternative-slot]").forEach((button) => button.addEventListener("click", () => {
@@ -2652,6 +2654,7 @@ function showDatesStage(
     collectionSlotsContainer.innerHTML = '<p class="assistant-slot-empty">Chargement des créneaux…</p>';
     const quoteContext = { startDate: assistantState.startDate, endDate: assistantState.endDate, postcode: assistantState.postcode,
       setupMode: assistantState.setupMode || "none", expressSelected: assistantState.sameDayExpressSelected,
+      extendedExhaustSelected: assistantState.extendedExhaustRequired === true && ["essential", "mobile-duo"].includes(productId),
       items: [{ productId, quantity: 1 }] };
     Promise.all([
       globalThis.IGLOUE_SERVICE_SLOT_CLIENT.loadAvailability({ productId, date: assistantState.startDate, serviceType: "delivery", includeAlternatives: true, quoteContext }),

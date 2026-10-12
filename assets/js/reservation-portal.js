@@ -21,6 +21,10 @@
       typeof data.email_verified === "boolean" && data.price && data.price.currency === "EUR" &&
       validService(data.delivery) && validService(data.collection) &&
       [data.price.total, data.price.delivery, data.price.options, data.price.deposit].every((n) => Number.isFinite(n) && n >= 0) &&
+      (data.price.options_breakdown === undefined || data.price.options_breakdown === null || data.price.options_breakdown && typeof data.price.options_breakdown === "object" &&
+        data.price.options_breakdown.extendedExhaust && typeof data.price.options_breakdown.extendedExhaust.selected === "boolean" &&
+        [0, 9].includes(data.price.options_breakdown.extendedExhaust.amount) &&
+        data.price.options_breakdown.extendedExhaust.selected === (data.price.options_breakdown.extendedExhaust.amount === 9)) &&
       !Number.isNaN(Date.parse(data.rental_start)) && !Number.isNaN(Date.parse(data.rental_end));
   }
   function setText(target, value) { const node = id(target); if (node) node.textContent = value; }
@@ -45,6 +49,10 @@
     setText("portal-reference", data.reference);
     setText("portal-delivery-price", formatAmount(data.price.delivery));
     setText("portal-options-price", formatAmount(data.price.options));
+    const exhaustOption = data.price.options_breakdown && data.price.options_breakdown.extendedExhaust;
+    const exhaustRow = id("portal-extended-exhaust-row");
+    if (exhaustRow) exhaustRow.hidden = !(exhaustOption && exhaustOption.selected === true);
+    if (exhaustOption && exhaustOption.selected === true) setText("portal-extended-exhaust-price", formatAmount(exhaustOption.amount));
     setText("portal-deposit", formatAmount(data.price.deposit));
     setText("portal-total", formatAmount(data.price.total));
     renderService("delivery", data.delivery);

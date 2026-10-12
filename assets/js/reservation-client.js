@@ -8,6 +8,7 @@
     "INVALID_DATES",
     "INVALID_SERVICE_WINDOW",
     "INVALID_SETUP",
+    "INVALID_ADD_ON",
     "EXPRESS_NOT_ALLOWED",
     "NO_MACHINE_AVAILABLE",
     "RESERVATION_EXPIRED",
@@ -64,7 +65,8 @@
       isNonEmptyString(value.service.deliverySlotId) &&
       isNonEmptyString(value.service.collectionSlotId) &&
       isNonEmptyString(value.service.setupMode) &&
-      typeof value.service.expressSelected === "boolean";
+      typeof value.service.expressSelected === "boolean" &&
+      typeof value.service.extendedExhaustSelected === "boolean";
   }
 
   function buildRequestBody(input) {
@@ -91,12 +93,19 @@
         deliverySlotId: input.service.deliverySlotId,
         collectionSlotId: input.service.collectionSlotId,
         setupMode: input.service.setupMode,
-        expressSelected: input.service.expressSelected
+        expressSelected: input.service.expressSelected,
+        extendedExhaustSelected: input.service.extendedExhaustSelected
       }
     };
   }
 
   function normalizeSuccess(payload) {
+    const breakdown = isObject(payload?.pricing?.optionsBreakdown)
+      ? payload.pricing.optionsBreakdown
+      : null;
+    const extendedExhaust = breakdown && isObject(breakdown.extendedExhaust)
+      ? breakdown.extendedExhaust
+      : null;
     if (
       !isObject(payload) ||
       payload.ok !== true ||
@@ -115,7 +124,12 @@
       !isNonEmptyString(payload.deliveryZone.name) ||
       !isObject(payload.pricing) ||
       !isNonEmptyString(payload.pricing.currency) ||
-      !["rentalPrice", "deliveryFee", "setupPrice", "expressPrice", "totalAmount", "depositAmount"]
+      !breakdown || !extendedExhaust ||
+      typeof extendedExhaust.selected !== "boolean" ||
+      ![0, 9].includes(extendedExhaust.amount) ||
+      extendedExhaust.selected !== (extendedExhaust.amount === 9) ||
+      payload.pricing.extendedExhaustPrice !== extendedExhaust.amount ||
+      !["rentalPrice", "deliveryFee", "setupPrice", "expressPrice", "extendedExhaustPrice", "totalAmount", "depositAmount"]
         .every((field) => typeof payload.pricing[field] === "number" && Number.isFinite(payload.pricing[field]))
     ) {
       throw new Error("INVALID_SUCCESS_RESPONSE");
@@ -141,6 +155,8 @@
         deliveryFee: payload.pricing.deliveryFee,
         setupPrice: payload.pricing.setupPrice,
         expressPrice: payload.pricing.expressPrice,
+        extendedExhaustPrice: payload.pricing.extendedExhaustPrice,
+        optionsBreakdown: payload.pricing.optionsBreakdown,
         totalAmount: payload.pricing.totalAmount,
         depositAmount: payload.pricing.depositAmount
       }

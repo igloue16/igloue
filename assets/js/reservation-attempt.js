@@ -33,7 +33,8 @@
       isNonEmptyString(value.service.deliverySlotId) &&
       isNonEmptyString(value.service.collectionSlotId) &&
       isNonEmptyString(value.service.setupMode) &&
-      typeof value.service.expressSelected === "boolean";
+      typeof value.service.expressSelected === "boolean" &&
+      typeof value.service.extendedExhaustSelected === "boolean";
   }
 
   function fingerprint(value) {
@@ -59,7 +60,8 @@
         deliverySlotId: value.service.deliverySlotId,
         collectionSlotId: value.service.collectionSlotId,
         setupMode: value.service.setupMode,
-        expressSelected: value.service.expressSelected
+        expressSelected: value.service.expressSelected,
+        extendedExhaustSelected: value.service.extendedExhaustSelected
       }
     });
   }

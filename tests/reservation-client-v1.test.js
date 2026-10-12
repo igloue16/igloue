@@ -13,7 +13,7 @@ const input = {
   productId: "essential",
   deliveryAddress: { line1: "1 Rue Test", line2: null, postcode: "16000", city: "Angouleme" },
   rental: { startDate: "2027-07-12", endDate: "2027-07-19" },
-  service: { deliverySlotId: "0830-1030", collectionSlotId: "1630-1830", setupMode: "none", expressSelected: false },
+  service: { deliverySlotId: "0830-1030", collectionSlotId: "1630-1830", setupMode: "none", expressSelected: false, extendedExhaustSelected: true },
   pricing: { total: 999 },
   customerId: "secret-customer",
   organisationId: "secret-organisation"
@@ -25,7 +25,7 @@ const successPayload = {
   productId: "essential",
   rental: { startDate: "2027-07-12", endDate: "2027-07-19", nights: 7 },
   deliveryZone: { name: "Angoulême proche" },
-  pricing: { currency: "EUR", rentalPrice: 59, deliveryFee: 29, setupPrice: 0, expressPrice: 0, totalAmount: 88, depositAmount: 250 },
+  pricing: { currency: "EUR", rentalPrice: 59, deliveryFee: 29, setupPrice: 0, expressPrice: 0, extendedExhaustPrice: 9, optionsBreakdown: { setup: { mode: "none", amount: 0 }, sameDayExpress: { selected: false, amount: 0 }, extendedExhaust: { selected: true, amount: 9 } }, totalAmount: 97, depositAmount: 250 },
   machineId: "secret-machine"
 };
 
@@ -66,10 +66,10 @@ const create = (value = input) => vm.runInContext(`IGLOUE_RESERVATION_CLIENT.cre
     productId: "essential",
     rental: { startDate: "2027-07-12", endDate: "2027-07-19", nights: 7 },
     deliveryZone: { name: "Angoulême proche" },
-    pricing: { currency: "EUR", rentalPrice: 59, deliveryFee: 29, setupPrice: 0, expressPrice: 0, totalAmount: 88, depositAmount: 250 }
+    pricing: { currency: "EUR", rentalPrice: 59, deliveryFee: 29, setupPrice: 0, expressPrice: 0, extendedExhaustPrice: 9, optionsBreakdown: { setup: { mode: "none", amount: 0 }, sameDayExpress: { selected: false, amount: 0 }, extendedExhaust: { selected: true, amount: 9 } }, totalAmount: 97, depositAmount: 250 }
   });
 
-  for (const code of ["INVALID_REQUEST", "INVALID_CUSTOMER", "INVALID_ADDRESS", "INVALID_PRODUCT", "INVALID_DATES", "INVALID_SERVICE_WINDOW", "INVALID_SETUP", "EXPRESS_NOT_ALLOWED", "NO_MACHINE_AVAILABLE", "RESERVATION_EXPIRED", "RESERVATION_UNAVAILABLE", "IDEMPOTENCY_CONFLICT", "TOO_MANY_ACTIVE_HOLDS", "METHOD_NOT_ALLOWED", "PAYLOAD_TOO_LARGE", "INTERNAL_ERROR"]) {
+  for (const code of ["INVALID_REQUEST", "INVALID_CUSTOMER", "INVALID_ADDRESS", "INVALID_PRODUCT", "INVALID_DATES", "INVALID_SERVICE_WINDOW", "INVALID_SETUP", "INVALID_ADD_ON", "EXPRESS_NOT_ALLOWED", "NO_MACHINE_AVAILABLE", "RESERVATION_EXPIRED", "RESERVATION_UNAVAILABLE", "IDEMPOTENCY_CONFLICT", "TOO_MANY_ACTIVE_HOLDS", "METHOD_NOT_ALLOWED", "PAYLOAD_TOO_LARGE", "INTERNAL_ERROR"]) {
     response = { ok: false, json: async () => ({ ok: false, error: { code, message: "private database detail" } }) };
     const error = await create();
     assert.deepEqual(JSON.parse(JSON.stringify(error)), { status: "error", code });
@@ -119,6 +119,8 @@ const create = (value = input) => vm.runInContext(`IGLOUE_RESERVATION_CLIENT.cre
   assert.equal(requests.length, fetchCount);
   const malformed = { ...input, service: { ...input.service, setupMode: "" } };
   assert.deepEqual(JSON.parse(JSON.stringify(await create(malformed))), { status: "error", code: "INVALID_REQUEST" });
+  const missingAddon = { ...input, service: { ...input.service, extendedExhaustSelected: undefined } };
+  assert.deepEqual(JSON.parse(JSON.stringify(await create(missingAddon))), { status: "error", code: "INVALID_REQUEST" });
   assert.equal(requests.length, fetchCount);
   console.log("Reservation client V1 tests passed (46 assertions / 30 scenarios).");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

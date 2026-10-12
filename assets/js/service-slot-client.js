@@ -19,10 +19,14 @@
   }
 
   function validPricing(value) {
-    return value && typeof value === "object" && [value.currentRental, value.proposedRental, value.rentalImpact,
-      value.deliveryCharge, value.collectionCharge, value.setupCharge, value.expressCharge, value.schedulingSurcharge,
-      value.currentTotal, value.total, value.delta]
-      .every(Number.isFinite) && value.currency === "EUR" && value.vat?.status === "not_configured";
+    if (!value || typeof value !== "object") return false;
+    const nonnegativeAmounts = [value.currentRental, value.proposedRental, value.deliveryCharge,
+      value.collectionCharge, value.setupCharge, value.extendedExhaustCharge, value.expressCharge,
+      value.schedulingSurcharge, value.currentTotal, value.total, value.depositAmount];
+    const signedAmounts = [value.rentalImpact, value.delta];
+    return nonnegativeAmounts.every((amount) => typeof amount === "number" && Number.isFinite(amount) && amount >= 0) &&
+      signedAmounts.every((amount) => typeof amount === "number" && Number.isFinite(amount)) &&
+      value.currency === "EUR" && value.vat?.status === "not_configured";
   }
 
   async function loadAvailability(input) {
