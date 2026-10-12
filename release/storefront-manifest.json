@@ -1,304 +1,304 @@
 {
-    "schema_version":  1,
-    "expected_file_count":  59,
-    "source_public_main":  "eb27d9807ee38ef7f73d3a5fb9f272e1dee10ea4",
-    "pr29_source_private_main":  "3f3f33eee2d652f91979a18f3ac746e258a76317",
-    "artifact_only":  true,
-    "files":  [
-                  {
-                      "path":  "CNAME",
-                      "sha256":  "f10d3aab128880f9677bfe44b3b5fb06e615183642c680201694e611e716ec79",
-                      "bytes":  14
-                  },
-                  {
-                      "path":  "assets/css/assistant.css",
-                      "sha256":  "843985da9f9cfcc1eeb9cade3f996488dea53ad7638e86d991771cc3ecd15472",
-                      "bytes":  57283
-                  },
-                  {
-                      "path":  "assets/css/base.css",
-                      "sha256":  "0a6ef754ac8796d1780f75041be1024bcea70761b7a2454227178321dd6f0ac5",
-                      "bytes":  1366
-                  },
-                  {
-                      "path":  "assets/css/components.css",
-                      "sha256":  "6f351403a7d7136ac3d555477074e02c74d21ed3d7361ef326718f70ce8f80a6",
-                      "bytes":  5343
-                  },
-                  {
-                      "path":  "assets/css/layout.css",
-                      "sha256":  "5f380db270ce0ddb1f12a1e20c228dbd0da839cde0f2b967dcbca508b9f4e651",
-                      "bytes":  6872
-                  },
-                  {
-                      "path":  "assets/css/reservation-review.css",
-                      "sha256":  "3950d0ac59e2f1c7a08d90640b15b0dee497dc92a2a8dd5eb407e85b127947e1",
-                      "bytes":  11288
-                  },
-                  {
-                      "path":  "assets/css/responsive.css",
-                      "sha256":  "3fceea75ba7f9b338e4e2b7cbd50d79220e8187ca1dd45b1ecb10c210dc7254d",
-                      "bytes":  8237
-                  },
-                  {
-                      "path":  "assets/images/assistant/delivery/express-stopwatch.svg",
-                      "sha256":  "0a787ef4983b4cc5f3b1706481b110ad5f6ab777b3d2778f164863bf9edc626e",
-                      "bytes":  863
-                  },
-                  {
-                      "path":  "assets/images/assistant/environment/condition-glazing.svg",
-                      "sha256":  "62b508df897fe0dbf6e22e8c0a45ecbb200af3788c7958382bb2b7be482d8ea9",
-                      "bytes":  1098
-                  },
-                  {
-                      "path":  "assets/images/assistant/environment/condition-hot.svg",
-                      "sha256":  "b40184799c33ea300298892843b66fa66658f4f3417d93b84b8d5bfc5f5fc34d",
-                      "bytes":  1834
-                  },
-                  {
-                      "path":  "assets/images/assistant/environment/condition-none.svg",
-                      "sha256":  "fd3356a3ee27c9d3e094be13b4a8585a60f482a4dec612bcb734219312ed6c28",
-                      "bytes":  601
-                  },
-                  {
-                      "path":  "assets/images/assistant/environment/condition-roof.svg",
-                      "sha256":  "d31b2546d9e20beedc2ece7283e508a4c1a4785283529712184f68910d9ac4a3",
-                      "bytes":  1421
-                  },
-                  {
-                      "path":  "assets/images/assistant/environment/condition-sun.svg",
-                      "sha256":  "6a0800defab2937227758536385200299bd61272539931647d8957e082ff809a",
-                      "bytes":  1225
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-balcony.svg",
-                      "sha256":  "a293e88a2dc53c3325878f0a77765759dc5f0758225d2a3c6b2224f961b42438",
-                      "bytes":  1579
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-classic.svg",
-                      "sha256":  "9ae333f58393b765cddfd3e4764db1345048705ccbcc6b7cd7e673639110ab39",
-                      "bytes":  1518
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-french-door.svg",
-                      "sha256":  "8d63842471c88da4027a9a471a532babf1ec48abdcce773903529eef53baf89e",
-                      "bytes":  1513
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-sliding-door.svg",
-                      "sha256":  "104be1788ddb0b24610514f0adec992f4a1bfde384913ccde2851a51f70f3f65",
-                      "bytes":  2140
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-sliding.svg",
-                      "sha256":  "57dae76818f114567afea223216ae941a7597dd52e126136b69474921dcd150f",
-                      "bytes":  1865
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-tilt-turn.svg",
-                      "sha256":  "e6034e5142b930e6096ab4d09bb23ac1dbe62acbfe440169a8ee7a3c9a811a8a",
-                      "bytes":  1314
-                  },
-                  {
-                      "path":  "assets/images/assistant/opening/window-velux.svg",
-                      "sha256":  "3bdabb853981ba57e1ed214449d5662dab486f968a9a305e1e3a82e8e69574a6",
-                      "bytes":  1253
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/local-marriage.svg",
-                      "sha256":  "a63d33baec260e1e14ef42c58027e055c726750b114dbb29c119ec1be1fc7ba1",
-                      "bytes":  2805
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/local-pro.svg",
-                      "sha256":  "bdcf66561b840e9e7ebd93ebdcd103ffab86873392bac538ad31e5884a89c4e5",
-                      "bytes":  2324
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/local-query.svg",
-                      "sha256":  "63af3f4ab8086fc9b6eb5df9d50e82467dd3b15eb23722b76f53d88a3b1810d8",
-                      "bytes":  974
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/local-salle.svg",
-                      "sha256":  "3ec042253e5e5c9f71fd671984687c0849a41ba35b4d9d24067b06f7f81fb829",
-                      "bytes":  1711
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/room-bedroom.svg",
-                      "sha256":  "2355bcea4936b516bcd1424125a8cf652be5a03260b47f3d0d339a0b9e0a499e",
-                      "bytes":  2368
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/room-living.svg",
-                      "sha256":  "3d7e1b7851ee3351ef643f8f005cd1ef6d1a2ef216023c1028b463fbd1768349",
-                      "bytes":  2386
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/room-office.svg",
-                      "sha256":  "ab31134fb39d3fb789a1222cec03c2853a54d10b8b537d4ea0b0a5826728c54d",
-                      "bytes":  3239
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/room-other-living.svg",
-                      "sha256":  "59c3793082ea510ee58a10687968df10777789054a48440980f8e052219ff9b9",
-                      "bytes":  1723
-                  },
-                  {
-                      "path":  "assets/images/assistant/rooms/room-other.svg",
-                      "sha256":  "75e91e8994d6ea1e25503078123c0295ad9d50b6ca0b1dda220971171a957fb2",
-                      "bytes":  1506
-                  },
-                  {
-                      "path":  "assets/images/homepage/igloue-hero-apartment.webp",
-                      "sha256":  "3eee1e162f4e63d543a20ae5afa4b01f79e396c307f3eebfd565dcc544f31507",
-                      "bytes":  171208
-                  },
-                  {
-                      "path":  "assets/js/alternative-availability-state.js",
-                      "sha256":  "6f367cd7e4f1f8697af603ce01eec80972093c2ca51aa17f8416e7f090f45b52",
-                      "bytes":  4242
-                  },
-                  {
-                      "path":  "assets/js/assistant.js",
-                      "sha256":  "474850ee8b78484ef6efc04e02048786167c5a1d21ce6a4355d337bbafea2bcc",
-                      "bytes":  127977
-                  },
-                  {
-                      "path":  "assets/js/availability-client.js",
-                      "sha256":  "836203ef8ea2af08288a161d21ec6ca2ae4060236b67c2466360a77ecd8500c1",
-                      "bytes":  2275
-                  },
-                  {
-                      "path":  "assets/js/availability-state.js",
-                      "sha256":  "204c9746a6fdaa67f6ba18bf86021cfa4b8cf80e2ec6a92b99b2877652a39467",
-                      "bytes":  2732
-                  },
-                  {
-                      "path":  "assets/js/availability.js",
-                      "sha256":  "59d985f564070f897cc40d7ad45ba91bcae1fdc588482e4c222539d2771ef5ce",
-                      "bytes":  1773
-                  },
-                  {
-                      "path":  "assets/js/bookings-provider.js",
-                      "sha256":  "a1613ecf389b42f216adad73f71d34ec3da3d5a12db98d440209c2857ea49e3e",
-                      "bytes":  1263
-                  },
-                  {
-                      "path":  "assets/js/calendar.js",
-                      "sha256":  "c40441813325ea8cd92c507eedc94e58ca29e164918cdd60b6cd0118e0980a45",
-                      "bytes":  14251
-                  },
-                  {
-                      "path":  "assets/js/customer-email-verification.js",
-                      "sha256":  "96fd29044ac1fbd7981b0b28dd77f8c8fa79f2c89271a310d4fc1ec41d1ab4bc",
-                      "bytes":  31687
-                  },
-                  {
-                      "path":  "assets/js/delivery-status.js",
-                      "sha256":  "f3a2be2483b9fbf40f864c4926cc923f0ef233221263b15e037172ff188c19e8",
-                      "bytes":  8918
-                  },
-                  {
-                      "path":  "assets/js/delivery.js",
-                      "sha256":  "b5b44c4b15cd9b8407ac69f66328867e93e63241b4f31501d6a37c9d4a6c8033",
-                      "bytes":  5716
-                  },
-                  {
-                      "path":  "assets/js/email-verification-page.js",
-                      "sha256":  "199020778f59fe65fb0d6305ae1f92f7b7e342489effd3bd6b59b3b470baaaa8",
-                      "bytes":  2499
-                  },
-                  {
-                      "path":  "assets/js/email-verification.js",
-                      "sha256":  "bf4ed604c7a9029063a7c1c882ed1d3c704aa43dd781775de082d4d643d882e3",
-                      "bytes":  807
-                  },
-                  {
-                      "path":  "assets/js/fleet-allocation.js",
-                      "sha256":  "e64824c3da69c5204021028c2bada64cc1bb1a343f497c3eb588ed9761b7f022",
-                      "bytes":  12249
-                  },
-                  {
-                      "path":  "assets/js/fleet.js",
-                      "sha256":  "5427ace745432d497b648330ff008f8596dbd591da05ffec9732f2c4ab952bef",
-                      "bytes":  2637
-                  },
-                  {
-                      "path":  "assets/js/inventory.js",
-                      "sha256":  "ba4bf4a2d726a24a3a95370e2f7491a3873eca1831c93d8a236be40679280526",
-                      "bytes":  5703
-                  },
-                  {
-                      "path":  "assets/js/pricing.js",
-                      "sha256":  "55dfce04caed0c3aaf5eed3495743fe3ae1763fae9c8c2d1c9909cbfd668aabf",
-                      "bytes":  3550
-                  },
-                  {
-                      "path":  "assets/js/products.js",
-                      "sha256":  "3825dfe43bd3818c971519048f3c1b22102409907f9e957f10f78bb97ede0277",
-                      "bytes":  5569
-                  },
-                  {
-                      "path":  "assets/js/reservation-attempt.js",
-                      "sha256":  "267c67afa7810a2fa1c7c769786973ffe8c60d8e1667beec2608e1ae71889f39",
-                      "bytes":  3263
-                  },
-                  {
-                      "path":  "assets/js/reservation-client.js",
-                      "sha256":  "0684118e4c9ce60d67ca317b8b26e678f5bbcf03061ce320877b8f027e5994b9",
-                      "bytes":  8437
-                  },
-                  {
-                      "path":  "assets/js/reservation-portal.js",
-                      "sha256":  "73395a0a816f8e7f8135d68455d5205c3d9e827b441c16d180b500bbd64fd4df",
-                      "bytes":  40067
-                  },
-                  {
-                      "path":  "assets/js/reservation-review.js",
-                      "sha256":  "a6f18d036237c854666f7a87b55f230b1a37d9e386401d81d7f99ae987e3a0bc",
-                      "bytes":  24417
-                  },
-                  {
-                      "path":  "assets/js/reservation.js",
-                      "sha256":  "4392f68e41f7c9f06df00133365b1f15f703cf867715f173347281b4fdc43053",
-                      "bytes":  12044
-                  },
-                  {
-                      "path":  "assets/js/schedule-provider.js",
-                      "sha256":  "b1ffac0d6177329b6a59f3fd8a448ad4393a1f353ed8eacfe72cd24616d84cec",
-                      "bytes":  2277
-                  },
-                  {
-                      "path":  "assets/js/service-slot-client.js",
-                      "sha256":  "949a6f018aaa43a67319400bc055fb1d98a5735f143886f7bb6c5ff984f954fd",
-                      "bytes":  4866
-                  },
-                  {
-                      "path":  "assets/js/supabase-config.js",
-                      "sha256":  "5d472b3a32cd72a92954822f7eed2e93832ae63c55709e993b284aa0ac6429e0",
-                      "bytes":  1784
-                  },
-                  {
-                      "path":  "delivery-status.html",
-                      "sha256":  "6f44132d73e75e81bfd7aec54e5b0c9a0370843650619b7e786c25ae9ae85609",
-                      "bytes":  5149
-                  },
-                  {
-                      "path":  "index.html",
-                      "sha256":  "bc755f3f571891861040d1acc80e4492abfabe4a529811e2908c8cd07fbf20a3",
-                      "bytes":  12386
-                  },
-                  {
-                      "path":  "reservation-portal.html",
-                      "sha256":  "5827e70e341462a06047bc73b2864be13d38451e0ad7d5e8432e10a98b2e9ed0",
-                      "bytes":  9691
-                  },
-                  {
-                      "path":  "verify-email/index.html",
-                      "sha256":  "e2d6e3133a5df614474ba531e7c0da8f51c455964dffaef3880718a36d9f9765",
-                      "bytes":  1987
-                  }
-              ]
+  "schema_version": 1,
+  "expected_file_count": 59,
+  "source_public_main": "eb27d9807ee38ef7f73d3a5fb9f272e1dee10ea4",
+  "pr29_source_private_main": "3f3f33eee2d652f91979a18f3ac746e258a76317",
+  "artifact_only": true,
+  "files": [
+    {
+      "path": "CNAME",
+      "sha256": "f10d3aab128880f9677bfe44b3b5fb06e615183642c680201694e611e716ec79",
+      "bytes": 14
+    },
+    {
+      "path": "assets/css/assistant.css",
+      "sha256": "15c588e85ff05f8748751fa7802e222208ea5a4ae20b70b43d0b80e6eadf5bed",
+      "bytes": 54621
+    },
+    {
+      "path": "assets/css/base.css",
+      "sha256": "cbf1d5beb9007073c8b6f0bcdd8b47ab5a608dbc8487f32cf1d3fd6f43969682",
+      "bytes": 1278
+    },
+    {
+      "path": "assets/css/components.css",
+      "sha256": "8dc46129c445e8c9985aed3dbfd25e99962c83c1cd8f82a7fcc100590980a0a5",
+      "bytes": 5071
+    },
+    {
+      "path": "assets/css/layout.css",
+      "sha256": "b58d5bbd0054bcc4ceb4853e2be7fff39f95d7879045f8e39e2825422c8925a9",
+      "bytes": 6521
+    },
+    {
+      "path": "assets/css/reservation-review.css",
+      "sha256": "9566eec03bed65b11d5bc625c72f9461fefd31ed3338a5dd66c8630acfb28393",
+      "bytes": 10929
+    },
+    {
+      "path": "assets/css/responsive.css",
+      "sha256": "32df5fc3e1894554bb319ac258168f0ca853af3904cb907ef41e81a387a2aae0",
+      "bytes": 7803
+    },
+    {
+      "path": "assets/images/assistant/delivery/express-stopwatch.svg",
+      "sha256": "6084c50fe20c79ca8b96e4769daa793b2d7cc4d8125be98019da31c6cb11e51b",
+      "bytes": 840
+    },
+    {
+      "path": "assets/images/assistant/environment/condition-glazing.svg",
+      "sha256": "39981b7c20a95454e8b547a639d10084dda219a231d67fd55567f9df294d0e10",
+      "bytes": 1083
+    },
+    {
+      "path": "assets/images/assistant/environment/condition-hot.svg",
+      "sha256": "924fa83a470820363e6a5acadb47d86000e9cedaa31e7a7686e4b362d145a195",
+      "bytes": 1816
+    },
+    {
+      "path": "assets/images/assistant/environment/condition-none.svg",
+      "sha256": "7a68bce0ae0cbc44a9fd1cfb3ef676bab55d872820b57e908878e8a3ab40f94a",
+      "bytes": 591
+    },
+    {
+      "path": "assets/images/assistant/environment/condition-roof.svg",
+      "sha256": "b0da08ef13c19ba073391ce3017421f8a053b430ad3f9cd43216d8d3b346b360",
+      "bytes": 1404
+    },
+    {
+      "path": "assets/images/assistant/environment/condition-sun.svg",
+      "sha256": "38628a9144cd088ccbe4c201e90087e9f4f495fe468504e102fe843d447a27ff",
+      "bytes": 1200
+    },
+    {
+      "path": "assets/images/assistant/opening/window-balcony.svg",
+      "sha256": "e608b605f58af20fc9854e7ccd051685bd2eaf5064ed32fdc20392b3120e3817",
+      "bytes": 1565
+    },
+    {
+      "path": "assets/images/assistant/opening/window-classic.svg",
+      "sha256": "e27d92af2e67443701583b2baab027169c5fd60e6ceb6b6b5e2bd6d80b074a83",
+      "bytes": 1505
+    },
+    {
+      "path": "assets/images/assistant/opening/window-french-door.svg",
+      "sha256": "74b153420126aa1a36a1136e36fef417b46d393cf84f0763f005eaf5349a19fd",
+      "bytes": 1500
+    },
+    {
+      "path": "assets/images/assistant/opening/window-sliding-door.svg",
+      "sha256": "bec181711207f9445031ba24e526dd01a78cb7cd2e2a36e486b072645131b096",
+      "bytes": 2108
+    },
+    {
+      "path": "assets/images/assistant/opening/window-sliding.svg",
+      "sha256": "f6db5a5250ef259e2c2bdebf79dc69e1f9cee958492d2557c1577972cbb912d7",
+      "bytes": 1851
+    },
+    {
+      "path": "assets/images/assistant/opening/window-tilt-turn.svg",
+      "sha256": "10dbb54213fad12a2885294f70ebe21af9cdd14951dc8869f5abce80c198edbe",
+      "bytes": 1302
+    },
+    {
+      "path": "assets/images/assistant/opening/window-velux.svg",
+      "sha256": "3e5eed0d99713433b3315dcad92d09e3e1576818600577c824b533c0092e1999",
+      "bytes": 1241
+    },
+    {
+      "path": "assets/images/assistant/rooms/local-marriage.svg",
+      "sha256": "a7ead3a95cc5569200e9862b19f531353fcc598bf65ab6f54ab6a2dc7ac57bdd",
+      "bytes": 2738
+    },
+    {
+      "path": "assets/images/assistant/rooms/local-pro.svg",
+      "sha256": "2116c5656316f288a0eda5707f6ff09d5b6c71966d328bbadd907d475b042e3c",
+      "bytes": 2266
+    },
+    {
+      "path": "assets/images/assistant/rooms/local-query.svg",
+      "sha256": "fac396069de26b39f874b101970e1a0257127fb8e79e53ada2174b2245784e18",
+      "bytes": 937
+    },
+    {
+      "path": "assets/images/assistant/rooms/local-salle.svg",
+      "sha256": "8b4ae6cd914605df85766df9e2837829b0ebeaa26bdb35139d67f3fe5af0d78d",
+      "bytes": 1666
+    },
+    {
+      "path": "assets/images/assistant/rooms/room-bedroom.svg",
+      "sha256": "435b40401df17fbf9f66c43926a026f4abe7a2f4fb720370cea06733ff3023e0",
+      "bytes": 2288
+    },
+    {
+      "path": "assets/images/assistant/rooms/room-living.svg",
+      "sha256": "e75aaafbf5c5d55ce4347ef71ccaedb32ae003836898dc6c4a296e8067bda2d5",
+      "bytes": 2316
+    },
+    {
+      "path": "assets/images/assistant/rooms/room-office.svg",
+      "sha256": "88f42ba9085826a17d8199e7e0d5cc88be9e13c13bcea2bfb25543514bb7f405",
+      "bytes": 3145
+    },
+    {
+      "path": "assets/images/assistant/rooms/room-other-living.svg",
+      "sha256": "5c68704d0d70ce2224e6672ca4c423d4283fa9d6d62f34974b21635200d9a802",
+      "bytes": 1671
+    },
+    {
+      "path": "assets/images/assistant/rooms/room-other.svg",
+      "sha256": "02e5a2ae1c8b631622307f23d78038076c41cebe810c352ee6d59a6891b7f6f9",
+      "bytes": 1460
+    },
+    {
+      "path": "assets/images/homepage/igloue-hero-apartment.webp",
+      "sha256": "3eee1e162f4e63d543a20ae5afa4b01f79e396c307f3eebfd565dcc544f31507",
+      "bytes": 171208
+    },
+    {
+      "path": "assets/js/alternative-availability-state.js",
+      "sha256": "fee40afe1ef6c62010c4d8f9f2eac548c24355456918a817bdf57883039cbb1e",
+      "bytes": 4081
+    },
+    {
+      "path": "assets/js/assistant.js",
+      "sha256": "2ddac089179b553b7ee07e562a1edd266f4e3296072522b8db781d322dad1be0",
+      "bytes": 123296
+    },
+    {
+      "path": "assets/js/availability-client.js",
+      "sha256": "74f4f4012f26244af7aef5796a8fb407504c507e29374b75e7975f8d531b00da",
+      "bytes": 2215
+    },
+    {
+      "path": "assets/js/availability-state.js",
+      "sha256": "d93992f41153b7eb692bf3c351f4b8c59bf91d2086a3ac97b53b4412d91501a5",
+      "bytes": 2624
+    },
+    {
+      "path": "assets/js/availability.js",
+      "sha256": "8f393c98f1c890fd042eced2d4dc5f13421e0f842b72eeb81311634b0c189644",
+      "bytes": 1724
+    },
+    {
+      "path": "assets/js/bookings-provider.js",
+      "sha256": "eeb1dbeb5d4cf8e27b216f757ed1ab4674b257271aa8abda5b3c1a93e08680df",
+      "bytes": 1218
+    },
+    {
+      "path": "assets/js/calendar.js",
+      "sha256": "58f1b6fcebb67f0cbf33354f2bfdd4d51d63de7d4c22e00a747b007e878e8a38",
+      "bytes": 13554
+    },
+    {
+      "path": "assets/js/customer-email-verification.js",
+      "sha256": "c7185f38b1dd1335cc4eb9250497748164998f5eb046aa0216b3f3a1ff39f964",
+      "bytes": 30948
+    },
+    {
+      "path": "assets/js/delivery-status.js",
+      "sha256": "71d4c105e1b2622581b7fa1b6c8b8fdf59f9285db4396563a3f99b43d503c84e",
+      "bytes": 8731
+    },
+    {
+      "path": "assets/js/delivery.js",
+      "sha256": "53c11f6c2847c3b752c381501f1b63120d1d4e5a606ae9fa0b435aaaa967850c",
+      "bytes": 5467
+    },
+    {
+      "path": "assets/js/email-verification-page.js",
+      "sha256": "dd615f6cb0595231fb87bf213f78f3104570a530ebb288dd4435a6bcc167d3db",
+      "bytes": 2422
+    },
+    {
+      "path": "assets/js/email-verification.js",
+      "sha256": "62c030b486d0066ea6688bdfd721a6f42e5180738be6c23b2b51d60232e56adb",
+      "bytes": 783
+    },
+    {
+      "path": "assets/js/fleet-allocation.js",
+      "sha256": "3affc04b636aea4aee080f447a74d6d81ccaceb741c01a0582ca892cd43f69e4",
+      "bytes": 11793
+    },
+    {
+      "path": "assets/js/fleet.js",
+      "sha256": "87894f721f060da9e7f1fa95bf633b8a9307f108a2c875ef34b210d6b3b2e608",
+      "bytes": 2543
+    },
+    {
+      "path": "assets/js/inventory.js",
+      "sha256": "e854a4a8658eac262d1c52ec3b66c9b5dfd5c8f83b5d70355f39fd2372fd94bb",
+      "bytes": 5382
+    },
+    {
+      "path": "assets/js/pricing.js",
+      "sha256": "49a59956da72309e049a91a511f8e8a39d58a0427f101d55c955a00cfd4adfee",
+      "bytes": 3381
+    },
+    {
+      "path": "assets/js/products.js",
+      "sha256": "2e90afe068e7ac0895f44472f6a16c35f829f5e2e05adce07b719eecb379ce73",
+      "bytes": 5318
+    },
+    {
+      "path": "assets/js/reservation-attempt.js",
+      "sha256": "1b8457d86954d28e605becdacee5944348a5d6d79f71d686907521f13bb7bb0d",
+      "bytes": 3167
+    },
+    {
+      "path": "assets/js/reservation-client.js",
+      "sha256": "536a80e1743244503e7796c2f02ded7258cbff0a42567c5b3110420ababea481",
+      "bytes": 8210
+    },
+    {
+      "path": "assets/js/reservation-portal.js",
+      "sha256": "07dd3733aac04ef393a29a0ea2ac3ebd8dbaafd3b173a25b207bb62baf33ba36",
+      "bytes": 39533
+    },
+    {
+      "path": "assets/js/reservation-review.js",
+      "sha256": "0b4e3d79192c89c9fca567aaa31fc93791a915f97b4060ed6cf0ac25be019780",
+      "bytes": 23724
+    },
+    {
+      "path": "assets/js/reservation.js",
+      "sha256": "4db8153b393419366239c90f4de9c1559f20dcb29d5cca5602e71afece5945bc",
+      "bytes": 11564
+    },
+    {
+      "path": "assets/js/schedule-provider.js",
+      "sha256": "69ec5ebce925e4522447b203ec73963224739f7cd6c9b6a118fcd5ca12d33c9d",
+      "bytes": 2185
+    },
+    {
+      "path": "assets/js/service-slot-client.js",
+      "sha256": "db7d419e71e344939060f6189764cb367a4b942b811f57181558a69bb20172f7",
+      "bytes": 4786
+    },
+    {
+      "path": "assets/js/supabase-config.js",
+      "sha256": "f81268dc196ae568b917f6fb78dac71b591419472c26e59ca8cc4de87d3b3583",
+      "bytes": 1749
+    },
+    {
+      "path": "delivery-status.html",
+      "sha256": "53bc4aaf303b9c2922f9f762b9fb247c295e4f799fc56f29d2a76dc5b8e6f8cb",
+      "bytes": 5070
+    },
+    {
+      "path": "index.html",
+      "sha256": "43ff6efa10d3c1fb858d0c3137e8201a3d186930326e14ff4d05af365adb09e3",
+      "bytes": 12011
+    },
+    {
+      "path": "reservation-portal.html",
+      "sha256": "1449e8cbd64d6f6ae42adbb955b9d6c5d1d136a8b5bb9ebf14e8586d7506a712",
+      "bytes": 9577
+    },
+    {
+      "path": "verify-email/index.html",
+      "sha256": "d7dce1c999c7936f419723e2429b042d1d63847a323e17152d09fb9389905e24",
+      "bytes": 1949
+    }
+  ]
 }

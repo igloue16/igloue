@@ -101,13 +101,10 @@ if (mode === "verify") {
     for (const rel of approved.keys()) {
       const destination = path.join(target, ...rel.split("/"));
       await mkdir(path.dirname(destination), { recursive: true });
-      if (sourceRef) {
-        const sourceFile = spawnSync("git", ["show", `${sourceRef}:${rel}`], { cwd: root, maxBuffer: 32 * 1024 * 1024 });
-        if (sourceFile.status !== 0) fail(`source file is unavailable at ${sourceRef}: ${rel}`);
-        await writeFile(destination, sourceFile.stdout, { flag: "wx" });
-      } else {
-        await writeFile(destination, await readFile(path.join(root, ...rel.split("/"))), { flag: "wx" });
-      }
+      const sourceRevision = sourceRef ?? "HEAD";
+      const sourceFile = spawnSync("git", ["show", `${sourceRevision}:${rel}`], { cwd: root, maxBuffer: 32 * 1024 * 1024 });
+      if (sourceFile.status !== 0) fail(`source file is unavailable at ${sourceRevision}: ${rel}`);
+      await writeFile(destination, sourceFile.stdout, { flag: "wx" });
     }
     await verifyDirectory(target);
   } catch (error) {
