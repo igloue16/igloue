@@ -31,6 +31,10 @@ jobs:
       github.ref == 'refs/heads/main' && inputs.confirm_rollback == true)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      IGLOUE_STOREFRONT_BUILD_TARGET: staging
+      IGLOUE_STOREFRONT_STAGING_SUPABASE_URL: ${{ vars.IGLOUE_STOREFRONT_STAGING_SUPABASE_URL }}
+      IGLOUE_STOREFRONT_STAGING_SUPABASE_PUBLISHABLE_KEY: ${{ vars.IGLOUE_STOREFRONT_STAGING_SUPABASE_PUBLISHABLE_KEY }}
     permissions:
       actions: read
       contents: read

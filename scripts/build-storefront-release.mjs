@@ -17,9 +17,52 @@ const requestedPath = optionAt >= 0 ? process.argv[optionAt + 1] : null;
 const sourceFlag = process.argv.indexOf("--source-ref");
 const sourceRef = sourceFlag >= 0 ? process.argv[sourceFlag + 1] : null;
 
+const CONFIG_PATH = "assets/js/supabase-config.js";
+const STAGING_URL = "https://fxhdxilvbzojkyyhktnu.supabase.co";
+const STAGING_HOSTNAMES = Object.freeze(["test.igloue.fr", "test.app.igloue.eu"]);
+const STAGING_GATEWAY = "https://igloue-customer-email-verification-gateway.plain-lab-58bb.workers.dev/customer-email-verification";
+const GENERATED_KIND = "staging-supabase-config-v1";
+
 function fail(message) {
   console.error(`Storefront release validation failed: ${message}`);
   process.exit(1);
+}
+
+function hash(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function required(env, name) {
+  const value = typeof env[name] === "string" ? env[name].trim() : "";
+  if (!value) throw new Error(`Missing required build variable: ${name}`);
+  return value;
+}
+
+function resolveStagingConfig(env = process.env) {
+  if (required(env, "IGLOUE_STOREFRONT_BUILD_TARGET") !== "staging") {
+    throw new Error("IGLOUE_STOREFRONT_BUILD_TARGET must be explicitly set to staging");
+  }
+  for (const name of ["IGLOUE_STOREFRONT_PRODUCTION_SUPABASE_URL", "IGLOUE_STOREFRONT_PRODUCTION_SUPABASE_PUBLISHABLE_KEY"]) {
+    if (Object.hasOwn(env, name)) throw new Error(`Production configuration is forbidden in a staging build (${name})`);
+  }
+  const projectUrl = required(env, "IGLOUE_STOREFRONT_STAGING_SUPABASE_URL");
+  if (projectUrl !== STAGING_URL) throw new Error("Configured Supabase URL does not match the staging project");
+  const publishableKey = required(env, "IGLOUE_STOREFRONT_STAGING_SUPABASE_PUBLISHABLE_KEY");
+  if (!/^sb_publishable_[A-Za-z0-9_-]{1,160}$/.test(publishableKey)) {
+    throw new Error("IGLOUE_STOREFRONT_STAGING_SUPABASE_PUBLISHABLE_KEY must be a Supabase publishable key");
+  }
+  return Object.freeze({ projectUrl, publishableKey });
+}
+
+function renderStagingConfig(config) {
+  const selected = JSON.stringify({
+    backend: "staging",
+    projectUrl: config.projectUrl,
+    publishableKey: config.publishableKey,
+    verificationGatewayUrl: STAGING_GATEWAY,
+    allowedHostnames: STAGING_HOSTNAMES,
+  });
+  return `(function configureIgloueSupabase(global) {\n  "use strict";\n  const selected = ${selected};\n  const hostname = String((global.location || {}).hostname || "").toLowerCase();\n  global.IGLOUE_SUPABASE_CONFIG = selected.allowedHostnames.includes(hostname)\n    ? Object.freeze({\n      backend: selected.backend,\n      projectUrl: selected.projectUrl,\n      publishableKey: selected.publishableKey,\n      verificationGatewayUrl: selected.verificationGatewayUrl,\n    })\n    : null;\n})(window);\n`;
 }
 
 if (!["build", "verify"].includes(mode) || !requestedPath) {
@@ -51,12 +94,22 @@ for (const entry of entries) {
   if (!allowed || rel.startsWith("assets/js/admin-") || rel.includes("platform-admin") || rel.includes("operations-board")) {
     fail(`path is outside the storefront-only boundary: ${rel}`);
   }
-  if (!/^[a-f0-9]{64}$/.test(entry.sha256 ?? "") || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0) fail(`invalid hash metadata: ${rel}`);
+  if (rel === CONFIG_PATH) {
+    // The manifest pins the source bytes; the emitted digest is derived from the
+    // validated staging inputs and checked again when the artifact is deployed.
+    if (entry.generated !== GENERATED_KIND || !/^[a-f0-9]{64}$/.test(entry.source_sha256 ?? "") || !Number.isSafeInteger(entry.source_bytes) || entry.source_bytes < 0) {
+      fail("staging config manifest metadata is invalid");
+    }
+    if (Object.hasOwn(entry, "sha256") || Object.hasOwn(entry, "bytes")) fail("generated config must use the staging-input hash verifier");
+  } else if (!/^[a-f0-9]{64}$/.test(entry.sha256 ?? "") || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0 || Object.hasOwn(entry, "generated")) {
+    fail(`invalid hash metadata: ${rel}`);
+  }
   approved.set(rel, entry);
 }
-for (const required of ["CNAME", "index.html", "reservation-portal.html", "delivery-status.html", "verify-email/index.html", "assets/js/supabase-config.js", "assets/js/assistant.js", "assets/js/calendar.js", "assets/js/service-slot-client.js", "assets/js/reservation-client.js", "assets/js/reservation-review.js", "assets/js/reservation-portal.js"]) {
-  if (!approved.has(required)) fail(`required customer file is not allowlisted: ${required}`);
+for (const requiredPath of ["CNAME", "index.html", "reservation-portal.html", "delivery-status.html", "verify-email/index.html", CONFIG_PATH, "assets/js/assistant.js", "assets/js/calendar.js", "assets/js/service-slot-client.js", "assets/js/reservation-client.js", "assets/js/reservation-review.js", "assets/js/reservation-portal.js"]) {
+  if (!approved.has(requiredPath)) fail(`required customer file is not allowlisted: ${requiredPath}`);
 }
+if ([...approved.values()].filter((entry) => entry.generated === GENERATED_KIND).length !== 1) fail("manifest must contain exactly one generated staging config");
 
 async function walk(directory, prefix = "") {
   const found = [];
@@ -72,22 +125,45 @@ async function walk(directory, prefix = "") {
   return found;
 }
 
-async function verifyDirectory(directory) {
+function readPinnedSource(rel, revision) {
+  const sourceFile = spawnSync("git", ["show", `${revision}:${rel}`], { cwd: root, maxBuffer: 32 * 1024 * 1024 });
+  if (sourceFile.status !== 0) throw new Error(`Source file is unavailable at the reviewed revision: ${rel}`);
+  return sourceFile.stdout;
+}
+
+function expectedBytes(entry, env) {
+  if (entry.generated === GENERATED_KIND) return Buffer.from(renderStagingConfig(resolveStagingConfig(env)), "utf8");
+  return null;
+}
+
+async function verifyDirectory(directory, env) {
   const actual = await walk(directory);
   const actualSet = new Set(actual);
   for (const rel of approved.keys()) if (!actualSet.has(rel)) fail(`approved file is missing: ${rel}`);
   for (const rel of actual) if (!approved.has(rel)) fail(`unapproved file is present: ${rel}`);
   for (const [rel, entry] of approved) {
     const bytes = await readFile(path.join(directory, ...rel.split("/")));
-    const hash = createHash("sha256").update(bytes).digest("hex");
-    if (bytes.length !== entry.bytes || hash !== entry.sha256) fail(`size or SHA-256 mismatch: ${rel}`);
+    if (entry.generated === GENERATED_KIND) {
+      const expected = expectedBytes(entry, env);
+      if (bytes.length !== expected.length || hash(bytes) !== hash(expected)) fail(`generated staging config hash mismatch: ${rel}`);
+    } else {
+      const digest = hash(bytes);
+      if (bytes.length !== entry.bytes || digest !== entry.sha256) fail(`size or SHA-256 mismatch: ${rel}`);
+    }
   }
-  console.log(`Verified ${actual.length} allowlisted storefront files; all sizes and SHA-256 hashes match.`);
+  console.log(`Verified ${actual.length} allowlisted storefront files; static hashes and generated staging config digest matched.`);
 }
 
 const target = path.resolve(requestedPath);
+let stagingConfig;
+try {
+  stagingConfig = resolveStagingConfig(process.env);
+} catch (error) {
+  fail(error instanceof Error ? error.message : "staging build configuration is invalid");
+}
+
 if (mode === "verify") {
-  await verifyDirectory(target);
+  await verifyDirectory(target, process.env);
 } else {
   if (target === root) fail("build output cannot be the repository root");
   try {
@@ -100,11 +176,16 @@ if (mode === "verify") {
       const destination = path.join(target, ...rel.split("/"));
       await mkdir(path.dirname(destination), { recursive: true });
       const sourceRevision = sourceRef ?? "HEAD";
-      const sourceFile = spawnSync("git", ["show", `${sourceRevision}:${rel}`], { cwd: root, maxBuffer: 32 * 1024 * 1024 });
-      if (sourceFile.status !== 0) fail(`source file is unavailable at ${sourceRevision}: ${rel}`);
-      await writeFile(destination, sourceFile.stdout, { flag: "wx" });
+      const sourceFile = readPinnedSource(rel, sourceRevision);
+      const entry = approved.get(rel);
+      let output = sourceFile;
+      if (entry.generated === GENERATED_KIND) {
+        if (sourceFile.length !== entry.source_bytes || hash(sourceFile) !== entry.source_sha256) fail(`pinned source config hash mismatch: ${rel}`);
+        output = Buffer.from(renderStagingConfig(stagingConfig), "utf8");
+      }
+      await writeFile(destination, output, { flag: "wx" });
     }
-    await verifyDirectory(target);
+    await verifyDirectory(target, process.env);
   } catch (error) {
     await rm(target, { recursive: true, force: true });
     throw error;
