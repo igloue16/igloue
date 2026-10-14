@@ -276,8 +276,9 @@
                   },
                   {
                       "path":  "assets/js/supabase-config.js",
-                      "sha256":  "f81268dc196ae568b917f6fb78dac71b591419472c26e59ca8cc4de87d3b3583",
-                      "bytes":  1749
+                      "generated":  "staging-supabase-config-v1",
+                      "source_sha256":  "f81268dc196ae568b917f6fb78dac71b591419472c26e59ca8cc4de87d3b3583",
+                      "source_bytes":  1749
                   },
                   {
                       "path":  "delivery-status.html",
