@@ -257,8 +257,8 @@
     },
     {
       "path": "assets/js/reservation-review.js",
-      "sha256": "ef288e64292659da68e080657be5aef965a58fbffb92e13243e5514fde27e59c",
-      "bytes": 25192
+      "sha256": "f4cac9ad68302c05a06bfc936db2ccdcb415dfe5812898033c1b5a99b97b8a9d",
+      "bytes": 24478
     },
     {
       "path": "assets/js/reservation.js",
