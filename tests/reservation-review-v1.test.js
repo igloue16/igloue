@@ -16,10 +16,6 @@ vm.runInContext(
 );
 
 vm.runInContext(`
-  const IGLOUE_SERVICE_WINDOWS = [
-    { id: "0830-1030", displayLabel: "08:30–10:30" },
-    { id: "1030-1230", displayLabel: "10:30–12:30" }
-  ];
   const IGLOUE_PRICING = { minimumRentalNights: 3, addOns: { extendedExhaust: { price: 9 } } };
   const IGLOUE_PRODUCTS = [
     { id: "essential", name: "IGLOUE Essential", weeklyPrice: 59 }
@@ -154,6 +150,15 @@ vm.runInContext(`
       return serviceType === "delivery"
         ? [{ id: "0830-1030" }]
         : [{ id: "1030-1230" }];
+    },
+    getWindowById(slotId, { serviceType } = {}) {
+      if (serviceType === "delivery" && slotId === "0830-1030") {
+        return { id: slotId, label: "08:30–10:30" };
+      }
+      if (serviceType === "collection" && slotId === "1030-1230") {
+        return { id: slotId, label: "10:30–12:30" };
+      }
+      return null;
     }
   };
 `, context);
@@ -251,6 +256,7 @@ reviewButtons.push({
 });
 
 context.collectionSlotAvailable = true;
+assert.equal(evaluate("typeof IGLOUE_SERVICE_WINDOWS"), "undefined", "test does not mask the removed browser global");
 vm.runInContext(`
   assistantState.collectionSlotId = "1030-1230";
   assistantState.availability = {
@@ -262,6 +268,29 @@ vm.runInContext(`
   };
 `, context);
 evaluate("showReservationReview(false)");
+assert.match(renderedReview, /08:30–10:30/, "delivery label comes from cached backend slot data");
+assert.match(renderedReview, /10:30–12:30/, "collection label comes from cached backend slot data");
+const cachedSlotProvider = context.IGLOUE_DELIVERY_SLOT_PROVIDER;
+context.IGLOUE_DELIVERY_SLOT_PROVIDER = undefined;
+assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "missing slot cache does not throw");
+assert.match(renderedReview, /Créneau à choisir/, "missing slot cache uses a safe review label");
+context.IGLOUE_DELIVERY_SLOT_PROVIDER = cachedSlotProvider;
+cachedSlotProvider.getWindowById = () => ({ label: 42 });
+assert.match(renderedReview, /Créneau à choisir/, "invalid slot labels use a safe review label");
+assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "invalid slot labels do not throw");
+cachedSlotProvider.getWindowById = () => ({ label: "<img src=x onerror=alert(1)>" });
+assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "untrusted slot labels do not throw");
+assert.match(renderedReview, /&lt;img src=x onerror=alert\(1\)&gt;/, "slot labels are escaped before rendering");
+assert.doesNotMatch(renderedReview, /<img src=x/, "slot labels cannot inject markup");
+cachedSlotProvider.getWindowById = (slotId, { serviceType } = {}) => {
+  if (serviceType === "delivery" && slotId === "0830-1030") {
+    return { id: slotId, label: "08:30–10:30" };
+  }
+  if (serviceType === "collection" && slotId === "1030-1230") {
+    return { id: slotId, label: "10:30–12:30" };
+  }
+  return null;
+};
 assert.match(renderedReview, /data-extended-exhaust/, "review exposes the compatible optional add-on");
 extendedExhaustCheckbox.checked = true;
 extendedExhaustCheckbox.change();

@@ -1,9 +1,22 @@
-function getReservationSlotLabel(slotId) {
-  const slot = IGLOUE_SERVICE_WINDOWS.find(
-    (candidate) => candidate.id === slotId
-  );
+function getReservationSlotLabel(slotId, request = {}) {
+  const slotProvider = globalThis.IGLOUE_DELIVERY_SLOT_PROVIDER;
+  let slot = null;
 
-  return slot ? slot.displayLabel : "Créneau à choisir";
+  try {
+    if (slotId && typeof slotProvider?.getWindowById === "function") {
+      slot = slotProvider.getWindowById(slotId, request);
+    }
+  } catch {
+    // A missing or stale display label must not prevent the review step.
+  }
+
+  const label = typeof slot?.label === "string"
+    ? slot.label
+    : slot?.displayLabel;
+
+  return typeof label === "string" && label.trim()
+    ? escapeReservationReviewHtml(label)
+    : "Créneau à choisir";
 }
 
 function formatReservationReviewDate(dateValue) {
@@ -454,13 +467,21 @@ function showReservationReview(addToHistory = true) {
                 <div>
                   <span>Livraison</span>
                   <strong>${formatReservationReviewDate(draft.delivery.date)}</strong>
-                  <b>${getReservationSlotLabel(draft.delivery.slotId)}</b>
+                  <b>${getReservationSlotLabel(draft.delivery.slotId, {
+                    productId: draft.product.selectedProductId,
+                    date: draft.delivery.date,
+                    serviceType: "delivery"
+                  })}</b>
                   <button type="button" data-review-edit="delivery-slot">Modifier</button>
                 </div>
                 <div>
                   <span>Reprise</span>
                   <strong>${formatReservationReviewDate(draft.collection.date)}</strong>
-                  <b>${getReservationSlotLabel(draft.collection.slotId)}</b>
+                  <b>${getReservationSlotLabel(draft.collection.slotId, {
+                    productId: draft.product.selectedProductId,
+                    date: draft.collection.date,
+                    serviceType: "collection"
+                  })}</b>
                   <button type="button" data-review-edit="collection-slot">Modifier</button>
                 </div>
               </div>
