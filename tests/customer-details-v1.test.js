@@ -157,6 +157,10 @@ requestButton.click();
 
 const form = assistantRoot.querySelector("[data-customer-details-form]");
 assert.ok(form, "customer-details stage renders");
+const deliveryInstructionsField = assistantRoot.querySelector("#assistant-delivery-instructions");
+assert.ok(deliveryInstructionsField, "optional delivery instructions have their own field");
+assert.equal(deliveryInstructionsField.attributes.maxlength, "500", "delivery instructions are bounded to 500 characters");
+assert.equal(deliveryInstructionsField.attributes.required, undefined, "delivery instructions remain optional");
 assert.equal(assistantRoot.querySelector("#assistant-phone").attributes.autocomplete, "tel", "phone exposes tel autocomplete");
 assert.equal(assistantRoot.querySelector("#assistant-phone").attributes.required, "", "phone is required");
 assert.equal(assistantRoot.querySelector("#assistant-address-line1").attributes.autocomplete, "address-line1", "address exposes address-line1 autocomplete");
@@ -181,12 +185,14 @@ const values = {
   "#assistant-phone": "+33 6 12 34 56 78",
   "#assistant-address-line1": "1 rue des Lilas",
   "#assistant-address-line2": "Bâtiment A",
+  "#assistant-delivery-instructions": "Code portail 1234, appeler à l’arrivée",
   "#assistant-city": "Angoulême"
 };
 
 const resetDetailsState = () => vm.runInContext(`
   assistantState.customerDetails = { firstName: "", lastName: "", email: "", phone: "" };
   assistantState.deliveryAddress = { line1: "", line2: "", city: "" };
+  assistantState.deliveryInstructions = "";
   showCustomerDetailsStage(false);
 `, context);
 
@@ -217,6 +223,21 @@ for (const [missingSelector, errorSelector] of [
 
 resetDetailsState();
 fillExcept(null);
+const overlongDeliveryInstructions = assistantRoot.querySelector("#assistant-delivery-instructions");
+overlongDeliveryInstructions.value = "x".repeat(501);
+overlongDeliveryInstructions.dispatchEvent({ type: "input" });
+assistantRoot.querySelector("[data-customer-details-form]").dispatchEvent({ type: "submit", preventDefault() {} });
+assert.equal(overlongDeliveryInstructions.attributes["aria-invalid"], "true", "overlong delivery instructions are rejected");
+assert.equal(assistantRoot.querySelector("#assistant-delivery-instructions-error").hidden, false, "overlong instructions show a field error");
+assert.ok(assistantRoot.querySelector('[data-assistant-stage="customer-details"]'), "overlong instructions keep the customer stage open");
+
+resetDetailsState();
+fillExcept(null);
+const validDeliveryInstructions = assistantRoot.querySelector("#assistant-delivery-instructions");
+validDeliveryInstructions.value = "Code portail 1234, appeler à l’arrivée";
+validDeliveryInstructions.dispatchEvent({ type: "input" });
+assert.equal(vm.runInContext("buildReservationDraft().deliveryInstructions", context), validDeliveryInstructions.value,
+  "delivery instructions survive customer details normalization");
 assistantRoot.querySelector("#assistant-phone").value = "";
 assistantRoot.querySelector("#assistant-phone").dispatchEvent({ type: "input" });
 assistantRoot.querySelector("#assistant-address-line2").value = "";
@@ -254,6 +275,8 @@ form.dispatchEvent({ type: "submit", preventDefault() {} });
 assert.equal(vm.runInContext("assistantState.customerDetails.firstName", context), "Ada");
 assert.equal(vm.runInContext("assistantState.customerDetails.phone", context), values["#assistant-phone"]);
 assert.equal(vm.runInContext("assistantState.deliveryAddress.line2", context), "Bâtiment A");
+assert.equal(vm.runInContext("assistantState.deliveryInstructions", context), validDeliveryInstructions.value,
+  "delivery instructions remain in the reservation draft state");
 assert.equal(vm.runInContext("assistantState.postcode", context), "16000");
 assert.equal(assistantRoot.querySelector("[data-assistant-stage=\"recommendation\"]") !== null, false, "valid form proceeds to the existing review stage");
 assert.equal(typeof context.fetch, "undefined", "the details stage does not introduce network access");

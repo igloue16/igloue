@@ -282,6 +282,16 @@ function buildReservationRequestPayload(draft) {
       postcode: draft.deliveryAddress.postcode,
       city: draft.deliveryAddress.city
     },
+    deliveryInstructions: draft.deliveryInstructions,
+    questionnaire: {
+      kind: "ig_climate_v1",
+      answers: {
+        manualAssessmentRequired: draft.requirements.manualAssessmentRequired,
+        room: draft.requirements.room,
+        opening: draft.requirements.opening,
+        setupMode: draft.delivery.setupMode
+      }
+    },
     rental: {
       startDate: draft.rental.deliveryDate,
       endDate: draft.rental.collectionDate
@@ -306,6 +316,10 @@ function getReservationSubmissionMessage(result) {
       "Cette tentative a changé. Vérifiez vos informations avant de réessayer.",
     INVALID_REQUEST:
       "Certains détails ne sont plus valides. Vérifiez votre réservation avant de réessayer.",
+    INVALID_QUESTIONNAIRE:
+      "Vérifiez les réponses sur la pièce et l'installation avant de réessayer.",
+    INVALID_DELIVERY_INSTRUCTIONS:
+      "Vérifiez les informations de livraison avant de réessayer.",
     INVALID_CUSTOMER:
       "Vérifiez vos coordonnées avant de réessayer.",
     INVALID_ADDRESS:
@@ -523,6 +537,7 @@ function showReservationReview(addToHistory = true) {
                   <b>${escapeReservationReviewHtml(deliveryAddress.postcode)} · ${escapeReservationReviewHtml(deliveryAddress.city)}</b>
                 </div>
               </div>
+              ${draft.deliveryInstructions ? `<p class="reservation-review-delivery-instructions"><strong>Information pour la livraison :</strong> ${escapeReservationReviewHtml(draft.deliveryInstructions)}</p>` : ""}
             </section>
 
             ${manualReview

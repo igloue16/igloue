@@ -2,6 +2,8 @@
   const endpointName = "create-reservation";
   const knownErrorCodes = new Set([
     "INVALID_REQUEST",
+    "INVALID_QUESTIONNAIRE",
+    "INVALID_DELIVERY_INSTRUCTIONS",
     "INVALID_CUSTOMER",
     "INVALID_ADDRESS",
     "INVALID_PRODUCT",
@@ -58,6 +60,12 @@
       (value.deliveryAddress.line2 === null || value.deliveryAddress.line2 === undefined || typeof value.deliveryAddress.line2 === "string") &&
       isNonEmptyString(value.deliveryAddress.postcode) &&
       isNonEmptyString(value.deliveryAddress.city) &&
+      ((value.questionnaire === undefined && value.deliveryInstructions === undefined) ||
+        (isObject(value.questionnaire) &&
+          value.questionnaire.kind === "ig_climate_v1" &&
+          isObject(value.questionnaire.answers) &&
+          (value.deliveryInstructions === null ||
+            typeof value.deliveryInstructions === "string" && value.deliveryInstructions.length <= 500))) &&
       isObject(value.rental) &&
       isNonEmptyString(value.rental.startDate) &&
       isNonEmptyString(value.rental.endDate) &&
@@ -85,6 +93,9 @@
         postcode: input.deliveryAddress.postcode,
         city: input.deliveryAddress.city
       },
+      ...(input.questionnaire === undefined
+        ? {}
+        : { deliveryInstructions: input.deliveryInstructions, questionnaire: input.questionnaire }),
       rental: {
         startDate: input.rental.startDate,
         endDate: input.rental.endDate

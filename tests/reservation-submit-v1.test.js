@@ -40,12 +40,13 @@ vm.runInContext(`
   const currentDraft = {
     customer: { firstName: "Ada", lastName: "Loue", email: "ada@example.com", phone: "0612345678" },
     deliveryAddress: { line1: "1 Rue Test", line2: null, postcode: "16000", city: "Angouleme" },
+    deliveryInstructions: "Call on arrival",
     location: { postcode: "16000", zone: { id: "local", name: "Angoulême proche" } },
     product: { selectedProductId: "essential", recommendedProductId: "essential" },
     requirements: {
       manualAssessmentRequired: false,
-      room: { type: "bedroom", area: 20, conditions: [] },
-      opening: { type: "casement", roofWindowBottomHeightRange: null }
+      room: { type: "bedroom", subtype: null, area: 20, conditions: ["sunny"] },
+      opening: { type: "casement", hasAccessibleOutdoorSpace: null, roofWindowBottomHeightRange: null, installationAssessmentRequired: false, extendedExhaustRequired: false }
     },
     rental: { deliveryDate: "2027-07-12", collectionDate: "2027-07-19", nights: 7 },
     delivery: { date: "2027-07-12", slotId: "0830-1030", expressSelected: false, setupMode: "none" },
@@ -122,6 +123,8 @@ assert.equal(calls[0].idempotencyKey, "attempt-1");
 assert.equal(Object.hasOwn(calls[0], "pricing"), false, "browser pricing is not sent");
 assert.equal(Object.hasOwn(calls[0], "customerId"), false, "customer ID is not sent");
 assert.equal(Object.hasOwn(calls[0], "machineId"), false, "machine ID is not sent");
+assert.equal(calls[0].questionnaire.answers.room.area, 20, "questionnaire survives review and submission");
+assert.equal(calls[0].deliveryInstructions, "Call on arrival", "delivery instructions survive review and submission");
 assert.equal(dispatched.length, 1, "compatibility event is dispatched once");
 
 resolveRequest({
@@ -149,7 +152,7 @@ resolveRequest({
   await retryClick;
   assert.equal(submit.disabled, false, "retryable failure re-enables submission");
   assert.match(status.textContent, /plus disponible/i);
-  console.log("Reservation submit integration tests passed (16 assertions).");
+  console.log("Reservation submit integration tests passed (18 assertions).");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
