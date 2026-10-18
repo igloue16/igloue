@@ -65,6 +65,7 @@ vm.runInContext(`
       postcode: "16000",
       city: "Angoulême"
     },
+    deliveryInstructions: "Code portail 1234, appeler à l'arrivée",
     location: {
       postcode: "16000",
       zone: { id: "local", name: "Angoulême proche" }
@@ -75,8 +76,8 @@ vm.runInContext(`
     },
     requirements: {
       manualAssessmentRequired: false,
-      room: { type: "bedroom", area: 20, conditions: [] },
-      opening: { type: "casement", roofWindowBottomHeightRange: null, extendedExhaustRequired: false }
+      room: { type: "bedroom", subtype: null, area: 20, conditions: ["sunny"] },
+      opening: { type: "casement", hasAccessibleOutdoorSpace: null, roofWindowBottomHeightRange: null, installationAssessmentRequired: false, extendedExhaustRequired: false }
     },
     rental: {
       deliveryDate: "2026-09-10",
@@ -278,6 +279,12 @@ context.IGLOUE_DELIVERY_SLOT_PROVIDER = cachedSlotProvider;
 cachedSlotProvider.getWindowById = () => ({ label: 42 });
 assert.match(renderedReview, /Créneau à choisir/, "invalid slot labels use a safe review label");
 assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "invalid slot labels do not throw");
+cachedSlotProvider.getWindowById = () => { throw new Error("stale slot cache"); };
+assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "a slot provider failure does not block review");
+assert.match(renderedReview, /Cr\u00e9neau \u00e0 choisir/, "a slot provider failure uses the safe fallback label");
+cachedSlotProvider.getWindowById = () => ({ displayLabel: "08:30\u201310:30" });
+assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "displayLabel fallback does not block review");
+assert.match(renderedReview, /08:30\u201310:30/, "displayLabel remains supported");
 cachedSlotProvider.getWindowById = () => ({ label: "<img src=x onerror=alert(1)>" });
 assert.doesNotThrow(() => evaluate("showReservationReview(false)"), "untrusted slot labels do not throw");
 assert.match(renderedReview, /&lt;img src=x onerror=alert\(1\)&gt;/, "slot labels are escaped before rendering");
@@ -296,6 +303,9 @@ extendedExhaustCheckbox.checked = true;
 extendedExhaustCheckbox.change();
 assert.equal(evaluate("assistantState.extendedExhaustRequired"), true, "customer selection is retained");
 assert.equal(evaluate("buildReservationRequestPayload(buildReservationDraft()).service.extendedExhaustSelected"), true, "customer selection reaches the reservation request");
+assert.equal(evaluate("buildReservationRequestPayload(buildReservationDraft()).questionnaire.answers.room.area"), 20, "room answers reach the reservation request");
+assert.equal(evaluate("buildReservationRequestPayload(buildReservationDraft()).questionnaire.answers.opening.type"), "casement", "opening answers reach the reservation request");
+assert.equal(evaluate("buildReservationRequestPayload(buildReservationDraft()).deliveryInstructions"), "Code portail 1234, appeler à l'arrivée", "delivery instructions stay separate from the address");
 assert.match(renderedReview, /Rallonge d'évacuation/, "selected add-on is itemized in the review price");
 assert.equal(evaluate("buildReservationDraft().pricing.total"), 80.14, "selected add-on updates the preview total exactly once");
 extendedExhaustCheckbox.checked = false;
@@ -303,6 +313,7 @@ extendedExhaustCheckbox.change();
 assert.match(renderedReview, /Ada O&#039;Connor/, "I: customer name is escaped and displayed");
 assert.match(renderedReview, /ada@example\.com/, "I: customer email is displayed");
 assert.match(renderedReview, /1 rue des Lilas/, "I: delivery address is displayed");
+assert.ok(renderedReview.includes("Code portail 1234, appeler à l&#039;arrivée"), "delivery instructions are escaped in the customer review");
 assert.match(renderedReview, /16000 · Angoulême/, "I: postcode and city are displayed");
 assert.doesNotMatch(renderedReview, /customerId/, "I: internal customer ID is not displayed");
 assert.match(renderedReview, /0612345678/, "I: normalized phone is displayed");

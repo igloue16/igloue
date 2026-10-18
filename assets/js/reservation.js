@@ -343,6 +343,7 @@ function buildNormalizedReservationDraft(state) {
         state.deliveryAddress && state.deliveryAddress.city
       )
     },
+    deliveryInstructions: normalizeReservationOptionalText(state.deliveryInstructions),
 
     location: {
       postcode: state.postcode || "",

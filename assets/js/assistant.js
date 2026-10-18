@@ -213,6 +213,9 @@ const ASSISTANT_I18N = {
       phoneError: "Saisissez un numéro de téléphone français valide.",
       line1: "Adresse",
       line2: "Complément d’adresse",
+      deliveryInstructions: "Une information utile pour notre livraison ?",
+      deliveryInstructionsHelp: "Par exemple : code d’accès, stationnement, sonnette en panne, étage ou appel à l’arrivée. 500 caractères maximum.",
+      deliveryInstructionsError: "Limitez les informations de livraison à 500 caractères.",
       city: "Ville",
       optional: "facultatif",
       postcode: "Code postal de livraison",
@@ -378,6 +381,7 @@ const assistantState = {
     line2: "",
     city: ""
   },
+  deliveryInstructions: "",
 
   deliveryZone: null,
   deliveryPrice: 0,
@@ -4155,6 +4159,13 @@ function showCustomerDetailsStage(addToHistory = true) {
               <input class="assistant-line-input" id="assistant-address-line2" name="line2" type="text" autocomplete="address-line2" value="${escapeAssistantHtml(address.line2)}">
             </div>
 
+            <div class="assistant-customer-field assistant-customer-field-wide">
+              <label class="assistant-label" for="assistant-delivery-instructions">${copy.deliveryInstructions} <span class="assistant-optional">(${copy.optional})</span></label>
+              <textarea class="assistant-line-input assistant-delivery-instructions" id="assistant-delivery-instructions" name="deliveryInstructions" maxlength="500" rows="3" aria-describedby="assistant-delivery-instructions-help assistant-delivery-instructions-error" aria-invalid="false">${escapeAssistantHtml(assistantState.deliveryInstructions)}</textarea>
+              <p class="assistant-hint" id="assistant-delivery-instructions-help">${copy.deliveryInstructionsHelp}</p>
+              <p class="assistant-error" id="assistant-delivery-instructions-error" role="alert" hidden></p>
+            </div>
+
             <div class="assistant-customer-field">
               <label class="assistant-label" for="assistant-city">${copy.city}</label>
               <input class="assistant-line-input" id="assistant-city" name="city" type="text" autocomplete="address-level2" required aria-describedby="assistant-city-error" aria-invalid="false" value="${escapeAssistantHtml(address.city)}">
@@ -4200,6 +4211,11 @@ function showCustomerDetailsStage(addToHistory = true) {
     });
   });
 
+  const deliveryInstructions = assistant.querySelector("#assistant-delivery-instructions");
+  deliveryInstructions.addEventListener("input", () => {
+    assistantState.deliveryInstructions = deliveryInstructions.value;
+  });
+
   assistant.querySelector("[data-change-postcode]").addEventListener(
     "click",
     () => showDeliveryStage()
@@ -4230,6 +4246,13 @@ function showCustomerDetailsStage(addToHistory = true) {
         setFieldError(assistant, inputSelector, errorSelector, message);
         if (message) errors.push(input);
       });
+
+      if (deliveryInstructions.value.length > 500) {
+        setFieldError(assistant, "#assistant-delivery-instructions", "#assistant-delivery-instructions-error", copy.deliveryInstructionsError);
+        errors.push(deliveryInstructions);
+      } else {
+        setFieldError(assistant, "#assistant-delivery-instructions", "#assistant-delivery-instructions-error", "");
+      }
 
       if (errors.length) {
         errors[0].focus();

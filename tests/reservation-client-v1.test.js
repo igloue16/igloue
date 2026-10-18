@@ -60,6 +60,24 @@ const create = (value = input) => vm.runInContext(`IGLOUE_RESERVATION_CLIENT.cre
   });
   assert.equal(JSON.stringify(JSON.parse(requests[0].options.body)).includes("pricing"), false);
   assert.equal(JSON.stringify(JSON.parse(requests[0].options.body)).includes("organisationId"), false);
+
+  const contextInput = {
+    ...input,
+    questionnaire: {
+      kind: "ig_climate_v1",
+      answers: {
+        manualAssessmentRequired: false,
+        room: { type: "bedroom", subtype: null, area: 24, conditions: ["sunny"] },
+        opening: { type: "casement", hasAccessibleOutdoorSpace: null, roofWindowBottomHeightRange: null, installationAssessmentRequired: false, extendedExhaustRequired: false },
+        setupMode: "none"
+      }
+    },
+    deliveryInstructions: "Call on arrival"
+  };
+  await create(contextInput);
+  const sentContext = JSON.parse(requests.at(-1).options.body);
+  assert.deepEqual(sentContext.questionnaire, contextInput.questionnaire, "questionnaire reaches the Edge request intact");
+  assert.equal(sentContext.deliveryInstructions, "Call on arrival", "instructions remain separate from the delivery address");
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
     status: "success",
     reservation: { reference: "public-ref", status: "pending", holdExpiresAt: "2027-07-12T10:30:00Z" },
@@ -121,6 +139,10 @@ const create = (value = input) => vm.runInContext(`IGLOUE_RESERVATION_CLIENT.cre
   assert.deepEqual(JSON.parse(JSON.stringify(await create(malformed))), { status: "error", code: "INVALID_REQUEST" });
   const missingAddon = { ...input, service: { ...input.service, extendedExhaustSelected: undefined } };
   assert.deepEqual(JSON.parse(JSON.stringify(await create(missingAddon))), { status: "error", code: "INVALID_REQUEST" });
+  const malformedQuestionnaire = { ...input, questionnaire: { kind: "unsupported", answers: {} }, deliveryInstructions: "" };
+  assert.deepEqual(JSON.parse(JSON.stringify(await create(malformedQuestionnaire))), { status: "error", code: "INVALID_REQUEST" });
+  const overlongInstructions = { ...contextInput, deliveryInstructions: "x".repeat(501) };
+  assert.deepEqual(JSON.parse(JSON.stringify(await create(overlongInstructions))), { status: "error", code: "INVALID_REQUEST" });
   assert.equal(requests.length, fetchCount);
-  console.log("Reservation client V1 tests passed (46 assertions / 30 scenarios).");
+  console.log("Reservation client V1 tests passed (50 assertions / 33 scenarios).");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

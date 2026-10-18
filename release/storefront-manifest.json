@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "expected_file_count": 59,
-  "source_public_main": "eb27d9807ee38ef7f73d3a5fb9f272e1dee10ea4",
+  "source_public_main": "eaed3a50bc928d8232401b45518fb8658afcd98a",
   "pr29_source_private_main": "3f3f33eee2d652f91979a18f3ac746e258a76317",
   "artifact_only": true,
   "files": [
@@ -162,8 +162,8 @@
     },
     {
       "path": "assets/js/assistant.js",
-      "sha256": "2ddac089179b553b7ee07e562a1edd266f4e3296072522b8db781d322dad1be0",
-      "bytes": 123296
+      "sha256": "a739b47c2a2862022065975618e4cb7277d6e2ef024ef7d3c2c48c3dea5205fa",
+      "bytes": 125127
     },
     {
       "path": "assets/js/availability-client.js",
@@ -247,8 +247,8 @@
     },
     {
       "path": "assets/js/reservation-client.js",
-      "sha256": "536a80e1743244503e7796c2f02ded7258cbff0a42567c5b3110420ababea481",
-      "bytes": 8210
+      "sha256": "060c4ff92e402b6cb59a5a91cb8db43314298423e0dcba824a3d39f0abba3f52",
+      "bytes": 8834
     },
     {
       "path": "assets/js/reservation-portal.js",
@@ -257,13 +257,13 @@
     },
     {
       "path": "assets/js/reservation-review.js",
-      "sha256": "f4cac9ad68302c05a06bfc936db2ccdcb415dfe5812898033c1b5a99b97b8a9d",
-      "bytes": 24478
+      "sha256": "44c8960bb6f30c01af3461f84fe9f2aae55849ca706382678bb2ee4054d5f38f",
+      "bytes": 25256
     },
     {
       "path": "assets/js/reservation.js",
-      "sha256": "4db8153b393419366239c90f4de9c1559f20dcb29d5cca5602e71afece5945bc",
-      "bytes": 11564
+      "sha256": "3e512e1bc2f31041dd44db4f913b75e55ce21e679ea18b1f64e98be4590ebd38",
+      "bytes": 11652
     },
     {
       "path": "assets/js/schedule-provider.js",
