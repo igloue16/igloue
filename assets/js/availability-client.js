@@ -24,10 +24,14 @@
   }
 
   async function checkAvailability({ productId, startDate, endDate, deliverySlotId, collectionSlotId }) {
+    let timeout = null;
     try {
+      const controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), 12000);
       const config = getConfig();
       const response = await global.fetch(`${config.projectUrl}/functions/v1/${endpointName}`, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           apikey: config.publishableKey,
           "content-type": "application/json"
@@ -53,6 +57,8 @@
         productId: typeof productId === "string" ? productId : null,
         error: error instanceof Error ? error.message : "Erreur de disponibilité."
       };
+    } finally {
+      if (timeout !== null) clearTimeout(timeout);
     }
   }
 

@@ -10,6 +10,9 @@ let requests = [];
 let response = { ok: true, json: async () => ({ ok: true, available: true, productId: "essential" }) };
 const context = vm.createContext({
   console,
+  AbortController,
+  setTimeout,
+  clearTimeout,
   fetch: async (url, options) => {
     requests.push({ url, options });
     return response;
@@ -48,6 +51,19 @@ const check = () => vm.runInContext(`IGLOUE_AVAILABILITY_CLIENT.checkAvailabilit
   assert.equal((await check()).status, "error");
   context.fetch = async () => { throw new Error("offline"); };
   assert.equal((await check()).status, "error");
+  let timeoutCallback;
+  context.setTimeout = (callback, milliseconds) => {
+    assert.equal(milliseconds, 12000, "availability checks have a bounded timeout");
+    timeoutCallback = callback;
+    return 1;
+  };
+  context.clearTimeout = () => {};
+  context.fetch = (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(new Error("timed out")), { once: true });
+  });
+  const timedCheck = check();
+  timeoutCallback();
+  assert.equal((await timedCheck).status, "error", "timed-out checks become recoverable errors");
   context.fetch = async (url, options) => {
     requests.push({ url, options });
     return response;
@@ -64,5 +80,5 @@ const check = () => vm.runInContext(`IGLOUE_AVAILABILITY_CLIENT.checkAvailabilit
   requests = [];
   assert.equal((await check()).status, "available");
   assert.equal(requests[0].url, "https://demo.supabase.co/functions/v1/check-availability");
-  console.log("Availability client V1 tests passed (19 assertions / 14 scenarios).");
+  console.log("Availability client V1 tests passed (including the bounded timeout path).");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

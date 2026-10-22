@@ -12,8 +12,8 @@
     },
     {
       "path": "assets/css/assistant.css",
-      "sha256": "15c588e85ff05f8748751fa7802e222208ea5a4ae20b70b43d0b80e6eadf5bed",
-      "bytes": 54621
+      "sha256": "f0191120b72754fa639dd216cc9533a8cdda9205bd08ae6186a2976f57f77dcb",
+      "bytes": 54743
     },
     {
       "path": "assets/css/base.css",
@@ -162,13 +162,13 @@
     },
     {
       "path": "assets/js/assistant.js",
-      "sha256": "2ddac089179b553b7ee07e562a1edd266f4e3296072522b8db781d322dad1be0",
-      "bytes": 123296
+      "sha256": "6325225d1cbf3a5a7b959c5fd5c00fa233d8bbaa265393b764a10ecfc5b1f444",
+      "bytes": 124314
     },
     {
       "path": "assets/js/availability-client.js",
-      "sha256": "74f4f4012f26244af7aef5796a8fb407504c507e29374b75e7975f8d531b00da",
-      "bytes": 2215
+      "sha256": "97ce563997ebdff134b6ee86aeb71f7cde49e732a32def90d70e7e1b309aa1c4",
+      "bytes": 2450
     },
     {
       "path": "assets/js/availability-state.js",

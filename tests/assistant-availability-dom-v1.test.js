@@ -418,5 +418,91 @@ const switchedQuote = slotQuoteRequests.find((selection) => selection.date === "
 assert.equal(switchedQuote.quoteContext.extendedExhaustSelected, true, `alternative date recheck retains selected exhaust add-on: ${JSON.stringify(slotQuoteRequests.filter((selection) => selection.date === "2027-07-11"))}`);
 assert.equal(vm.runInContext("assistantState.deliverySlotId", context), "alt-morning", "slot selection survives the availability recheck");
 
+// Unit changes retain service selections, while only the current server result
+// may enable Continue. Technical failures expose a keyboard-operable retry.
+const retryDeliveryDate = "2027-07-11";
+const retryCollectionDate = "2027-07-19";
+vm.runInContext(`
+  assistantState.postcode = "16000";
+  assistantState.startDate = "${retryDeliveryDate}";
+  assistantState.endDate = "${retryCollectionDate}";
+  assistantState.deliverySlotId = "0830-1030";
+  assistantState.collectionSlotId = "1630-1830";
+  assistantState.roomArea = 20;
+  assistantState.openingType = "casement";
+  assistantState.recommendedProduct = getProductById("essential");
+  assistantState.idealProduct = assistantState.recommendedProduct;
+  availabilityState.reset();
+`, context);
+
+let resolveOldUnit;
+let resolveCurrentUnit;
+const unitRequests = [];
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    unitRequests.push({ ...selection });
+    return new Promise((resolve) => {
+      if (selection.productId === "essential") resolveOldUnit = resolve;
+      else resolveCurrentUnit = resolve;
+    });
+  }
+};
+vm.runInContext('selectProductChoice("essential")', context);
+vm.runInContext('selectProductChoice("mobile-duo")', context);
+await Promise.resolve();
+assert.equal(unitRequests.length, 2, "distinct unit selections are checked independently");
+assert.equal(unitRequests[1].deliverySlotId, "0830-1030", "delivery slot is preserved for the new unit check");
+assert.equal(unitRequests[1].collectionSlotId, "1630-1830", "collection slot is preserved for the new unit check");
+resolveOldUnit({ status: "available", available: true, productId: "essential" });
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(vm.runInContext("assistantState.availability.status", context), "checking", "stale unit response cannot confirm the current unit");
+assert.ok(Object.hasOwn(assistantRoot.querySelector("[data-reservation-request]").attributes, "disabled"), "Continue stays disabled while current availability is pending");
+resolveCurrentUnit({ status: "error", available: null, productId: "mobile-duo" });
+await new Promise((resolve) => setImmediate(resolve));
+let retryButton = assistantRoot.querySelector("[data-retry-availability]");
+assert.ok(retryButton, "technical availability failure offers a retry button");
+assert.equal(retryButton.tagName, "BUTTON");
+assert.equal(retryButton.attributes.type, "button");
+assert.ok(assistantRoot.querySelector('[role="alert"]'), "technical failure is announced");
+assert.ok(Object.hasOwn(assistantRoot.querySelector("[data-reservation-request]").attributes, "disabled"), "failed availability cannot proceed");
+assert.equal(vm.runInContext("assistantState.startDate", context), retryDeliveryDate, "retry state preserves dates");
+
+let retryRequests = 0;
+let resolveRetry;
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    retryRequests += 1;
+    assert.equal(selection.productId, "mobile-duo");
+    assert.equal(selection.startDate, retryDeliveryDate);
+    return new Promise((resolve) => { resolveRetry = resolve; });
+  }
+};
+retryButton.click();
+retryButton.click();
+await Promise.resolve();
+assert.equal(retryRequests, 1, "repeated retry clicks cannot start concurrent requests");
+assert.equal(vm.runInContext("assistantState.availability.status", context), "checking");
+assert.ok(Object.hasOwn(assistantRoot.querySelector("[data-reservation-request]").attributes, "disabled"));
+resolveRetry({ status: "error", available: null, productId: "mobile-duo" });
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(vm.runInContext("assistantState.availability.status", context), "error", "a failed retry returns to the recoverable error state");
+assert.ok(assistantRoot.querySelector("[data-retry-availability]"), "a failed retry remains recoverable");
+
+context.IGLOUE_AVAILABILITY_CLIENT = {
+  checkAvailability(selection) {
+    retryRequests += 1;
+    return Promise.resolve({ status: "available", available: true, productId: selection.productId });
+  }
+};
+retryButton = assistantRoot.querySelector("[data-retry-availability]");
+assert.ok(retryButton, "technical retry remains available after unavailable state is rendered");
+retryButton.click();
+await new Promise((resolve) => setImmediate(resolve));
+assert.equal(vm.runInContext("assistantState.availability.status", context), "available");
+const confirmedContinue = assistantRoot.querySelector("[data-reservation-request]");
+assert.equal(Object.hasOwn(confirmedContinue.attributes, "disabled"), false, "current server confirmation enables Continue");
+confirmedContinue.click();
+assert.ok(assistantRoot.querySelector("[data-customer-details-form]"), "confirmed availability advances to customer details");
+
 console.log("Assistant availability DOM flow passed, including extended-exhaust alternate-date switching.");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

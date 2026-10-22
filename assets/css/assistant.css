@@ -296,6 +296,14 @@
   line-height: 1.4 !important;
 }
 
+.assistant-availability-error > p {
+  margin: 0 0 4px;
+}
+
+.assistant-availability-error > button {
+  min-height: 44px;
+}
+
 .assistant-error {
   margin: 6px 0 0;
   color: #9b2f2f !important;
