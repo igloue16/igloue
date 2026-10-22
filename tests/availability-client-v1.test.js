@@ -64,6 +64,30 @@ const check = () => vm.runInContext(`IGLOUE_AVAILABILITY_CLIENT.checkAvailabilit
   const timedCheck = check();
   timeoutCallback();
   assert.equal((await timedCheck).status, "error", "timed-out checks become recoverable errors");
+
+  let fallbackTimeout;
+  const fallbackContext = vm.createContext({
+    setTimeout: (callback, milliseconds) => {
+      assert.equal(milliseconds, 12000, "fallback timeout remains bounded");
+      fallbackTimeout = callback;
+      return 2;
+    },
+    clearTimeout: () => {},
+    fetch: () => new Promise(() => {})
+  });
+  fallbackContext.window = fallbackContext;
+  fallbackContext.IGLOUE_SUPABASE_CONFIG = {
+    projectUrl: "https://demo.supabase.co",
+    publishableKey: "sb_publishable_test"
+  };
+  vm.runInContext(clientSource, fallbackContext);
+  const fallbackCheck = vm.runInContext(
+    `IGLOUE_AVAILABILITY_CLIENT.checkAvailability(${JSON.stringify(request)})`,
+    fallbackContext
+  );
+  fallbackTimeout();
+  assert.equal((await fallbackCheck).status, "error", "timeout remains recoverable without AbortController");
+
   context.fetch = async (url, options) => {
     requests.push({ url, options });
     return response;

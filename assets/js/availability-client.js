@@ -26,12 +26,12 @@
   async function checkAvailability({ productId, startDate, endDate, deliverySlotId, collectionSlotId }) {
     let timeout = null;
     try {
-      const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), 12000);
+      const Controller = global.AbortController;
+      const controller = typeof Controller === "function" ? new Controller() : null;
       const config = getConfig();
-      const response = await global.fetch(`${config.projectUrl}/functions/v1/${endpointName}`, {
+      const request = global.fetch(`${config.projectUrl}/functions/v1/${endpointName}`, {
         method: "POST",
-        signal: controller.signal,
+        ...(controller ? { signal: controller.signal } : {}),
         headers: {
           apikey: config.publishableKey,
           "content-type": "application/json"
@@ -42,6 +42,13 @@
           service: { deliverySlotId, collectionSlotId }
         })
       });
+      const deadline = new Promise((_, reject) => {
+        timeout = setTimeout(() => {
+          if (controller) controller.abort();
+          reject(new Error("La vérification de disponibilité a expiré."));
+        }, 12000);
+      });
+      const response = await Promise.race([request, deadline]);
       let payload;
       try {
         payload = await response.json();

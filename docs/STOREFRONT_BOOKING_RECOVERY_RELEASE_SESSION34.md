@@ -16,7 +16,7 @@ Only these three existing allowlisted paths change. SHA-256 values and byte coun
 | Path | SHA-256 | Bytes |
 | --- | --- | ---: |
 | `assets/js/assistant.js` | `6325225d1cbf3a5a7b959c5fd5c00fa233d8bbaa265393b764a10ecfc5b1f444` | 124314 |
-| `assets/js/availability-client.js` | `97ce563997ebdff134b6ee86aeb71f7cde49e732a32def90d70e7e1b309aa1c4` | 2450 |
+| `assets/js/availability-client.js` | `c295600d24530fc720be732e3c33e1120441d8219f796d293ac89ce5a8db2ca1` | 2801 |
 | `assets/css/assistant.css` | `f0191120b72754fa639dd216cc9533a8cdda9205bd08ae6186a2976f57f77dcb` | 54743 |
 
 The release allowlist remains 59 files. The release changes no page, `CNAME`, Supabase config source or environment value. The new test and internal documentation files are outside the Pages artifact; admin files remain outside the existing allowlist. `assets/js/supabase-config.js` remains generated at build time by the existing staging-only builder.
@@ -29,13 +29,14 @@ The `igloue16/igloue` Pages workflow is restricted to a successful `Frontend CI`
 
 ## Verification
 
-- `node tests/availability-client-v1.test.js`: passed, including the 12-second timeout/abort path.
+- `node tests/availability-client-v1.test.js`: passed, including the 12-second abort path and timeout fallback when `AbortController` is unavailable.
+- Publisher Frontend CI initially exposed a browser-like release-test context without `AbortController`; the client now supports that context while retaining the bounded timeout. The regression is covered by the focused client test; CI rerun is pending.
 - `node tests/assistant-availability-dom-v1.test.js`: passed, including unit switching, selection retention, retry and stale-response handling.
 - Clean-room artifact test run: 30 subtests across 18 storefront test files passed. The source-tree Supabase config test expects generated staging configuration and is therefore run against the generated artifact.
 - `node scripts/build-storefront-release.mjs verify --dir <proposal-artifact>`: passed; all 59 allowlisted files matched, including generated staging config using a synthetic publishable-key fixture.
 - `node scripts/check-storefront-syntax.mjs --dir <proposal-artifact>`: passed; 25 allowlisted browser JavaScript files syntax-checked.
 - `git diff --check`: passed.
-- A commit-pinned release test was not run because the package is intentionally uncommitted; the publisher PR CI must run it against the proposed branch before merge.
+- The commit-pinned release suite must pass in publisher Frontend CI before merge.
 - No real browser walkthrough, booking, email or payment was performed.
 ## Approval and rollback
 
