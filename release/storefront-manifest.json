@@ -167,8 +167,8 @@
     },
     {
       "path": "assets/js/availability-client.js",
-      "sha256": "c295600d24530fc720be732e3c33e1120441d8219f796d293ac89ce5a8db2ca1",
-      "bytes": 2801
+      "sha256": "3846265bc801e0ff525de09de378c6a130b660eb9faba57b07ce1fea41e818f2",
+      "bytes": 3012
     },
     {
       "path": "assets/js/availability-state.js",

@@ -42,13 +42,14 @@
           service: { deliverySlotId, collectionSlotId }
         })
       });
-      const deadline = new Promise((_, reject) => {
-        timeout = setTimeout(() => {
+      const scheduleTimeout = global.setTimeout;
+      const deadline = typeof scheduleTimeout === "function" ? new Promise((_, reject) => {
+        timeout = scheduleTimeout.call(global, () => {
           if (controller) controller.abort();
           reject(new Error("La vérification de disponibilité a expiré."));
         }, 12000);
-      });
-      const response = await Promise.race([request, deadline]);
+      }) : null;
+      const response = deadline ? await Promise.race([request, deadline]) : await request;
       let payload;
       try {
         payload = await response.json();
@@ -65,7 +66,9 @@
         error: error instanceof Error ? error.message : "Erreur de disponibilité."
       };
     } finally {
-      if (timeout !== null) clearTimeout(timeout);
+      if (timeout !== null && typeof global.clearTimeout === "function") {
+        global.clearTimeout(timeout);
+      }
     }
   }
 

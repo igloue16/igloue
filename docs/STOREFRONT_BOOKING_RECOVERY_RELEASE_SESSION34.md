@@ -16,7 +16,7 @@ Only these three existing allowlisted paths change. SHA-256 values and byte coun
 | Path | SHA-256 | Bytes |
 | --- | --- | ---: |
 | `assets/js/assistant.js` | `6325225d1cbf3a5a7b959c5fd5c00fa233d8bbaa265393b764a10ecfc5b1f444` | 124314 |
-| `assets/js/availability-client.js` | `c295600d24530fc720be732e3c33e1120441d8219f796d293ac89ce5a8db2ca1` | 2801 |
+| `assets/js/availability-client.js` | `3846265bc801e0ff525de09de378c6a130b660eb9faba57b07ce1fea41e818f2` | 3012 |
 | `assets/css/assistant.css` | `f0191120b72754fa639dd216cc9533a8cdda9205bd08ae6186a2976f57f77dcb` | 54743 |
 
 The release allowlist remains 59 files. The release changes no page, `CNAME`, Supabase config source or environment value. The new test and internal documentation files are outside the Pages artifact; admin files remain outside the existing allowlist. `assets/js/supabase-config.js` remains generated at build time by the existing staging-only builder.
@@ -30,7 +30,7 @@ The `igloue16/igloue` Pages workflow is restricted to a successful `Frontend CI`
 ## Verification
 
 - `node tests/availability-client-v1.test.js`: passed, including the 12-second abort path and timeout fallback when `AbortController` is unavailable.
-- Publisher Frontend CI initially exposed a browser-like release-test context without `AbortController`; the client now supports that context while retaining the bounded timeout. The regression is covered by the focused client test; CI rerun is pending.
+- Publisher Frontend CI exposed a browser-like release-test context without `AbortController` or timers. The client now tolerates absent abort support and uses the bounded timeout whenever the browser timer API is available; focused client tests cover the fallback behavior.
 - `node tests/assistant-availability-dom-v1.test.js`: passed, including unit switching, selection retention, retry and stale-response handling.
 - Clean-room artifact test run: 30 subtests across 18 storefront test files passed. The source-tree Supabase config test expects generated staging configuration and is therefore run against the generated artifact.
 - `node scripts/build-storefront-release.mjs verify --dir <proposal-artifact>`: passed; all 59 allowlisted files matched, including generated staging config using a synthetic publishable-key fixture.
