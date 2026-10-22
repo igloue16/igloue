@@ -3889,12 +3889,8 @@ function selectProductChoice(productId) {
   assistantState.recommendedProduct =
     product;
 
-  revalidateAssistantServiceSlots({
-    delivery: true,
-    collection: true,
-    announceInvalidation: true
-  });
-
+  // Retain chosen slots across unit changes. The existing check-availability
+  // endpoint validates both window IDs for the newly selected unit and dates.
   availabilityState.reset();
   alternativeAvailabilityState.reset();
   assistantState.availability = availabilityState.getState();
@@ -3913,6 +3909,31 @@ function selectProductChoice(productId) {
     } else if (availability.status === "error") {
       showRecommendationResult(false);
     } else if (availability.status === "available") {
+      showRecommendationResult(false);
+    }
+  });
+}
+
+function retryRecommendationAvailability() {
+  if (assistantState.availability.status !== "error") {
+    return;
+  }
+
+  const selectionKey = assistantState.availability.key;
+  const retry = calculateAvailability({ forceAvailability: true });
+  showRecommendationResult(false);
+
+  retry.then((availability) => {
+    if (
+      !isCurrentAvailabilityResult(availability) ||
+      availability.key !== selectionKey
+    ) {
+      return;
+    }
+
+    if (availability.status === "unavailable") {
+      showUnavailableRecommendation(false);
+    } else {
       showRecommendationResult(false);
     }
   });
@@ -4349,7 +4370,10 @@ function showRecommendationResult(
     assistantState.availability.status === "checking"
       ? `<p class="assistant-note" role="status">Vérification de la disponibilité…</p>`
       : assistantState.availability.status === "error"
-        ? `<p class="assistant-note" role="alert">La disponibilité ne peut pas être vérifiée pour le moment. Réessayez.</p>`
+        ? `<div class="assistant-note assistant-availability-error" role="alert">
+            <p>La disponibilité ne peut pas être vérifiée pour le moment.</p>
+            <button class="assistant-inline-action" type="button" data-retry-availability>Réessayer</button>
+          </div>`
         : "";
 
   const assistant = renderAssistant(
@@ -4573,6 +4597,11 @@ function showRecommendationResult(
 
   connectBackControl(assistant);
   connectInfoControls(assistant);
+
+  const retryAvailabilityButton = assistant.querySelector("[data-retry-availability]");
+  if (retryAvailabilityButton) {
+    retryAvailabilityButton.addEventListener("click", retryRecommendationAvailability);
+  }
 
   const setupDialog = assistant.querySelector(
     "[data-setup-confirmation]"
